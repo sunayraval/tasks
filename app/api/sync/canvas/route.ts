@@ -158,7 +158,7 @@ function parseCanvasSummary(rawSummary: string): {
 }
 
 // Strictly classify whether an item is from an actual academic class vs extra school clutter
-export function isActualClassAssignment(
+function isActualClassAssignment(
   rawSummary: string,
   rawDescription: string = "",
   url: string = ""
