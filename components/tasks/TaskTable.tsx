@@ -619,6 +619,25 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   const visibleRows = useMemo(() => {
     let list = [...tasks];
 
+    // Automatically filter out stale/past assignments (e.g. 10/31/2026 and earlier)
+    const now = new Date();
+    const startOfTodayTime = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    ).getTime();
+
+    list = list.filter((t) => {
+      if (isTaskHeaderRow(t)) return true;
+      if (t.due_date) {
+        const dueTime = new Date(t.due_date).getTime();
+        if (!isNaN(dueTime) && dueTime < startOfTodayTime) {
+          return false;
+        }
+      }
+      return true;
+    });
+
     if (
       statusFilter !== "ALL" ||
       typeFilter !== "ALL" ||

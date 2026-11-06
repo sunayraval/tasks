@@ -220,23 +220,23 @@ export default function TaskItWorkspacePage() {
 
           const loadedTasks = ((dbTasks || []) as TaskItem[]).filter((t) => {
             if (deletedTaskIdsRef.current.has(t.id)) return false;
-            // Cut out past Canvas clutter (e.g. 10/31 and earlier)
-            if (
-              t.is_canvas_assignment &&
-              t.due_date &&
-              new Date(t.due_date) < startOfToday
-            ) {
-              return false;
+            // Always preserve movable header divider rows
+            if (t.custom_properties?.is_header) return true;
+            // Cut out any past tasks (such as 10/31/2026 and earlier)
+            if (t.due_date) {
+              const dueTime = new Date(t.due_date).getTime();
+              if (!isNaN(dueTime) && dueTime < startOfToday.getTime()) {
+                return false;
+              }
             }
             return true;
           });
 
-          // Clean up past Canvas tasks from Supabase in background
+          // Purge all past tasks (e.g. 10/31 and earlier) from Supabase database
           supabase
             .from("tasks")
             .delete()
             .eq("user_id", user.id)
-            .eq("is_canvas_assignment", true)
             .lt("due_date", startOfToday.toISOString())
             .then();
 
@@ -757,21 +757,23 @@ export default function TaskItWorkspacePage() {
         }
 
         const incoming: TaskItem[] = data.tasks || [];
-        if (incoming.length === 0) {
-          if (!isAutoSync) {
-            showToast(
-              "Canvas feed up to date (no items due today, tomorrow, or day after)."
-            );
-          }
-          return { count: 0, usedDemoFeed: Boolean(data.usedDemoFeed) };
-        }
+        const now = new Date();
+        const startOfToday = new Date(now);
+        startOfToday.setHours(0, 0, 0, 0);
 
         let addedCount = 0;
         setTasks((prev) => {
-          // Keep all user-created tasks and movable headers
-          const userTasksAndHeaders = prev.filter(
-            (t) => !t.is_canvas_assignment && !deletedTaskIdsRef.current.has(t.id)
-          );
+          // Keep all user-created tasks and movable headers that are not in the past
+          const userTasksAndHeaders = prev.filter((t) => {
+            if (deletedTaskIdsRef.current.has(t.id)) return false;
+            if (t.custom_properties?.is_header) return true;
+            if (t.is_canvas_assignment) return false;
+            if (t.due_date) {
+              const dueTime = new Date(t.due_date).getTime();
+              if (!isNaN(dueTime) && dueTime < startOfToday.getTime()) return false;
+            }
+            return true;
+          });
 
           // Only add incoming assignments that haven't been deleted in this session
           const cleanIncoming = incoming.filter(
@@ -781,6 +783,15 @@ export default function TaskItWorkspacePage() {
           addedCount = cleanIncoming.length;
           return [...userTasksAndHeaders, ...cleanIncoming];
         });
+
+        if (incoming.length === 0) {
+          if (!isAutoSync) {
+            showToast(
+              "Canvas feed up to date (no items due today, tomorrow, or day after)."
+            );
+          }
+          return { count: 0, usedDemoFeed: Boolean(data.usedDemoFeed) };
+        }
 
         if (addedCount > 0 || !isAutoSync) {
           showToast(
