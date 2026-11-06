@@ -618,6 +618,33 @@ export const MIN_COLUMN_WIDTHS: Record<keyof ColumnHeadersConfig, number> = {
   notes: 130,
 };
 
+export const MAX_COLUMN_WIDTH = 1200;
+
+class SmartPointerSensor extends PointerSensor {
+  static activators = [
+    {
+      eventName: "onPointerDown" as const,
+      handler: ({ nativeEvent: event }: { nativeEvent: PointerEvent }) => {
+        let cur = event.target as HTMLElement | null;
+        while (cur) {
+          if (
+            cur.getAttribute?.("data-no-dnd") === "true" ||
+            cur.classList?.contains("cursor-col-resize") ||
+            cur.tagName === "INPUT" ||
+            cur.tagName === "TEXTAREA" ||
+            cur.tagName === "SELECT" ||
+            cur.tagName === "TH"
+          ) {
+            return false;
+          }
+          cur = cur.parentElement;
+        }
+        return true;
+      },
+    },
+  ];
+}
+
 export const TaskTable: React.FC<TaskTableProps> = ({
   tasks,
   selectedTaskId,
@@ -649,18 +676,15 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       try {
         const saved = localStorage.getItem("taskit_column_widths_v1");
         if (saved) {
-          return { ...DEFAULT_COLUMN_WIDTHS, ...JSON.parse(saved) };
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === "object") {
+            return { ...DEFAULT_COLUMN_WIDTHS, ...parsed };
+          }
         }
       } catch {}
     }
     return DEFAULT_COLUMN_WIDTHS;
   });
-
-  const resizingColRef = useRef<{
-    colKey: keyof ColumnHeadersConfig;
-    startX: number;
-    startWidth: number;
-  } | null>(null);
 
   const [activeResizingCol, setActiveResizingCol] = useState<
     keyof ColumnHeadersConfig | null
@@ -668,68 +692,83 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
   const startResize = (
     colKey: keyof ColumnHeadersConfig,
-    e: React.MouseEvent | React.TouchEvent
+    e: React.PointerEvent<HTMLDivElement>
   ) => {
     e.preventDefault();
     e.stopPropagation();
 
-    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
-    resizingColRef.current = {
-      colKey,
-      startX: clientX,
-      startWidth: colWidths[colKey] || DEFAULT_COLUMN_WIDTHS[colKey],
-    };
+    const startX = e.clientX;
+    const startWidth =
+      colWidths[colKey] || DEFAULT_COLUMN_WIDTHS[colKey] || 140;
+    const minW = MIN_COLUMN_WIDTHS[colKey] || 90;
+    const maxW = MAX_COLUMN_WIDTH;
+
     setActiveResizingCol(colKey);
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
 
-    const onMouseMove = (moveEvent: MouseEvent | TouchEvent) => {
-      if (!resizingColRef.current) return;
-      const currentX =
-        "touches" in moveEvent
-          ? moveEvent.touches[0].clientX
-          : moveEvent.clientX;
-      const delta = currentX - resizingColRef.current.startX;
-      const minW =
-        MIN_COLUMN_WIDTHS[resizingColRef.current.colKey] || 90;
-      const newWidth = Math.max(
-        minW,
-        resizingColRef.current.startWidth + delta
+    let rafId: number | null = null;
+    let latestWidth = startWidth;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault();
+      moveEvent.stopPropagation();
+      const delta = moveEvent.clientX - startX;
+      latestWidth = Math.min(
+        maxW,
+        Math.max(minW, Math.round(startWidth + delta))
       );
 
-      setColWidths((prev) => ({
-        ...prev,
-        [resizingColRef.current!.colKey]: newWidth,
-      }));
-    };
-
-    const onMouseUp = () => {
-      setActiveResizingCol(null);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-      window.removeEventListener("touchmove", onMouseMove);
-      window.removeEventListener("touchend", onMouseUp);
-
-      if (resizingColRef.current) {
-        setColWidths((prev) => {
-          try {
-            localStorage.setItem(
-              "taskit_column_widths_v1",
-              JSON.stringify(prev)
-            );
-          } catch {}
-          return prev;
+      if (rafId === null) {
+        rafId = window.requestAnimationFrame(() => {
+          setColWidths((prev) => ({
+            ...prev,
+            [colKey]: latestWidth,
+          }));
+          rafId = null;
         });
-        resizingColRef.current = null;
       }
     };
 
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    window.addEventListener("touchmove", onMouseMove, { passive: false });
-    window.addEventListener("touchend", onMouseUp);
+    const cleanup = () => {
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      window.removeEventListener("pointermove", onPointerMove, true);
+      window.removeEventListener("pointerup", onPointerUp, true);
+      window.removeEventListener("pointercancel", onPointerUp, true);
+      setActiveResizingCol(null);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    const onPointerUp = (upEvent: PointerEvent) => {
+      upEvent.preventDefault();
+      upEvent.stopPropagation();
+      cleanup();
+
+      setColWidths((prev) => {
+        const next = {
+          ...prev,
+          [colKey]: latestWidth,
+        };
+        try {
+          localStorage.setItem(
+            "taskit_column_widths_v1",
+            JSON.stringify(next)
+          );
+        } catch {}
+        return next;
+      });
+    };
+
+    window.addEventListener("pointermove", onPointerMove, {
+      capture: true,
+      passive: false,
+    });
+    window.addEventListener("pointerup", onPointerUp, { capture: true });
+    window.addEventListener("pointercancel", onPointerUp, { capture: true });
   };
 
   const resetColumnWidth = (colKey: keyof ColumnHeadersConfig) => {
@@ -772,7 +811,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   const [newTagColor, setNewTagColor] = useState<BadgeColorKey>("cyan");
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(SmartPointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -1005,6 +1044,15 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     { key: "notes", sortable: false },
   ];
 
+  const totalTableWidth = useMemo(() => {
+    const sumCols = columnDefs.reduce((acc, col) => {
+      const w = colWidths[col.key] || DEFAULT_COLUMN_WIDTHS[col.key] || 120;
+      return acc + w;
+    }, 0);
+    // 44px drag handle + 96px actions column + sum of user-stretched columns
+    return 44 + 96 + sumCols;
+  }, [colWidths, columnDefs]);
+
   return (
     <div className="space-y-4">
       {/* Top Filter & Quick Actions Bar */}
@@ -1221,14 +1269,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
           >
-            <SortableContext
-              items={visibleRows.map((t) => t.id)}
-              strategy={verticalListSortingStrategy}
-            >
               <table
                 className="text-left border-collapse"
                 style={{
-                  width: "max-content",
+                  width: `${totalTableWidth}px`,
                   minWidth: "100%",
                   tableLayout: "fixed",
                 }}
@@ -1336,9 +1380,18 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
                           {/* Interactive Column Stretch Resizer Handle */}
                           <div
-                            onMouseDown={(e) => startResize(colKey, e)}
-                            onTouchStart={(e) => startResize(colKey, e)}
-                            onDoubleClick={() => resetColumnWidth(colKey)}
+                            data-no-dnd="true"
+                            onPointerDown={(e) => {
+                              e.stopPropagation();
+                              startResize(colKey, e);
+                            }}
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                            }}
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              resetColumnWidth(colKey);
+                            }}
                             className="absolute right-0 top-0 bottom-0 w-3.5 cursor-col-resize select-none touch-none flex items-center justify-center z-20 group/handle hover:bg-primary/25 transition-colors"
                             title="Drag right edge to stretch or shrink column (Double-click to reset)"
                           >
@@ -1363,7 +1416,11 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 </thead>
 
                 {/* Unified Document Body: Both Movable Headers & Task Rows */}
-                <tbody>
+                <SortableContext
+                  items={visibleRows.map((t) => t.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <tbody>
                   {visibleRows.map((rowItem, rowIndex) => {
                     const isHeader = isTaskHeaderRow(rowItem);
 
@@ -2026,8 +2083,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     </td>
                   </tr>
                 </tbody>
-              </table>
-            </SortableContext>
+              </SortableContext>
+            </table>
           </DndContext>
         </div>
       </div>
