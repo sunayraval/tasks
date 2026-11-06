@@ -335,82 +335,19 @@ export default function TaskItWorkspacePage() {
 
     const {
       data: { subscription: authListener },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setIsAuthenticated(true);
-        const { data: dbTasks } = await supabase
-          .from("tasks")
-          .select("*")
-          .eq("user_id", session.user.id)
-          .order("order_index", { ascending: true });
-        if (dbTasks) {
-          setTasks(
-            (dbTasks as TaskItem[]).filter(
-              (t) => !deletedTaskIdsRef.current.has(t.id)
-            )
-          );
-        }
       } else {
         setIsAuthenticated(false);
         setTasks([]);
       }
     });
 
-    // Granular Real-time Subscription: avoids full-table refetches that cause flicker/resurrection
-    const channel = supabase
-      .channel("tasks-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "tasks" },
-        (payload) => {
-          if (payload.eventType === "DELETE") {
-            const deletedId = (payload.old as { id?: string })?.id;
-            if (deletedId) {
-              deletedTaskIdsRef.current.add(deletedId);
-              setTasks((prev) => prev.filter((t) => t.id !== deletedId));
-            }
-            return;
-          }
-
-          if (payload.eventType === "INSERT") {
-            const newItem = payload.new as TaskItem;
-            if (
-              !newItem?.id ||
-              deletedTaskIdsRef.current.has(newItem.id)
-            ) {
-              return;
-            }
-            setTasks((prev) => {
-              if (prev.some((t) => t.id === newItem.id)) return prev;
-              return [...prev, newItem];
-            });
-            return;
-          }
-
-          if (payload.eventType === "UPDATE") {
-            const updatedItem = payload.new as TaskItem;
-            if (
-              !updatedItem?.id ||
-              deletedTaskIdsRef.current.has(updatedItem.id)
-            ) {
-              return;
-            }
-            setTasks((prev) =>
-              prev.map((t) =>
-                t.id === updatedItem.id ? { ...t, ...updatedItem } : t
-              )
-            );
-            return;
-          }
-        }
-      )
-      .subscribe();
-
     return () => {
       authListener.unsubscribe();
-      supabase.removeChannel(channel);
     };
-  }, [showToast, profile.canvas_feed_url]);
+  }, []); // Run strictly once on mount to avoid re-fetch loops and resurrection flickers
 
   // 2. Apply theme & custom colors to html element
   useEffect(() => {
@@ -705,6 +642,9 @@ export default function TaskItWorkspacePage() {
   // 7. Update Task or Header Row
   const handleUpdateTask = useCallback(
     async (taskId: string, updates: Partial<TaskItem>) => {
+      // Do not update or resurrect a deleted row
+      if (deletedTaskIdsRef.current.has(taskId)) return;
+
       const nowISO = new Date().toISOString();
       setTasks((prev) =>
         prev.map((t) =>
@@ -750,8 +690,9 @@ export default function TaskItWorkspacePage() {
 
           if (isUuid) {
             await supabase.from("tasks").delete().eq("id", taskId);
-          } else if (target) {
-            // Delete legacy non-UUID items by title
+          }
+          if (target?.title) {
+            // Also ensure any duplicate or legacy rows with matching title/user are cleaned
             await supabase
               .from("tasks")
               .delete()
