@@ -214,9 +214,31 @@ export default function TaskItWorkspacePage() {
             .eq("user_id", user.id)
             .order("order_index", { ascending: true });
 
-          const loadedTasks = ((dbTasks || []) as TaskItem[]).filter(
-            (t) => !deletedTaskIdsRef.current.has(t.id)
-          );
+          const now = new Date();
+          const startOfToday = new Date(now);
+          startOfToday.setHours(0, 0, 0, 0);
+
+          const loadedTasks = ((dbTasks || []) as TaskItem[]).filter((t) => {
+            if (deletedTaskIdsRef.current.has(t.id)) return false;
+            // Cut out past Canvas clutter (e.g. 10/31 and earlier)
+            if (
+              t.is_canvas_assignment &&
+              t.due_date &&
+              new Date(t.due_date) < startOfToday
+            ) {
+              return false;
+            }
+            return true;
+          });
+
+          // Clean up past Canvas tasks from Supabase in background
+          supabase
+            .from("tasks")
+            .delete()
+            .eq("user_id", user.id)
+            .eq("is_canvas_assignment", true)
+            .lt("due_date", startOfToday.toISOString())
+            .then();
 
           const hasAnyHeaderRow = loadedTasks.some((t) =>
             Boolean(t.custom_properties?.is_header)
@@ -805,36 +827,18 @@ export default function TaskItWorkspacePage() {
 
         let addedCount = 0;
         setTasks((prev) => {
-          const updatedList = [...prev];
-          for (const item of incoming) {
-            // If already deleted in this session, never restore
-            if (deletedTaskIdsRef.current.has(item.id)) continue;
+          // Keep all user-created tasks and movable headers
+          const userTasksAndHeaders = prev.filter(
+            (t) => !t.is_canvas_assignment && !deletedTaskIdsRef.current.has(t.id)
+          );
 
-            const existingIdx = updatedList.findIndex(
-              (t) =>
-                t.id === item.id ||
-                (t.is_canvas_assignment &&
-                  t.title.toLowerCase() === item.title.toLowerCase())
-            );
+          // Only add incoming assignments that haven't been deleted in this session
+          const cleanIncoming = incoming.filter(
+            (t) => !deletedTaskIdsRef.current.has(t.id)
+          );
 
-            if (existingIdx !== -1) {
-              updatedList[existingIdx] = {
-                ...updatedList[existingIdx],
-                due_date: item.due_date,
-                priority: item.priority,
-                estimated_minutes: item.estimated_minutes,
-                section_group: item.section_group,
-                canvas_course_code: item.canvas_course_code,
-                tags: Array.from(
-                  new Set([...updatedList[existingIdx].tags, ...item.tags])
-                ),
-              };
-            } else {
-              updatedList.push(item);
-              addedCount++;
-            }
-          }
-          return updatedList;
+          addedCount = cleanIncoming.length;
+          return [...userTasksAndHeaders, ...cleanIncoming];
         });
 
         if (addedCount > 0 || !isAutoSync) {
