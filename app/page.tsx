@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   ActionProposalPayload,
+  DEFAULT_WORKSPACE_CONFIG,
   getWorkspaceConfig,
   SectionGroup,
   TaskItem,
@@ -24,6 +25,69 @@ import { QuickCreateTaskModal } from "@/components/tasks/QuickCreateTaskModal";
 import { CheckCircle2, LogIn } from "lucide-react";
 
 const LOCAL_STORAGE_CONFIG_KEY = "taskit_workspace_config_v1";
+const HEADERS_SEEDED_STORAGE_KEY = "taskit_doc_headers_seeded_v1";
+
+function buildDefaultHeaderRowsForTasks(
+  userId: string,
+  existingTasks: TaskItem[],
+  sections = DEFAULT_WORKSPACE_CONFIG.sections
+): { combined: TaskItem[]; createdHeaders: TaskItem[] } {
+  const nowISO = new Date().toISOString();
+  const combined: TaskItem[] = [];
+  const createdHeaders: TaskItem[] = [];
+  const placedTaskIds = new Set<string>();
+
+  sections.forEach((sec, idx) => {
+    const headerItem: TaskItem = {
+      id: `header-seed-${Date.now()}-${idx}`,
+      user_id: userId,
+      title: sec.title,
+      content: "",
+      status: "To Do",
+      type: "General",
+      priority: "Medium",
+      due_date: null,
+      estimated_minutes: 0,
+      tags: [],
+      notes: "",
+      is_canvas_assignment: false,
+      canvas_course_code: null,
+      custom_properties: { is_header: true },
+      section_group: sec.id,
+      order_index: 0,
+      completed_at: null,
+      created_at: nowISO,
+      updated_at: nowISO,
+    };
+    createdHeaders.push(headerItem);
+    combined.push(headerItem);
+
+    for (const t of existingTasks) {
+      if (!placedTaskIds.has(t.id) && t.section_group === sec.id) {
+        combined.push(t);
+        placedTaskIds.add(t.id);
+      }
+    }
+  });
+
+  for (const t of existingTasks) {
+    if (!placedTaskIds.has(t.id)) {
+      combined.push(t);
+      placedTaskIds.add(t.id);
+    }
+  }
+
+  const indexed = combined.map((item, i) => ({
+    ...item,
+    order_index: i,
+  }));
+
+  const indexedHeaders = indexed.filter((item) =>
+    Boolean(item.custom_properties?.is_header)
+  );
+
+  return { combined: indexed, createdHeaders: indexedHeaders };
+}
 
 export default function TaskItWorkspacePage() {
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
@@ -128,8 +192,89 @@ export default function TaskItWorkspacePage() {
             .eq("user_id", user.id)
             .order("order_index", { ascending: true });
 
-          if (dbTasks) {
-            setTasks(dbTasks as TaskItem[]);
+          const loadedTasks = (dbTasks || []) as TaskItem[];
+          const hasAnyHeaderRow = loadedTasks.some((t) =>
+            Boolean(t.custom_properties?.is_header)
+          );
+          const alreadySeeded =
+            typeof window !== "undefined" &&
+            localStorage.getItem(`${HEADERS_SEEDED_STORAGE_KEY}_${user.id}`) ===
+              "true";
+
+          if (!hasAnyHeaderRow && !alreadySeeded) {
+            if (typeof window !== "undefined") {
+              localStorage.setItem(
+                `${HEADERS_SEEDED_STORAGE_KEY}_${user.id}`,
+                "true"
+              );
+            }
+
+            const activeSections =
+              getWorkspaceConfig(dbProfile || DEFAULT_PROFILE).sections ||
+              DEFAULT_WORKSPACE_CONFIG.sections;
+
+            const { combined, createdHeaders } = buildDefaultHeaderRowsForTasks(
+              user.id,
+              loadedTasks,
+              activeSections
+            );
+            setTasks(combined);
+
+            // Insert movable header rows into Supabase tasks table
+            if (createdHeaders.length > 0) {
+              const payload = createdHeaders.map((h) => ({
+                user_id: user.id,
+                title: h.title,
+                content: "",
+                status: h.status,
+                type: h.type,
+                priority: h.priority,
+                due_date: null,
+                estimated_minutes: 0,
+                tags: [],
+                notes: "",
+                is_canvas_assignment: false,
+                canvas_course_code: null,
+                custom_properties: { is_header: true },
+                section_group: h.section_group,
+                order_index: h.order_index,
+              }));
+
+              const { data: insertedHeaders } = await supabase
+                .from("tasks")
+                .insert(payload)
+                .select();
+
+              if (insertedHeaders && insertedHeaders.length > 0) {
+                setTasks((prev) => {
+                  let insertIdx = 0;
+                  return prev.map((row) => {
+                    if (
+                      row.id.startsWith("header-seed-") &&
+                      insertedHeaders[insertIdx]
+                    ) {
+                      const real = insertedHeaders[insertIdx] as TaskItem;
+                      insertIdx++;
+                      return real;
+                    }
+                    return row;
+                  });
+                });
+              }
+
+              // Also persist updated order_index for existing tasks
+              for (const item of combined) {
+                if (!item.id.startsWith("header-seed-")) {
+                  supabase
+                    .from("tasks")
+                    .update({ order_index: item.order_index })
+                    .eq("id", item.id)
+                    .then();
+                }
+              }
+            }
+          } else {
+            setTasks(loadedTasks);
           }
         } else {
           setIsAuthenticated(false);
@@ -146,7 +291,7 @@ export default function TaskItWorkspacePage() {
 
     const {
       data: { subscription: authListener },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         setIsAuthenticated(true);
         const { data: dbTasks } = await supabase
@@ -281,7 +426,7 @@ export default function TaskItWorkspacePage() {
         updated_at: nowISO,
       };
 
-      setTasks((prev) => [created, ...prev]);
+      setTasks((prev) => [...prev, created]);
       showToast(`Created: "${created.title}"`);
 
       if (isSupabaseConfigured() && isAuthenticated) {
@@ -302,6 +447,7 @@ export default function TaskItWorkspacePage() {
               notes: created.notes,
               is_canvas_assignment: created.is_canvas_assignment,
               canvas_course_code: created.canvas_course_code,
+              custom_properties: created.custom_properties || {},
               section_group: created.section_group,
               order_index: created.order_index,
             })
@@ -321,16 +467,22 @@ export default function TaskItWorkspacePage() {
     [showToast, isAuthenticated, profile.id]
   );
 
-  // 6. Inline Create Task Row directly in Table
+  // 6a. Inline Create Task Row directly in Table (at bottom or right after a specific row/header)
   const handleInlineCreateTask = useCallback(
-    (sectionId?: SectionGroup): string => {
+    (afterRowId?: string): string => {
       const nowISO = new Date().toISOString();
       const tempId = `task-${Date.now()}`;
-      const targetSection =
-        sectionId || workspaceConfig.sections[0]?.id || "TODAY";
       const defaultStatus = workspaceConfig.statuses[0]?.label || "To Do";
       const defaultType = workspaceConfig.types[0]?.label || "General";
       const defaultPriority = workspaceConfig.priorities[2]?.label || "Medium";
+
+      let insertOrderIndex = tasks.length;
+      const afterIdx = afterRowId
+        ? tasks.findIndex((t) => t.id === afterRowId)
+        : -1;
+      if (afterIdx !== -1) {
+        insertOrderIndex = afterIdx + 1;
+      }
 
       const created: TaskItem = {
         id: tempId,
@@ -347,14 +499,26 @@ export default function TaskItWorkspacePage() {
         is_canvas_assignment: false,
         canvas_course_code: null,
         custom_properties: {},
-        section_group: targetSection,
-        order_index: tasks.length,
+        section_group: "TODAY",
+        order_index: insertOrderIndex,
         completed_at: null,
         created_at: nowISO,
         updated_at: nowISO,
       };
 
-      setTasks((prev) => [...prev, created]);
+      let nextList: TaskItem[] = [];
+      if (afterIdx !== -1) {
+        const copy = [...tasks];
+        copy.splice(afterIdx + 1, 0, created);
+        nextList = copy.map((item, idx) => ({ ...item, order_index: idx }));
+      } else {
+        nextList = [...tasks, created].map((item, idx) => ({
+          ...item,
+          order_index: idx,
+        }));
+      }
+
+      setTasks(nextList);
 
       if (isSupabaseConfigured() && isAuthenticated) {
         const supabase = createClient();
@@ -373,8 +537,9 @@ export default function TaskItWorkspacePage() {
             notes: created.notes,
             is_canvas_assignment: created.is_canvas_assignment,
             canvas_course_code: created.canvas_course_code,
+            custom_properties: {},
             section_group: created.section_group,
-            order_index: created.order_index,
+            order_index: insertOrderIndex,
           })
           .select()
           .single()
@@ -393,10 +558,102 @@ export default function TaskItWorkspacePage() {
 
       return tempId;
     },
-    [workspaceConfig, profile.id, tasks.length, isAuthenticated]
+    [workspaceConfig, profile.id, tasks, isAuthenticated]
   );
 
-  // 7. Update Task
+  // 6b. Inline Create Movable Header Row directly in Table
+  const handleInlineCreateHeader = useCallback(
+    (afterRowId?: string, defaultTitle?: string): string => {
+      const nowISO = new Date().toISOString();
+      const tempId = `header-${Date.now()}`;
+      const headerTitle = defaultTitle || "——— ✨ NEW HEADER ✨ ———";
+
+      let insertOrderIndex = tasks.length;
+      const afterIdx = afterRowId
+        ? tasks.findIndex((t) => t.id === afterRowId)
+        : -1;
+      if (afterIdx !== -1) {
+        insertOrderIndex = afterIdx + 1;
+      }
+
+      const createdHeader: TaskItem = {
+        id: tempId,
+        user_id: profile.id,
+        title: headerTitle,
+        content: "",
+        status: "To Do",
+        type: "General",
+        priority: "Medium",
+        due_date: null,
+        estimated_minutes: 0,
+        tags: [],
+        notes: "",
+        is_canvas_assignment: false,
+        canvas_course_code: null,
+        custom_properties: { is_header: true },
+        section_group: "TODAY",
+        order_index: insertOrderIndex,
+        completed_at: null,
+        created_at: nowISO,
+        updated_at: nowISO,
+      };
+
+      let nextList: TaskItem[] = [];
+      if (afterIdx !== -1) {
+        const copy = [...tasks];
+        copy.splice(afterIdx + 1, 0, createdHeader);
+        nextList = copy.map((item, idx) => ({ ...item, order_index: idx }));
+      } else {
+        nextList = [...tasks, createdHeader].map((item, idx) => ({
+          ...item,
+          order_index: idx,
+        }));
+      }
+
+      setTasks(nextList);
+
+      if (isSupabaseConfigured() && isAuthenticated) {
+        const supabase = createClient();
+        supabase
+          .from("tasks")
+          .insert({
+            user_id: profile.id,
+            title: createdHeader.title,
+            content: "",
+            status: createdHeader.status,
+            type: createdHeader.type,
+            priority: createdHeader.priority,
+            due_date: null,
+            estimated_minutes: 0,
+            tags: [],
+            notes: "",
+            is_canvas_assignment: false,
+            canvas_course_code: null,
+            custom_properties: { is_header: true },
+            section_group: createdHeader.section_group,
+            order_index: insertOrderIndex,
+          })
+          .select()
+          .single()
+          .then(({ data }) => {
+            if (data?.id) {
+              setTasks((prev) =>
+                prev.map((t) =>
+                  t.id === tempId
+                    ? { ...(data as TaskItem), title: t.title }
+                    : t
+                )
+              );
+            }
+          });
+      }
+
+      return tempId;
+    },
+    [profile.id, tasks, isAuthenticated]
+  );
+
+  // 7. Update Task or Header Row
   const handleUpdateTask = useCallback(
     async (taskId: string, updates: Partial<TaskItem>) => {
       const nowISO = new Date().toISOString();
@@ -419,7 +676,7 @@ export default function TaskItWorkspacePage() {
     [isAuthenticated]
   );
 
-  // 8. Delete Task
+  // 8. Delete Task or Header Row
   const handleDeleteTask = useCallback(
     async (taskId: string) => {
       const target = tasks.find((t) => t.id === taskId);
@@ -443,10 +700,33 @@ export default function TaskItWorkspacePage() {
     [tasks, selectedTaskId, showToast, isAuthenticated]
   );
 
-  // 9. Reorder Tasks
-  const handleReorderTasks = useCallback((newTasks: TaskItem[]) => {
-    setTasks(newTasks);
-  }, []);
+  // 9. Reorder Tasks & Movable Headers (persists order_index to Supabase)
+  const handleReorderTasks = useCallback(
+    (newTasks: TaskItem[]) => {
+      const indexed = newTasks.map((item, idx) => ({
+        ...item,
+        order_index: idx,
+      }));
+      setTasks(indexed);
+
+      if (isSupabaseConfigured() && isAuthenticated) {
+        const supabase = createClient();
+        for (const item of indexed) {
+          if (
+            !item.id.startsWith("task-") &&
+            !item.id.startsWith("header-")
+          ) {
+            supabase
+              .from("tasks")
+              .update({ order_index: item.order_index })
+              .eq("id", item.id)
+              .then();
+          }
+        }
+      }
+    },
+    [isAuthenticated]
+  );
 
   // 10. Sync Canvas
   const handleSyncCanvasTasks = useCallback(
@@ -489,12 +769,12 @@ export default function TaskItWorkspacePage() {
               canvas_course_code: item.canvas_course_code || "HCPSS",
               custom_properties: item.custom_properties || {},
               section_group: item.section_group || "TODAY",
-              order_index: 0,
+              order_index: updatedList.length,
               completed_at: null,
               created_at: nowISO,
               updated_at: nowISO,
             };
-            updatedList.unshift(newItem);
+            updatedList.push(newItem);
             addedCount++;
           }
         }
@@ -570,17 +850,17 @@ export default function TaskItWorkspacePage() {
           canvas_course_code: null,
           custom_properties: {},
           section_group: c.section_group || "TODAY",
-          order_index: idx,
+          order_index: tasks.length + idx,
           completed_at: null,
           created_at: nowISO,
           updated_at: nowISO,
         }));
 
-        setTasks((prev) => [...newItems, ...prev]);
+        setTasks((prev) => [...prev, ...newItems]);
         showToast(`Added ${newItems.length} tasks!`);
       }
     },
-    [profile.id, isAuthenticated, showToast]
+    [profile.id, isAuthenticated, showToast, tasks.length]
   );
 
   // Google OAuth Sign In
@@ -702,7 +982,7 @@ export default function TaskItWorkspacePage() {
                 streakDays={1}
               />
 
-              {/* Customizable Inline Task Table */}
+              {/* Customizable Document-Style Task Table */}
               <TaskTable
                 tasks={tasks}
                 selectedTaskId={selectedTaskId}
@@ -713,6 +993,7 @@ export default function TaskItWorkspacePage() {
                 onDeleteTask={handleDeleteTask}
                 onReorderTasks={handleReorderTasks}
                 onInlineCreateTask={handleInlineCreateTask}
+                onInlineCreateHeader={handleInlineCreateHeader}
                 onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
                 onOpenSettingsTab={(tab) => {
                   setSettingsTab(tab);

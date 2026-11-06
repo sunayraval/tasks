@@ -43,36 +43,14 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
   };
 
   const stats = useMemo(() => {
-    const todayDateStr = new Date().toDateString();
-
-    const todayPool = tasks.filter((t) => {
-      if (t.section_group === "TODAY" || t.section_group === "COLLEGE") {
-        return true;
-      }
-      if (
-        t.completed_at &&
-        new Date(t.completed_at).toDateString() === todayDateStr
-      ) {
-        return true;
-      }
-      if (t.due_date) {
-        const due = new Date(t.due_date);
-        const now = new Date();
-        return (
-          due.toDateString() === todayDateStr ||
-          (due < now && t.status !== "Done")
-        );
-      }
-      return false;
-    });
-
-    const pool = todayPool.length > 0 ? todayPool : tasks;
-    const total = pool.length;
-    const done = pool.filter((t) => t.status === "Done").length;
+    // Exclude movable header divider rows from task statistics
+    const realTasks = tasks.filter((t) => !t.custom_properties?.is_header);
+    const total = realTasks.length;
+    const done = realTasks.filter((t) => t.status === "Done").length;
     const remaining = Math.max(0, total - done);
     const percentage = total > 0 ? Math.round((done / total) * 100) : 0;
 
-    const totalRemainingMinutes = pool
+    const totalRemainingMinutes = realTasks
       .filter((t) => t.status !== "Done")
       .reduce((acc, t) => acc + (t.estimated_minutes || 30), 0);
 
@@ -112,7 +90,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
                     setEditingTitle(false);
                   }
                 }}
-                className="w-full max-w-md rounded-lg border border-primary bg-black/60 px-2.5 py-1 text-xl sm:text-2xl font-bold text-white focus:outline-none"
+                className="w-full max-w-md rounded-lg border border-primary bg-black/75 px-2.5 py-1 text-xl sm:text-2xl font-bold text-white focus:outline-none"
               />
             ) : (
               <button
@@ -144,7 +122,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
                       setEditingSubtitle(false);
                     }
                   }}
-                  className="w-full max-w-2xl rounded-lg border border-primary bg-black/60 px-2.5 py-1 text-xs text-white focus:outline-none"
+                  className="w-full max-w-2xl rounded-lg border border-primary bg-black/75 px-2.5 py-1 text-xs text-white focus:outline-none"
                 />
               ) : (
                 <button
@@ -170,7 +148,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/30 px-3 py-1.5 text-xs">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-white/60">Done Today:</span>
+              <span className="text-white/60">Completed:</span>
               <span className="font-semibold text-white">
                 {stats.done} / {stats.total}
               </span>

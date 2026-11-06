@@ -5,85 +5,92 @@
 /* 0. Monochrome (Pure Clean Black & White) */
 :root,
 [data-theme="monochrome"] {
+  color-scheme: dark;
   --bg-base: #09090b;
   --surface: #18181b;
   --accent: #27272a;
   --primary: #ffffff;
   --highlight: #f4f4f5;
-  --panel-bg: rgba(18, 18, 22, 0.82);
-  --panel-header: rgba(28, 28, 34, 0.88);
+  --panel-bg: rgba(18, 18, 22, 0.88);
+  --panel-header: rgba(28, 28, 34, 0.94);
   --panel-border: rgba(255, 255, 255, 0.14);
 }
 
 /* 1. Cyber Ocean */
 [data-theme="cyber_ocean"] {
+  color-scheme: dark;
   --bg-base: #041f24;
   --surface: #0a3c44;
   --accent: #136f7a;
   --primary: #00e5ff;
   --highlight: #a8f9ff;
-  --panel-bg: rgba(5, 34, 40, 0.78);
-  --panel-header: rgba(10, 58, 68, 0.85);
+  --panel-bg: rgba(5, 34, 40, 0.86);
+  --panel-header: rgba(10, 58, 68, 0.92);
   --panel-border: rgba(0, 229, 255, 0.25);
 }
 
 /* 2. Warm Slate / Terracotta Ember */
 [data-theme="warm_slate"] {
+  color-scheme: dark;
   --bg-base: #1f1410;
   --surface: #38241d;
   --accent: #6e4230;
   --primary: #f97316;
   --highlight: #fed7aa;
-  --panel-bg: rgba(34, 21, 16, 0.8);
-  --panel-header: rgba(56, 36, 29, 0.88);
+  --panel-bg: rgba(34, 21, 16, 0.86);
+  --panel-header: rgba(56, 36, 29, 0.92);
   --panel-border: rgba(249, 115, 22, 0.26);
 }
 
 /* 3. Electric Sky / Lavender */
 [data-theme="electric_lavender"] {
+  color-scheme: dark;
   --bg-base: #120e29;
   --surface: #241b4b;
   --accent: #4a358c;
   --primary: #a855f7;
   --highlight: #e9d5ff;
-  --panel-bg: rgba(22, 16, 48, 0.78);
-  --panel-header: rgba(38, 28, 78, 0.86);
+  --panel-bg: rgba(22, 16, 48, 0.86);
+  --panel-header: rgba(38, 28, 78, 0.92);
   --panel-border: rgba(168, 85, 247, 0.28);
 }
 
 /* 4. Alpine Forest / Emerald */
 [data-theme="alpine_forest"] {
+  color-scheme: dark;
   --bg-base: #071f18;
   --surface: #103b2e;
   --accent: #1d634d;
   --primary: #10b981;
   --highlight: #a7f3d0;
-  --panel-bg: rgba(8, 34, 26, 0.78);
-  --panel-header: rgba(16, 59, 46, 0.86);
+  --panel-bg: rgba(8, 34, 26, 0.86);
+  --panel-header: rgba(16, 59, 46, 0.92);
   --panel-border: rgba(16, 185, 129, 0.26);
 }
 
 /* 5. Mint Sunray / Solaris Gold */
 [data-theme="mint_sunray"] {
+  color-scheme: dark;
   --bg-base: #072227;
   --surface: #11464f;
   --accent: #246a73;
   --primary: #facc15;
   --highlight: #fef08a;
-  --panel-bg: rgba(9, 36, 42, 0.78);
-  --panel-header: rgba(17, 70, 79, 0.86);
+  --panel-bg: rgba(9, 36, 42, 0.86);
+  --panel-header: rgba(17, 70, 79, 0.92);
   --panel-border: rgba(250, 204, 21, 0.26);
 }
 
 /* 6. Crimson Nebula */
 [data-theme="rose_nebula"] {
+  color-scheme: dark;
   --bg-base: #210918;
   --surface: #3d122d;
   --accent: #701d51;
   --primary: #f43f5e;
   --highlight: #fecdd3;
-  --panel-bg: rgba(36, 10, 26, 0.78);
-  --panel-header: rgba(61, 18, 45, 0.86);
+  --panel-bg: rgba(36, 10, 26, 0.86);
+  --panel-header: rgba(61, 18, 45, 0.92);
   --panel-border: rgba(244, 63, 94, 0.28);
 }
 
@@ -93,6 +100,7 @@
 
 html,
 body {
+  color-scheme: dark;
   background-color: var(--bg-base);
   color: #f4f4f5;
   min-height: 100vh;
@@ -101,11 +109,30 @@ body {
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
+select,
+input,
+textarea,
+option {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #12161f;
+  color: #f4f4f5;
+}
+
 /* Theme-Aware Glass Surfaces */
 .theme-panel {
   background-color: var(--panel-bg);
   border-color: var(--panel-border);
   box-shadow: 0 10px 35px -5px rgba(0, 0, 0, 0.45),
+    0 0 0 1px var(--panel-border);
+}
+
+.theme-popover {
+  background-color: color-mix(in srgb, var(--bg-base) 92%, #000000);
+  border-color: var(--panel-border);
+  box-shadow: 0 16px 40px -4px rgba(0, 0, 0, 0.75),
     0 0 0 1px var(--panel-border);
 }
 
@@ -117,8 +144,8 @@ body {
 .theme-section-bg {
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--surface) 75%, transparent) 0%,
-    color-mix(in srgb, var(--bg-base) 65%, transparent) 100%
+    color-mix(in srgb, var(--surface) 82%, #000000) 0%,
+    color-mix(in srgb, var(--bg-base) 78%, #000000) 100%
   );
   border-color: var(--panel-border);
 }
@@ -128,8 +155,9 @@ body {
 }
 
 .theme-input {
-  background-color: color-mix(in srgb, var(--bg-base) 75%, black);
+  background-color: color-mix(in srgb, var(--bg-base) 82%, #000000);
   border-color: var(--panel-border);
+  color: #ffffff;
 }
 
 .theme-input:focus {

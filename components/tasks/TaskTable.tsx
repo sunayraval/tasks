@@ -2,15 +2,6 @@
 
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getFilteredRowModel,
-  flexRender,
-  ColumnDef,
-  SortingState,
-} from "@tanstack/react-table";
-import {
   DndContext,
   closestCenter,
   KeyboardSensor,
@@ -29,13 +20,11 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   TaskItem,
-  TaskPriority,
   TaskStatus,
-  TaskType,
-  SectionGroup,
   ViewMode,
   WorkspaceConfig,
   ColumnHeadersConfig,
+  CustomOptionItem,
   BadgeColorKey,
   BADGE_COLOR_KEYS,
   BADGE_COLOR_MAP,
@@ -50,7 +39,6 @@ import {
   Plus,
   Search,
   ChevronDown,
-  ChevronRight,
   Filter,
   AlertCircle,
   Trash2,
@@ -58,7 +46,9 @@ import {
   Check,
   Tag,
   Settings2,
-  FolderPlus,
+  Heading,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { TaskDocumentEditor } from "@/components/editor/TaskDocumentEditor";
 
@@ -71,11 +61,16 @@ interface TaskTableProps {
   onUpdateTask: (taskId: string, updates: Partial<TaskItem>) => void;
   onDeleteTask: (taskId: string) => void;
   onReorderTasks: (newTasks: TaskItem[]) => void;
-  onInlineCreateTask: (sectionId?: SectionGroup) => string;
+  onInlineCreateTask: (afterRowId?: string) => string;
+  onInlineCreateHeader: (afterRowId?: string, defaultTitle?: string) => string;
   onUpdateWorkspaceConfig: (updates: Partial<WorkspaceConfig>) => void;
   onOpenSettingsTab: (
     tab: "appearance" | "customize" | "view" | "ai" | "integrations"
   ) => void;
+}
+
+export function isTaskHeaderRow(task: TaskItem): boolean {
+  return Boolean(task.custom_properties?.is_header);
 }
 
 export function formatRelativeDueDate(
@@ -140,69 +135,24 @@ export function formatEstimatedTime(minutes: number): string {
   return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
 }
 
-interface SortableTaskRowProps {
-  task: TaskItem;
-  children: React.ReactNode;
-  isSelected: boolean;
-}
-
-const SortableTaskRow: React.FC<SortableTaskRowProps> = ({
-  task,
-  children,
-  isSelected,
-}) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: task.id });
-
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  return (
-    <tr
-      ref={setNodeRef}
-      style={style}
-      className={`group border-b border-white/10 transition-colors ${
-        isSelected
-          ? "bg-primary/15"
-          : task.status === "Done"
-          ? "bg-black/25 opacity-60 hover:opacity-95"
-          : "theme-row-hover"
-      }`}
-    >
-      <td className="w-8 pl-3 pr-1 py-2 align-middle">
-        <button
-          type="button"
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing text-white/35 hover:text-white p-1 rounded"
-          title="Drag to reorder"
-        >
-          <GripVertical className="w-3.5 h-3.5" />
-        </button>
-      </td>
-      {children}
-    </tr>
-  );
-};
-
-// Inline Title & Notes Input Cell
+// Inline Editable Text Input (works like a document line)
 const InlineTextCell: React.FC<{
   value: string;
   placeholder: string;
   isDone?: boolean;
   autoFocus?: boolean;
   onCommit: (val: string) => void;
+  onEnterKey?: () => void;
   className?: string;
-}> = ({ value, placeholder, isDone, autoFocus, onCommit, className = "" }) => {
+}> = ({
+  value,
+  placeholder,
+  isDone,
+  autoFocus,
+  onCommit,
+  onEnterKey,
+  className = "",
+}) => {
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -235,16 +185,390 @@ const InlineTextCell: React.FC<{
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           e.currentTarget.blur();
+          onEnterKey?.();
         }
         if (e.key === "Escape") {
           setDraft(value);
           e.currentTarget.blur();
         }
       }}
-      className={`w-full rounded-md bg-transparent px-1.5 py-1 text-xs sm:text-sm focus:bg-black/50 focus:outline-none focus:ring-1 focus:ring-primary/70 transition-all ${
+      className={`w-full rounded-md bg-transparent px-1.5 py-1 text-xs sm:text-sm focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-primary/70 transition-all ${
         isDone ? "line-through text-white/40" : "text-white"
       } placeholder-white/30 ${className}`}
     />
+  );
+};
+
+// Custom Dark-Glass Popover Pill Dropdown (replaces native white <select>)
+const PillPopoverDropdown: React.FC<{
+  value: string;
+  options: CustomOptionItem[];
+  onSelect: (val: string) => void;
+  onAddNewOption: (label: string, color: BadgeColorKey) => void;
+  onOpenManage: () => void;
+  placeholder?: string;
+}> = ({
+  value,
+  options,
+  onSelect,
+  onAddNewOption,
+  onOpenManage,
+  placeholder = "Add option...",
+}) => {
+  const [open, setOpen] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [newColor, setNewColor] = useState<BadgeColorKey>("cyan");
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const activeOpt = options.find(
+    (o) =>
+      o.label.toLowerCase() === (value || "").toLowerCase() ||
+      o.id.toLowerCase() === (value || "").toLowerCase()
+  );
+  const badgeClasses = getBadgeClasses(activeOpt?.color || "slate");
+
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleaned = newLabel.trim();
+    if (!cleaned) return;
+    onAddNewOption(cleaned, newColor);
+    onSelect(cleaned);
+    setNewLabel("");
+    setOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-all hover:brightness-110 ${badgeClasses}`}
+      >
+        <span>{value || options[0]?.label || "Select"}</span>
+        <ChevronDown className="w-3 h-3 opacity-70" />
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 top-full mt-1.5 w-56 rounded-xl border theme-popover p-2 z-50 space-y-2 backdrop-blur-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="max-h-44 overflow-y-auto space-y-1 pr-0.5">
+            {options.map((opt) => {
+              const isSelected =
+                opt.label.toLowerCase() === (value || "").toLowerCase();
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    onSelect(opt.label);
+                    setOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs transition-colors ${
+                    isSelected
+                      ? "bg-white/15 text-white font-semibold"
+                      : "text-white/80 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <span
+                    className={`rounded border px-2 py-0.5 text-[11px] font-medium ${getBadgeClasses(
+                      opt.color
+                    )}`}
+                  >
+                    {opt.label}
+                  </span>
+                  {isSelected && <Check className="w-3.5 h-3.5 text-primary" />}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Quick Add New Option Inline */}
+          <form
+            onSubmit={handleCreate}
+            className="border-t border-white/10 pt-2 space-y-1.5"
+          >
+            <div className="flex items-center gap-1">
+              <input
+                type="text"
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+                placeholder={placeholder}
+                className="flex-1 rounded-lg border border-white/15 bg-black/75 px-2 py-1 text-[11px] text-white placeholder-white/40 focus:border-primary focus:outline-none"
+              />
+              <button
+                type="submit"
+                className="rounded-lg bg-primary px-2 py-1 text-[11px] font-bold text-black hover:brightness-110"
+              >
+                Add
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1 pt-0.5">
+              {BADGE_COLOR_KEYS.slice(0, 10).map((ck) => (
+                <button
+                  key={ck}
+                  type="button"
+                  onClick={() => setNewColor(ck)}
+                  className={`h-3.5 w-3.5 rounded-full border ${
+                    newColor === ck
+                      ? "ring-2 ring-white scale-110"
+                      : "opacity-60 hover:opacity-100"
+                  }`}
+                  style={{ backgroundColor: BADGE_COLOR_MAP[ck].dot }}
+                  title={BADGE_COLOR_MAP[ck].label}
+                />
+              ))}
+            </div>
+          </form>
+
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onOpenManage();
+            }}
+            className="w-full flex items-center justify-center gap-1 border-t border-white/10 pt-1.5 text-[11px] text-primary hover:underline"
+          >
+            <Settings2 className="w-3 h-3" />
+            <span>Edit Options in Settings</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Custom Dark-Glass Duration Popover (replaces native white <select>)
+const DurationPopoverCell: React.FC<{
+  minutes: number;
+  onChange: (mins: number) => void;
+}> = ({ minutes, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const [customMins, setCustomMins] = useState(String(minutes || 30));
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const presets = [15, 30, 45, 60, 90, 120, 180];
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-black/40 px-2 py-1 text-xs font-mono text-white/90 hover:border-primary/60 transition-colors"
+      >
+        <span>{formatEstimatedTime(minutes || 30)}</span>
+        <ChevronDown className="w-3 h-3 opacity-60" />
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 top-full mt-1.5 w-44 rounded-xl border theme-popover p-2 z-50 space-y-2 backdrop-blur-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="grid grid-cols-2 gap-1">
+            {presets.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => {
+                  onChange(p);
+                  setOpen(false);
+                }}
+                className={`rounded-lg px-2 py-1 text-xs font-mono text-center transition-colors ${
+                  minutes === p
+                    ? "bg-primary text-black font-bold"
+                    : "bg-white/5 text-white/80 hover:bg-white/15 hover:text-white"
+                }`}
+              >
+                {formatEstimatedTime(p)}
+              </button>
+            ))}
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const val = Math.max(5, parseInt(customMins, 10) || 30);
+              onChange(val);
+              setOpen(false);
+            }}
+            className="flex items-center gap-1 border-t border-white/10 pt-1.5"
+          >
+            <input
+              type="number"
+              min={5}
+              max={600}
+              value={customMins}
+              onChange={(e) => setCustomMins(e.target.value)}
+              placeholder="Mins"
+              className="w-full rounded border border-white/15 bg-black/75 px-2 py-1 text-xs text-white font-mono focus:border-primary focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="rounded bg-primary px-2 py-1 text-[11px] font-bold text-black"
+            >
+              Set
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Custom Dark-Glass Filter Popover for Top Bar
+const FilterDropdown: React.FC<{
+  label: string;
+  value: string;
+  options: CustomOptionItem[];
+  onChange: (val: string) => void;
+}> = ({ label, value, options, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 rounded-lg border theme-input px-2.5 py-1.5 text-xs text-white/90 hover:border-primary/50 transition-colors"
+      >
+        <Filter className="w-3 h-3 text-primary" />
+        <span>{value === "ALL" ? `All ${label}` : value}</span>
+        <ChevronDown className="w-3 h-3 opacity-60" />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1.5 w-48 rounded-xl border theme-popover p-1.5 z-50 space-y-1 backdrop-blur-2xl">
+          <button
+            type="button"
+            onClick={() => {
+              onChange("ALL");
+              setOpen(false);
+            }}
+            className={`w-full flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
+              value === "ALL"
+                ? "bg-primary/20 text-highlight font-semibold"
+                : "text-white/75 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            <span>All {label}</span>
+            {value === "ALL" && <Check className="w-3.5 h-3.5 text-primary" />}
+          </button>
+          {options.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => {
+                onChange(opt.label);
+                setOpen(false);
+              }}
+              className={`w-full flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
+                value === opt.label
+                  ? "bg-white/15 text-white font-semibold"
+                  : "text-white/75 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <span
+                className={`rounded border px-1.5 py-0.5 text-[10px] ${getBadgeClasses(
+                  opt.color
+                )}`}
+              >
+                {opt.label}
+              </span>
+              {value === opt.label && (
+                <Check className="w-3.5 h-3.5 text-primary" />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Sortable Wrapper for BOTH Header Divider Rows AND Task Rows
+const SortableDocumentRow: React.FC<{
+  item: TaskItem;
+  isHeader: boolean;
+  isSelected: boolean;
+  children: (dragProps: {
+    attributes: Record<string, any>;
+    listeners: Record<string, any> | undefined;
+  }) => React.ReactNode;
+}> = ({ item, isHeader, isSelected, children }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.55 : 1,
+    zIndex: isDragging ? 30 : undefined,
+  };
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={
+        isHeader
+          ? "group border-y theme-section-bg transition-colors"
+          : `group border-b border-white/10 transition-colors ${
+              isSelected
+                ? "bg-primary/15"
+                : item.status === "Done"
+                ? "bg-black/25 opacity-60 hover:opacity-95"
+                : "theme-row-hover"
+            }`
+      }
+    >
+      {children({ attributes, listeners })}
+    </tr>
   );
 };
 
@@ -258,35 +582,26 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   onDeleteTask,
   onReorderTasks,
   onInlineCreateTask,
+  onInlineCreateHeader,
   onUpdateWorkspaceConfig,
   onOpenSettingsTab,
 }) => {
-  const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
-  const [collapsedSections, setCollapsedSections] = useState<
-    Record<string, boolean>
-  >({});
-  const [newlyCreatedTaskId, setNewlyCreatedTaskId] = useState<string | null>(
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortAsc, setSortAsc] = useState<boolean>(true);
+  const [newlyCreatedRowId, setNewlyCreatedRowId] = useState<string | null>(
     null
   );
 
-  // Header inline editing state
+  // Column header inline editing
   const [editingColKey, setEditingColKey] = useState<
     keyof ColumnHeadersConfig | null
   >(null);
   const [colHeaderDraft, setColHeaderDraft] = useState("");
 
-  // Section header inline editing state
-  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
-  const [sectionLabelDraft, setSectionLabelDraft] = useState("");
-
-  // New section creation inline state
-  const [addingNewSection, setAddingNewSection] = useState(false);
-  const [newSectionName, setNewSectionName] = useState("");
-
-  // Open Tag Popover row ID
+  // Tags popover state
   const [openTagDropdownTaskId, setOpenTagDropdownTaskId] = useState<
     string | null
   >(null);
@@ -294,37 +609,94 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   const [newTagColor, setNewTagColor] = useState<BadgeColorKey>("cyan");
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
 
-  const sections = workspaceConfig.sections;
+  // Filter rows: Header rows stay visible unless searching/filtering hides them
+  const visibleRows = useMemo(() => {
+    let list = [...tasks];
 
-  const filteredTasks = useMemo(() => {
-    return tasks.filter((t) => {
-      if (statusFilter !== "ALL" && t.status !== statusFilter) return false;
-      if (typeFilter !== "ALL" && t.type !== typeFilter) return false;
-      if (globalFilter.trim()) {
-        const q = globalFilter.toLowerCase();
-        const matchTitle = t.title.toLowerCase().includes(q);
-        const matchNotes = (t.notes || "").toLowerCase().includes(q);
-        const matchTags = t.tags.some((tag) => tag.toLowerCase().includes(q));
-        const matchCourse = (t.canvas_course_code || "")
-          .toLowerCase()
-          .includes(q);
-        return matchTitle || matchNotes || matchTags || matchCourse;
-      }
-      return true;
-    });
-  }, [tasks, statusFilter, typeFilter, globalFilter]);
+    if (
+      statusFilter !== "ALL" ||
+      typeFilter !== "ALL" ||
+      globalFilter.trim() !== ""
+    ) {
+      list = list.filter((t) => {
+        if (isTaskHeaderRow(t)) {
+          if (globalFilter.trim()) {
+            return t.title
+              .toLowerCase()
+              .includes(globalFilter.trim().toLowerCase());
+          }
+          return true;
+        }
+        if (statusFilter !== "ALL" && t.status !== statusFilter) return false;
+        if (typeFilter !== "ALL" && t.type !== typeFilter) return false;
+        if (globalFilter.trim()) {
+          const q = globalFilter.toLowerCase();
+          const matchTitle = t.title.toLowerCase().includes(q);
+          const matchNotes = (t.notes || "").toLowerCase().includes(q);
+          const matchTags = t.tags.some((tag) =>
+            tag.toLowerCase().includes(q)
+          );
+          return matchTitle || matchNotes || matchTags;
+        }
+        return true;
+      });
+    }
 
-  const handleTriggerNewRow = (secId?: SectionGroup) => {
-    const targetSection = secId || sections[0]?.id || "TODAY";
-    setCollapsedSections((prev) => ({ ...prev, [targetSection]: false }));
-    const createdId = onInlineCreateTask(targetSection);
-    setNewlyCreatedTaskId(createdId);
+    if (sortField) {
+      list.sort((a, b) => {
+        if (isTaskHeaderRow(a) || isTaskHeaderRow(b)) return 0;
+        const valA = String((a as any)[sortField] || "");
+        const valB = String((b as any)[sortField] || "");
+        return sortAsc
+          ? valA.localeCompare(valB)
+          : valB.localeCompare(valA);
+      });
+    }
+
+    return list;
+  }, [tasks, statusFilter, typeFilter, globalFilter, sortField, sortAsc]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = tasks.findIndex((t) => t.id === active.id);
+    const newIndex = tasks.findIndex((t) => t.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const moved = arrayMove(tasks, oldIndex, newIndex).map((item, idx) => ({
+        ...item,
+        order_index: idx,
+      }));
+      onReorderTasks(moved);
+    }
+  };
+
+  const moveRowStep = (rowId: string, dir: -1 | 1) => {
+    const idx = tasks.findIndex((t) => t.id === rowId);
+    const targetIdx = idx + dir;
+    if (idx === -1 || targetIdx < 0 || targetIdx >= tasks.length) return;
+    const moved = arrayMove(tasks, idx, targetIdx).map((item, i) => ({
+      ...item,
+      order_index: i,
+    }));
+    onReorderTasks(moved);
+  };
+
+  const handleCreateTaskClick = (afterRowId?: string) => {
+    const newId = onInlineCreateTask(afterRowId);
+    setNewlyCreatedRowId(newId);
+  };
+
+  const handleCreateHeaderClick = (afterRowId?: string) => {
+    const newId = onInlineCreateHeader(afterRowId);
+    setNewlyCreatedRowId(newId);
   };
 
   const commitColumnHeader = (colKey: keyof ColumnHeadersConfig) => {
@@ -341,54 +713,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     }
   };
 
-  const commitSectionLabel = (secId: string) => {
-    setEditingSectionId(null);
-    const cleaned = sectionLabelDraft.trim();
-    if (!cleaned) return;
-    const updatedSections = sections.map((s) =>
-      s.id === secId ? { ...s, label: cleaned } : s
-    );
-    onUpdateWorkspaceConfig({ sections: updatedSections });
-  };
-
-  const handleAddNewSection = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleaned = newSectionName.trim();
-    if (!cleaned) return;
-    const id = cleaned.toUpperCase().replace(/\s+/g, "_");
-    if (!sections.some((s) => s.id === id)) {
-      onUpdateWorkspaceConfig({
-        sections: [...sections, { id, label: cleaned, badge: "Custom Section" }],
-      });
-    }
-    setNewSectionName("");
-    setAddingNewSection(false);
-  };
-
-  const handleDeleteSection = (secId: string) => {
-    if (sections.length <= 1) return;
-    const fallbackSec = sections.find((s) => s.id !== secId)?.id || "TODAY";
-    tasks.forEach((t) => {
-      if (t.section_group === secId) {
-        onUpdateTask(t.id, { section_group: fallbackSec });
-      }
-    });
-    onUpdateWorkspaceConfig({
-      sections: sections.filter((s) => s.id !== secId),
-    });
-  };
-
-  const moveSectionOrder = (dir: -1 | 1, sectionId: SectionGroup) => {
-    const idx = sections.findIndex((s) => s.id === sectionId);
-    const targetIdx = idx + dir;
-    if (targetIdx < 0 || targetIdx >= sections.length) return;
-    onUpdateWorkspaceConfig({
-      sections: arrayMove(sections, idx, targetIdx),
-    });
-  };
-
   const getOptionColor = (
-    list: Array<{ id: string; label: string; color: BadgeColorKey }>,
+    list: CustomOptionItem[],
     value: string,
     fallback: BadgeColorKey = "slate"
   ): BadgeColorKey => {
@@ -400,584 +726,29 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     return found ? found.color : fallback;
   };
 
-  const columns = useMemo<ColumnDef<TaskItem>[]>(
-    () => [
-      {
-        accessorKey: "title",
-        header: workspaceConfig.columnHeaders.title,
-        cell: ({ row }) => {
-          const t = row.original;
-          const isDone = t.status === "Done";
-          return (
-            <div className="flex items-center gap-2 min-w-[230px] max-w-[400px]">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const nextStatus: TaskStatus = isDone
-                    ? workspaceConfig.statuses[0]?.label || "To Do"
-                    : "Done";
-                  onUpdateTask(t.id, {
-                    status: nextStatus,
-                    completed_at:
-                      nextStatus === "Done" ? new Date().toISOString() : null,
-                  });
-                }}
-                className="shrink-0 text-white/45 hover:text-primary transition-colors"
-                title={isDone ? "Mark as To Do" : "Complete Task"}
-              >
-                {isDone ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                ) : (
-                  <Circle className="w-4 h-4 hover:text-primary" />
-                )}
-              </button>
-
-              <div className="flex-1 min-w-0">
-                <InlineTextCell
-                  value={t.title}
-                  placeholder="Type task name..."
-                  isDone={isDone}
-                  autoFocus={newlyCreatedTaskId === t.id}
-                  onCommit={(val) => {
-                    onUpdateTask(t.id, { title: val || "Untitled Task" });
-                    if (newlyCreatedTaskId === t.id) {
-                      setNewlyCreatedTaskId(null);
-                    }
-                  }}
-                  className="font-medium"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  onSelectTask(selectedTaskId === t.id ? null : t.id)
-                }
-                className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/60 hover:border-primary/60 hover:text-highlight transition-all shrink-0"
-                title="Open rich-text document & details"
-              >
-                <FileText className="w-3 h-3" />
-                <span className="hidden sm:inline">Doc</span>
-              </button>
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: "status",
-        header: workspaceConfig.columnHeaders.status,
-        cell: ({ row }) => {
-          const t = row.original;
-          const colorKey = getOptionColor(
-            workspaceConfig.statuses,
-            t.status,
-            "slate"
-          );
-          const badgeCls = getBadgeClasses(colorKey);
-          const allStatuses = workspaceConfig.statuses.some(
-            (s) => s.label === t.status
-          )
-            ? workspaceConfig.statuses
-            : [
-                ...workspaceConfig.statuses,
-                { id: t.status, label: t.status, color: "slate" as BadgeColorKey },
-              ];
-
-          return (
-            <select
-              value={t.status}
-              onChange={(e) => {
-                if (e.target.value === "__MANAGE__") {
-                  onOpenSettingsTab("customize");
-                  return;
-                }
-                const nextStatus = e.target.value;
-                onUpdateTask(t.id, {
-                  status: nextStatus,
-                  completed_at:
-                    nextStatus === "Done" ? new Date().toISOString() : null,
-                });
-              }}
-              className={`cursor-pointer rounded-md border px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary transition-colors ${badgeCls}`}
-            >
-              {allStatuses.map((s) => (
-                <option
-                  key={s.id}
-                  value={s.label}
-                  className="bg-zinc-900 text-white"
-                >
-                  {s.label}
-                </option>
-              ))}
-              <option value="__MANAGE__" className="bg-zinc-900 text-primary">
-                ⚙️ Edit Statuses...
-              </option>
-            </select>
-          );
-        },
-      },
-      {
-        accessorKey: "type",
-        header: workspaceConfig.columnHeaders.type,
-        cell: ({ row }) => {
-          const t = row.original;
-          const colorKey = getOptionColor(
-            workspaceConfig.types,
-            t.type,
-            "violet"
-          );
-          const badgeCls = getBadgeClasses(colorKey);
-          const allTypes = workspaceConfig.types.some((item) => item.label === t.type)
-            ? workspaceConfig.types
-            : [
-                ...workspaceConfig.types,
-                { id: t.type, label: t.type, color: "slate" as BadgeColorKey },
-              ];
-
-          return (
-            <select
-              value={t.type}
-              onChange={(e) => {
-                if (e.target.value === "__MANAGE__") {
-                  onOpenSettingsTab("customize");
-                  return;
-                }
-                onUpdateTask(t.id, { type: e.target.value });
-              }}
-              className={`cursor-pointer rounded-md border px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary transition-colors ${badgeCls}`}
-            >
-              {allTypes.map((item) => (
-                <option
-                  key={item.id}
-                  value={item.label}
-                  className="bg-zinc-900 text-white"
-                >
-                  {item.label}
-                </option>
-              ))}
-              <option value="__MANAGE__" className="bg-zinc-900 text-primary">
-                ⚙️ Edit Categories...
-              </option>
-            </select>
-          );
-        },
-      },
-      {
-        accessorKey: "priority",
-        header: workspaceConfig.columnHeaders.priority,
-        cell: ({ row }) => {
-          const t = row.original;
-          const colorKey = getOptionColor(
-            workspaceConfig.priorities,
-            t.priority,
-            "amber"
-          );
-          const badgeCls = getBadgeClasses(colorKey);
-          const allPriorities = workspaceConfig.priorities.some(
-            (p) => p.label === t.priority
-          )
-            ? workspaceConfig.priorities
-            : [
-                ...workspaceConfig.priorities,
-                {
-                  id: t.priority,
-                  label: t.priority,
-                  color: "slate" as BadgeColorKey,
-                },
-              ];
-
-          return (
-            <select
-              value={t.priority}
-              onChange={(e) => {
-                if (e.target.value === "__MANAGE__") {
-                  onOpenSettingsTab("customize");
-                  return;
-                }
-                onUpdateTask(t.id, { priority: e.target.value });
-              }}
-              className={`cursor-pointer rounded-md border px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary transition-colors ${badgeCls}`}
-            >
-              {allPriorities.map((p) => (
-                <option
-                  key={p.id}
-                  value={p.label}
-                  className="bg-zinc-900 text-white"
-                >
-                  {p.label}
-                </option>
-              ))}
-              <option value="__MANAGE__" className="bg-zinc-900 text-primary">
-                ⚙️ Edit Priorities...
-              </option>
-            </select>
-          );
-        },
-      },
-      {
-        accessorKey: "due_date",
-        header: workspaceConfig.columnHeaders.due_date,
-        cell: ({ row }) => {
-          const t = row.original;
-          const { label, isOverdue, isToday } = formatRelativeDueDate(
-            t.due_date,
-            t.status
-          );
-          const dateVal = t.due_date
-            ? new Date(t.due_date).toISOString().split("T")[0]
-            : "";
-
-          return (
-            <div className="relative inline-flex items-center gap-1.5 group/date">
-              <input
-                type="date"
-                value={dateVal}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  onUpdateTask(t.id, {
-                    due_date: val
-                      ? new Date(`${val}T23:59:00`).toISOString()
-                      : null,
-                  });
-                }}
-                className="cursor-pointer rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs text-white/90 hover:border-primary/50 focus:border-primary focus:outline-none"
-                title={label}
-              />
-              {isOverdue && (
-                <span title={label}>
-                  <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                </span>
-              )}
-              {isToday && !isOverdue && (
-                <span className="rounded bg-primary/20 border border-primary/40 px-1.5 py-0.5 text-[10px] font-semibold text-highlight">
-                  Today
-                </span>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: "estimated_minutes",
-        header: workspaceConfig.columnHeaders.estimated_minutes,
-        cell: ({ row }) => {
-          const t = row.original;
-          const presets = [15, 30, 45, 60, 90, 120, 180];
-          const currentMins = t.estimated_minutes || 30;
-          const options = presets.includes(currentMins)
-            ? presets
-            : [...presets, currentMins].sort((a, b) => a - b);
-
-          return (
-            <select
-              value={currentMins}
-              onChange={(e) =>
-                onUpdateTask(t.id, {
-                  estimated_minutes: parseInt(e.target.value, 10) || 30,
-                })
-              }
-              className="cursor-pointer rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs font-mono text-white/85 hover:border-primary/50 focus:border-primary focus:outline-none"
-            >
-              {options.map((mins) => (
-                <option
-                  key={mins}
-                  value={mins}
-                  className="bg-zinc-900 text-white"
-                >
-                  {formatEstimatedTime(mins)}
-                </option>
-              ))}
-            </select>
-          );
-        },
-      },
-      {
-        accessorKey: "tags",
-        header: workspaceConfig.columnHeaders.tags,
-        cell: ({ row }) => {
-          const t = row.original;
-          const isDropdownOpen = openTagDropdownTaskId === t.id;
-
-          const toggleTagOnTask = (tagLabel: string) => {
-            const exists = t.tags.includes(tagLabel);
-            const nextTags = exists
-              ? t.tags.filter((tg) => tg !== tagLabel)
-              : [...t.tags, tagLabel];
-            onUpdateTask(t.id, { tags: nextTags });
-          };
-
-          const handleCreateNewTagInline = (e: React.FormEvent) => {
-            e.preventDefault();
-            const raw = newTagName.trim();
-            if (!raw) return;
-            const formatted = raw.startsWith("#") ? raw : `#${raw}`;
-            if (
-              !workspaceConfig.tags.some(
-                (tg) => tg.label.toLowerCase() === formatted.toLowerCase()
-              )
-            ) {
-              onUpdateWorkspaceConfig({
-                tags: [
-                  ...workspaceConfig.tags,
-                  { id: formatted, label: formatted, color: newTagColor },
-                ],
-              });
-            }
-            if (!t.tags.includes(formatted)) {
-              onUpdateTask(t.id, { tags: [...t.tags, formatted] });
-            }
-            setNewTagName("");
-          };
-
-          return (
-            <div className="relative min-w-[150px]">
-              <div
-                onClick={() =>
-                  setOpenTagDropdownTaskId(isDropdownOpen ? null : t.id)
-                }
-                className="cursor-pointer flex flex-wrap items-center gap-1 rounded-md border border-transparent hover:border-white/20 hover:bg-black/30 px-1.5 py-1 min-h-[28px] transition-colors"
-                title="Click to select or edit tags"
-              >
-                {t.is_canvas_assignment && t.canvas_course_code && (
-                  <span className="rounded border border-orange-500/40 bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-orange-300">
-                    {t.canvas_course_code}
-                  </span>
-                )}
-                {t.tags.map((tag) => {
-                  const tagColor = getOptionColor(
-                    workspaceConfig.tags,
-                    tag,
-                    "cyan"
-                  );
-                  return (
-                    <span
-                      key={tag}
-                      className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${getBadgeClasses(
-                        tagColor
-                      )}`}
-                    >
-                      {tag}
-                    </span>
-                  );
-                })}
-                <span className="inline-flex items-center gap-0.5 rounded border border-dashed border-white/20 px-1.5 py-0.5 text-[10px] text-white/50 hover:text-white hover:border-primary/60">
-                  <Plus className="w-2.5 h-2.5" />
-                  {t.tags.length === 0 ? "Tags" : ""}
-                </span>
-              </div>
-
-              {isDropdownOpen && (
-                <div
-                  className="absolute left-0 top-full mt-1 w-64 rounded-xl border theme-panel p-2.5 shadow-2xl backdrop-blur-2xl z-50 space-y-2.5"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
-                    <span className="text-[11px] font-bold text-white flex items-center gap-1">
-                      <Tag className="w-3 h-3 text-primary" />
-                      Select Tags
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setOpenTagDropdownTaskId(null)}
-                      className="text-[10px] text-white/50 hover:text-white"
-                    >
-                      Done
-                    </button>
-                  </div>
-
-                  {/* Tag Options List */}
-                  <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
-                    {workspaceConfig.tags.map((tagOpt) => {
-                      const active = t.tags.includes(tagOpt.label);
-                      return (
-                        <button
-                          key={tagOpt.id}
-                          type="button"
-                          onClick={() => toggleTagOnTask(tagOpt.label)}
-                          className={`w-full flex items-center justify-between rounded-lg px-2 py-1 text-xs transition-colors ${
-                            active
-                              ? "bg-white/15 text-white font-semibold"
-                              : "text-white/70 hover:bg-white/10 hover:text-white"
-                          }`}
-                        >
-                          <span
-                            className={`rounded border px-1.5 py-0.5 text-[10px] ${getBadgeClasses(
-                              tagOpt.color
-                            )}`}
-                          >
-                            {tagOpt.label}
-                          </span>
-                          {active && (
-                            <Check className="w-3.5 h-3.5 text-primary" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Quick Create New Tag Inline */}
-                  <form
-                    onSubmit={handleCreateNewTagInline}
-                    className="border-t border-white/10 pt-2 space-y-1.5"
-                  >
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="text"
-                        value={newTagName}
-                        onChange={(e) => setNewTagName(e.target.value)}
-                        placeholder="New #tag name..."
-                        className="flex-1 rounded-lg border border-white/15 bg-black/60 px-2 py-1 text-[11px] text-white placeholder-white/35 focus:border-primary focus:outline-none"
-                      />
-                      <button
-                        type="submit"
-                        className="rounded-lg bg-primary px-2 py-1 text-[11px] font-bold text-black hover:brightness-110"
-                      >
-                        Add
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-1 pt-0.5">
-                      {BADGE_COLOR_KEYS.slice(0, 10).map((ck) => (
-                        <button
-                          key={ck}
-                          type="button"
-                          onClick={() => setNewTagColor(ck)}
-                          className={`h-3.5 w-3.5 rounded-full border ${
-                            newTagColor === ck
-                              ? "ring-2 ring-white scale-110"
-                              : "opacity-60 hover:opacity-100"
-                          }`}
-                          style={{ backgroundColor: BADGE_COLOR_MAP[ck].dot }}
-                          title={BADGE_COLOR_MAP[ck].label}
-                        />
-                      ))}
-                    </div>
-                  </form>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOpenTagDropdownTaskId(null);
-                      onOpenSettingsTab("customize");
-                    }}
-                    className="w-full flex items-center justify-center gap-1 border-t border-white/10 pt-2 text-[11px] text-primary hover:underline"
-                  >
-                    <Settings2 className="w-3 h-3" />
-                    <span>Manage All Tags in Settings</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: "notes",
-        header: workspaceConfig.columnHeaders.notes,
-        cell: ({ row }) => {
-          const t = row.original;
-          return (
-            <div className="min-w-[150px] max-w-[220px]">
-              <InlineTextCell
-                value={t.notes || ""}
-                placeholder="Add quick note..."
-                onCommit={(val) => onUpdateTask(t.id, { notes: val })}
-                className="text-white/75"
-              />
-            </div>
-          );
-        },
-      },
-      {
-        id: "actions",
-        header: "",
-        cell: ({ row }) => {
-          const t = row.original;
-          return (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeleteTask(t.id);
-              }}
-              className="p-1.5 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-950/30 transition-colors"
-              title="Delete Task"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          );
-        },
-      },
-    ],
-    [
-      workspaceConfig,
-      newlyCreatedTaskId,
-      selectedTaskId,
-      openTagDropdownTaskId,
-      newTagName,
-      newTagColor,
-      onSelectTask,
-      onUpdateTask,
-      onDeleteTask,
-      onUpdateWorkspaceConfig,
-      onOpenSettingsTab,
-    ]
-  );
-
-  const table = useReactTable({
-    data: filteredTasks,
-    columns,
-    state: {
-      sorting,
-    },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-  });
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = tasks.findIndex((t) => t.id === active.id);
-    const newIndex = tasks.findIndex((t) => t.id === over.id);
-
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const targetTask = tasks[newIndex];
-      const moved = arrayMove(tasks, oldIndex, newIndex).map((item, idx) =>
-        item.id === active.id
-          ? {
-              ...item,
-              section_group: targetTask.section_group,
-              order_index: idx,
-            }
-          : { ...item, order_index: idx }
-      );
-      onReorderTasks(moved);
-    }
-  };
-
-  const allSortedRows = table.getRowModel().rows;
   const selectedTaskObj = useMemo(
-    () => tasks.find((t) => t.id === selectedTaskId) || null,
+    () =>
+      tasks.find((t) => t.id === selectedTaskId && !isTaskHeaderRow(t)) || null,
     [tasks, selectedTaskId]
   );
 
-  const headerKeyMap: Record<string, keyof ColumnHeadersConfig> = {
-    title: "title",
-    status: "status",
-    type: "type",
-    priority: "priority",
-    due_date: "due_date",
-    estimated_minutes: "estimated_minutes",
-    tags: "tags",
-    notes: "notes",
-  };
+  const columnDefs: Array<{
+    key: keyof ColumnHeadersConfig;
+    sortable?: boolean;
+  }> = [
+    { key: "title", sortable: true },
+    { key: "status", sortable: true },
+    { key: "type", sortable: true },
+    { key: "priority", sortable: true },
+    { key: "due_date", sortable: true },
+    { key: "estimated_minutes", sortable: false },
+    { key: "tags", sortable: false },
+    { key: "notes", sortable: false },
+  ];
 
   return (
     <div className="space-y-4">
-      {/* Filter & Actions Bar */}
+      {/* Top Filter & Quick Actions Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-xl border theme-panel p-3.5 backdrop-blur-xl">
         <div className="flex flex-wrap items-center gap-2.5 flex-1">
           {/* Search Input */}
@@ -987,387 +758,789 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               type="text"
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
-              placeholder="Search tasks, #tags, categories..."
+              placeholder="Search document rows, #tags, notes..."
               className="w-full rounded-lg border theme-input pl-9 pr-3 py-1.5 text-xs text-white placeholder-white/40 focus:outline-none"
             />
           </div>
 
-          {/* Status Filter */}
-          <div className="flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-primary hidden sm:inline" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-lg border theme-input px-2.5 py-1.5 text-xs text-white/90 focus:outline-none"
-            >
-              <option value="ALL" className="bg-zinc-900">
-                All {workspaceConfig.columnHeaders.status}es
-              </option>
-              {workspaceConfig.statuses.map((s) => (
-                <option key={s.id} value={s.label} className="bg-zinc-900">
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Custom Dark-Glass Status Filter */}
+          <FilterDropdown
+            label={workspaceConfig.columnHeaders.status}
+            value={statusFilter}
+            options={workspaceConfig.statuses}
+            onChange={setStatusFilter}
+          />
 
-          {/* Category Filter */}
-          <select
+          {/* Custom Dark-Glass Category Filter */}
+          <FilterDropdown
+            label={workspaceConfig.columnHeaders.type}
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="rounded-lg border theme-input px-2.5 py-1.5 text-xs text-white/90 focus:outline-none"
-          >
-            <option value="ALL" className="bg-zinc-900">
-              All {workspaceConfig.columnHeaders.type}s
-            </option>
-            {workspaceConfig.types.map((t) => (
-              <option key={t.id} value={t.label} className="bg-zinc-900">
-                {t.label}
-              </option>
-            ))}
-          </select>
+            options={workspaceConfig.types}
+            onChange={setTypeFilter}
+          />
 
           <button
             type="button"
             onClick={() => onOpenSettingsTab("customize")}
             className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-highlight hover:border-primary/50 hover:bg-primary/10 transition-colors"
-            title="Customize tags, categories, statuses & headers"
+            title="Edit tags, statuses, categories & colors in Settings"
           >
             <Settings2 className="w-3.5 h-3.5 text-primary" />
-            <span>Edit Tags &amp; Options</span>
+            <span>Customize Tags &amp; Types</span>
           </button>
         </div>
 
-        {/* Right: Quick Add Row Button */}
+        {/* Right: Quick Add Task or Header Buttons */}
         <div className="flex items-center gap-2 self-end md:self-center">
           <button
             type="button"
-            onClick={() => handleTriggerNewRow(sections[0]?.id || "TODAY")}
+            onClick={() => handleCreateHeaderClick()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-semibold text-highlight hover:bg-primary/25 transition-all"
+            title="Insert a movable header divider row"
+          >
+            <Heading className="w-3.5 h-3.5 text-primary" />
+            <span>+ New Header</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleCreateTaskClick()}
             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-black shadow-neon hover:brightness-110 transition-all"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>New Task Row</span>
+            <span>+ New Task</span>
           </button>
         </div>
       </div>
 
-      {/* Main Customizable Table */}
+      {/* Main Document-Style Table */}
       <div className="rounded-xl border theme-panel overflow-visible backdrop-blur-xl">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-visible">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
           >
             <SortableContext
-              items={filteredTasks.map((t) => t.id)}
+              items={visibleRows.map((t) => t.id)}
               strategy={verticalListSortingStrategy}
             >
               <table className="w-full text-left border-collapse">
+                {/* Editable Column Headers */}
                 <thead>
-                  {table.getHeaderGroups().map((headerGroup) => (
-                    <tr
-                      key={headerGroup.id}
-                      className="border-b theme-header-bg text-[11px] font-semibold uppercase tracking-wider text-highlight/90"
-                    >
-                      <th className="w-8 pl-3 pr-1 py-3" />
-                      {headerGroup.headers.map((header) => {
-                        const colKey = headerKeyMap[header.column.id];
-                        const isEditingThisCol =
-                          colKey && editingColKey === colKey;
+                  <tr className="border-b theme-header-bg text-[11px] font-semibold uppercase tracking-wider text-highlight/90">
+                    <th className="w-10 pl-3 pr-1 py-3" />
+                    {columnDefs.map(({ key: colKey, sortable }) => {
+                      const isEditingThisCol = editingColKey === colKey;
+                      return (
+                        <th key={colKey} className="px-3 py-3 select-none">
+                          <div className="inline-flex items-center gap-1.5 group/col">
+                            {isEditingThisCol ? (
+                              <input
+                                type="text"
+                                autoFocus
+                                value={colHeaderDraft}
+                                onChange={(e) =>
+                                  setColHeaderDraft(e.target.value)
+                                }
+                                onBlur={() => commitColumnHeader(colKey)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter")
+                                    commitColumnHeader(colKey);
+                                  if (e.key === "Escape")
+                                    setEditingColKey(null);
+                                }}
+                                className="w-28 rounded border border-primary bg-black/85 px-1.5 py-0.5 text-[11px] font-bold text-white focus:outline-none"
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setColHeaderDraft(
+                                    workspaceConfig.columnHeaders[colKey]
+                                  );
+                                  setEditingColKey(colKey);
+                                }}
+                                className="inline-flex items-center gap-1 hover:text-white transition-colors"
+                                title="Click to rename column header"
+                              >
+                                <span>
+                                  {workspaceConfig.columnHeaders[colKey]}
+                                </span>
+                                <Pencil className="w-2.5 h-2.5 opacity-0 group-hover/col:opacity-80 text-primary transition-opacity" />
+                              </button>
+                            )}
 
-                        return (
-                          <th key={header.id} className="px-3 py-3 select-none">
-                            {header.isPlaceholder ? null : colKey ? (
-                              <div className="inline-flex items-center gap-1.5 group/col">
-                                {isEditingThisCol ? (
-                                  <input
-                                    type="text"
-                                    autoFocus
-                                    value={colHeaderDraft}
-                                    onChange={(e) =>
-                                      setColHeaderDraft(e.target.value)
+                            {sortable && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (sortField === colKey) {
+                                    if (!sortAsc) {
+                                      setSortField(null);
+                                    } else {
+                                      setSortAsc(false);
                                     }
-                                    onBlur={() => commitColumnHeader(colKey)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter")
-                                        commitColumnHeader(colKey);
-                                      if (e.key === "Escape")
-                                        setEditingColKey(null);
-                                    }}
-                                    className="w-28 rounded border border-primary bg-black/80 px-1.5 py-0.5 text-[11px] font-bold text-white focus:outline-none"
-                                  />
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setColHeaderDraft(
-                                        workspaceConfig.columnHeaders[colKey]
-                                      );
-                                      setEditingColKey(colKey);
-                                    }}
-                                    className="inline-flex items-center gap-1 hover:text-white transition-colors"
-                                    title="Click to rename column header"
-                                  >
-                                    <span>
-                                      {workspaceConfig.columnHeaders[colKey]}
-                                    </span>
-                                    <Pencil className="w-2.5 h-2.5 opacity-0 group-hover/col:opacity-70 text-primary transition-opacity" />
-                                  </button>
-                                )}
-
-                                <button
-                                  type="button"
-                                  onClick={header.column.getToggleSortingHandler()}
-                                  className="p-0.5 rounded hover:bg-white/10 text-white/40 hover:text-white transition-colors"
-                                  title="Sort by column"
-                                >
-                                  <ArrowUpDown className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ) : null}
-                          </th>
-                        );
-                      })}
-                    </tr>
-                  ))}
+                                  } else {
+                                    setSortField(colKey);
+                                    setSortAsc(true);
+                                  }
+                                }}
+                                className={`p-0.5 rounded hover:bg-white/10 transition-colors ${
+                                  sortField === colKey
+                                    ? "text-primary"
+                                    : "text-white/35 hover:text-white"
+                                }`}
+                                title="Sort by column"
+                              >
+                                <ArrowUpDown className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
+                    <th className="w-24 px-3 py-3 text-right">Actions</th>
+                  </tr>
                 </thead>
 
+                {/* Unified Document Body: Both Movable Headers & Task Rows */}
                 <tbody>
-                  {sections.map((secMeta, secIndex) => {
-                    const secId = secMeta.id;
-                    const sectionRows = allSortedRows.filter(
-                      (r) => r.original.section_group === secId
-                    );
-                    const isCollapsed = Boolean(collapsedSections[secId]);
-                    const isEditingSec = editingSectionId === secId;
+                  {visibleRows.map((rowItem, rowIndex) => {
+                    const isHeader = isTaskHeaderRow(rowItem);
 
-                    return (
-                      <React.Fragment key={secId}>
-                        {/* Editable Section Header Row */}
-                        <tr className="border-y theme-section-bg">
-                          <td colSpan={10} className="px-4 py-2.5">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2">
+                    if (isHeader) {
+                      return (
+                        <SortableDocumentRow
+                          key={rowItem.id}
+                          item={rowItem}
+                          isHeader={true}
+                          isSelected={false}
+                        >
+                          {({ attributes, listeners }) => (
+                            <>
+                              {/* Drag Handle for Header Row */}
+                              <td className="w-10 pl-3 pr-1 py-2.5 align-middle">
                                 <button
                                   type="button"
-                                  onClick={() =>
-                                    setCollapsedSections((prev) => ({
-                                      ...prev,
-                                      [secId]: !prev[secId],
-                                    }))
-                                  }
-                                  className="p-0.5 text-primary hover:text-white transition-colors"
+                                  {...attributes}
+                                  {...listeners}
+                                  className="cursor-grab active:cursor-grabbing text-primary/70 hover:text-white p-1 rounded"
+                                  title="Drag header up or down anywhere in the table"
                                 >
-                                  {isCollapsed ? (
-                                    <ChevronRight className="w-4 h-4" />
-                                  ) : (
-                                    <ChevronDown className="w-4 h-4" />
-                                  )}
-                                </button>
-
-                                {isEditingSec ? (
-                                  <input
-                                    type="text"
-                                    autoFocus
-                                    value={sectionLabelDraft}
-                                    onChange={(e) =>
-                                      setSectionLabelDraft(e.target.value)
-                                    }
-                                    onBlur={() => commitSectionLabel(secId)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter")
-                                        commitSectionLabel(secId);
-                                      if (e.key === "Escape")
-                                        setEditingSectionId(null);
-                                    }}
-                                    className="rounded border border-primary bg-black/70 px-2 py-0.5 text-xs sm:text-sm font-bold text-white focus:outline-none"
-                                  />
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSectionLabelDraft(secMeta.label);
-                                      setEditingSectionId(secId);
-                                    }}
-                                    className="group/sec flex items-center gap-1.5 text-xs sm:text-sm font-bold tracking-wider text-highlight hover:text-white transition-colors"
-                                    title="Click to rename section header"
-                                  >
-                                    <span>{secMeta.label}</span>
-                                    <Pencil className="w-3 h-3 opacity-0 group-hover/sec:opacity-80 text-primary transition-opacity" />
-                                  </button>
-                                )}
-
-                                <span className="rounded-full bg-black/40 border border-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/70">
-                                  {sectionRows.length}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => handleTriggerNewRow(secId)}
-                                  className="rounded-lg border border-primary/40 bg-primary/15 px-2.5 py-0.5 text-[11px] font-semibold text-highlight hover:bg-primary hover:text-black transition-all"
-                                >
-                                  + New Task
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={secIndex === 0}
-                                  onClick={() => moveSectionOrder(-1, secId)}
-                                  className="rounded p-1 text-xs text-white/50 hover:text-white disabled:opacity-20"
-                                  title="Move section up"
-                                >
-                                  ↑
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={secIndex === sections.length - 1}
-                                  onClick={() => moveSectionOrder(1, secId)}
-                                  className="rounded p-1 text-xs text-white/50 hover:text-white disabled:opacity-20"
-                                  title="Move section down"
-                                >
-                                  ↓
-                                </button>
-                                {sections.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteSection(secId)}
-                                    className="rounded p-1 text-xs text-white/35 hover:text-red-400 transition-colors"
-                                    title="Remove section"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-
-                        {/* Section Tasks */}
-                        {!isCollapsed && (
-                          <>
-                            {sectionRows.map((row) => (
-                              <React.Fragment key={row.id}>
-                                <SortableTaskRow
-                                  task={row.original}
-                                  isSelected={
-                                    selectedTaskId === row.original.id
-                                  }
-                                >
-                                  {row.getVisibleCells().map((cell) => (
-                                    <td
-                                      key={cell.id}
-                                      className="px-3 py-2 align-middle"
-                                    >
-                                      {flexRender(
-                                        cell.column.columnDef.cell,
-                                        cell.getContext()
-                                      )}
-                                    </td>
-                                  ))}
-                                </SortableTaskRow>
-
-                                {/* Inline Editor if viewMode === inline */}
-                                {viewMode === "inline" &&
-                                  selectedTaskId === row.original.id &&
-                                  selectedTaskObj && (
-                                    <tr>
-                                      <td colSpan={10} className="px-4 py-2">
-                                        <TaskDocumentEditor
-                                          task={selectedTaskObj}
-                                          viewMode="inline"
-                                          workspaceConfig={workspaceConfig}
-                                          onClose={() => onSelectTask(null)}
-                                          onUpdateTask={onUpdateTask}
-                                          onDeleteTask={onDeleteTask}
-                                        />
-                                      </td>
-                                    </tr>
-                                  )}
-                              </React.Fragment>
-                            ))}
-
-                            {/* Notion-Style Bottom-of-Section "+ New task" Row */}
-                            <tr className="border-b border-white/5 hover:bg-white/[0.04] transition-colors">
-                              <td colSpan={10} className="p-0">
-                                <button
-                                  type="button"
-                                  onClick={() => handleTriggerNewRow(secId)}
-                                  className="w-full flex items-center gap-2 px-10 py-2 text-xs text-white/45 hover:text-highlight transition-colors text-left"
-                                >
-                                  <Plus className="w-3.5 h-3.5 text-primary" />
-                                  <span>
-                                    New task in{" "}
-                                    <strong className="font-semibold">
-                                      {secMeta.label}
-                                    </strong>
-                                  </span>
+                                  <GripVertical className="w-4 h-4" />
                                 </button>
                               </td>
+
+                              {/* Inline Editable Header Title spanning across the table */}
+                              <td colSpan={8} className="px-3 py-2 align-middle">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex-1 max-w-xl">
+                                    <InlineTextCell
+                                      value={rowItem.title}
+                                      placeholder="Type header title (e.g. ——— 📅 TODAY 📅 ———)..."
+                                      autoFocus={
+                                        newlyCreatedRowId === rowItem.id
+                                      }
+                                      onCommit={(val) => {
+                                        onUpdateTask(rowItem.id, {
+                                          title:
+                                            val || "——— NEW HEADER ———",
+                                        });
+                                        if (newlyCreatedRowId === rowItem.id) {
+                                          setNewlyCreatedRowId(null);
+                                        }
+                                      }}
+                                      className="font-bold tracking-wider text-highlight text-xs sm:text-sm"
+                                    />
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleCreateTaskClick(rowItem.id)
+                                      }
+                                      className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-highlight hover:bg-primary hover:text-black transition-all"
+                                      title="Insert task directly below this header"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                      <span>Task Below</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleCreateHeaderClick(rowItem.id)
+                                      }
+                                      className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] text-white/75 hover:text-white hover:border-primary/50 transition-all"
+                                      title="Insert another header below"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                      <span>Header</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Move Up / Move Down / Delete Controls for Header Row */}
+                              <td className="px-3 py-2 align-middle text-right whitespace-nowrap">
+                                <div className="inline-flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    disabled={rowIndex === 0}
+                                    onClick={() =>
+                                      moveRowStep(rowItem.id, -1)
+                                    }
+                                    className="p-1 rounded text-white/55 hover:text-white hover:bg-white/10 disabled:opacity-20"
+                                    title="Move header up"
+                                  >
+                                    <ArrowUp className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      rowIndex === visibleRows.length - 1
+                                    }
+                                    onClick={() =>
+                                      moveRowStep(rowItem.id, 1)
+                                    }
+                                    className="p-1 rounded text-white/55 hover:text-white hover:bg-white/10 disabled:opacity-20"
+                                    title="Move header down"
+                                  >
+                                    <ArrowDown className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => onDeleteTask(rowItem.id)}
+                                    className="p-1 rounded text-white/45 hover:text-red-400 hover:bg-red-950/30 transition-colors"
+                                    title="Delete header row"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </SortableDocumentRow>
+                      );
+                    }
+
+                    // Normal Task Row
+                    const t = rowItem;
+                    const isDone = t.status === "Done";
+                    const isTagMenuOpen = openTagDropdownTaskId === t.id;
+                    const {
+                      label: dueLabel,
+                      isOverdue,
+                      isToday,
+                    } = formatRelativeDueDate(t.due_date, t.status);
+                    const dateVal = t.due_date
+                      ? new Date(t.due_date).toISOString().split("T")[0]
+                      : "";
+
+                    const toggleTagOnTask = (tagLabel: string) => {
+                      const exists = t.tags.includes(tagLabel);
+                      const nextTags = exists
+                        ? t.tags.filter((tg) => tg !== tagLabel)
+                        : [...t.tags, tagLabel];
+                      onUpdateTask(t.id, { tags: nextTags });
+                    };
+
+                    const handleCreateNewTagInline = (e: React.FormEvent) => {
+                      e.preventDefault();
+                      const raw = newTagName.trim();
+                      if (!raw) return;
+                      const formatted = raw.startsWith("#") ? raw : `#${raw}`;
+                      if (
+                        !workspaceConfig.tags.some(
+                          (tg) =>
+                            tg.label.toLowerCase() === formatted.toLowerCase()
+                        )
+                      ) {
+                        onUpdateWorkspaceConfig({
+                          tags: [
+                            ...workspaceConfig.tags,
+                            {
+                              id: formatted,
+                              label: formatted,
+                              color: newTagColor,
+                            },
+                          ],
+                        });
+                      }
+                      if (!t.tags.includes(formatted)) {
+                        onUpdateTask(t.id, { tags: [...t.tags, formatted] });
+                      }
+                      setNewTagName("");
+                    };
+
+                    return (
+                      <React.Fragment key={t.id}>
+                        <SortableDocumentRow
+                          item={t}
+                          isHeader={false}
+                          isSelected={selectedTaskId === t.id}
+                        >
+                          {({ attributes, listeners }) => (
+                            <>
+                              {/* 0. Drag Handle */}
+                              <td className="w-10 pl-3 pr-1 py-2 align-middle">
+                                <button
+                                  type="button"
+                                  {...attributes}
+                                  {...listeners}
+                                  className="cursor-grab active:cursor-grabbing text-white/35 hover:text-white p-1 rounded"
+                                  title="Drag row up or down"
+                                >
+                                  <GripVertical className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+
+                              {/* 1. Task Title + Complete Toggle + Doc Drawer Button */}
+                              <td className="px-3 py-2 align-middle">
+                                <div className="flex items-center gap-2 min-w-[230px] max-w-[400px]">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const nextStatus: TaskStatus = isDone
+                                        ? workspaceConfig.statuses[0]?.label ||
+                                          "To Do"
+                                        : "Done";
+                                      onUpdateTask(t.id, {
+                                        status: nextStatus,
+                                        completed_at:
+                                          nextStatus === "Done"
+                                            ? new Date().toISOString()
+                                            : null,
+                                      });
+                                    }}
+                                    className="shrink-0 text-white/45 hover:text-primary transition-colors"
+                                    title={
+                                      isDone ? "Mark as To Do" : "Complete Task"
+                                    }
+                                  >
+                                    {isDone ? (
+                                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                    ) : (
+                                      <Circle className="w-4 h-4 hover:text-primary" />
+                                    )}
+                                  </button>
+
+                                  <div className="flex-1 min-w-0">
+                                    <InlineTextCell
+                                      value={t.title}
+                                      placeholder="Type task title..."
+                                      isDone={isDone}
+                                      autoFocus={newlyCreatedRowId === t.id}
+                                      onCommit={(val) => {
+                                        onUpdateTask(t.id, {
+                                          title: val || "Untitled Task",
+                                        });
+                                        if (newlyCreatedRowId === t.id) {
+                                          setNewlyCreatedRowId(null);
+                                        }
+                                      }}
+                                      className="font-medium"
+                                    />
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      onSelectTask(
+                                        selectedTaskId === t.id ? null : t.id
+                                      )
+                                    }
+                                    className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/60 hover:border-primary/60 hover:text-highlight transition-all shrink-0"
+                                    title="Open rich-text document"
+                                  >
+                                    <FileText className="w-3 h-3" />
+                                    <span className="hidden sm:inline">
+                                      Doc
+                                    </span>
+                                  </button>
+                                </div>
+                              </td>
+
+                              {/* 2. Status Custom Dark Popover Dropdown */}
+                              <td className="px-3 py-2 align-middle">
+                                <PillPopoverDropdown
+                                  value={t.status}
+                                  options={workspaceConfig.statuses}
+                                  placeholder="New status..."
+                                  onSelect={(nextStatus) =>
+                                    onUpdateTask(t.id, {
+                                      status: nextStatus,
+                                      completed_at:
+                                        nextStatus === "Done"
+                                          ? new Date().toISOString()
+                                          : null,
+                                    })
+                                  }
+                                  onAddNewOption={(label, color) =>
+                                    onUpdateWorkspaceConfig({
+                                      statuses: [
+                                        ...workspaceConfig.statuses,
+                                        { id: label, label, color },
+                                      ],
+                                    })
+                                  }
+                                  onOpenManage={() =>
+                                    onOpenSettingsTab("customize")
+                                  }
+                                />
+                              </td>
+
+                              {/* 3. Category / Type Custom Dark Popover Dropdown */}
+                              <td className="px-3 py-2 align-middle">
+                                <PillPopoverDropdown
+                                  value={t.type}
+                                  options={workspaceConfig.types}
+                                  placeholder="New category..."
+                                  onSelect={(nextType) =>
+                                    onUpdateTask(t.id, { type: nextType })
+                                  }
+                                  onAddNewOption={(label, color) =>
+                                    onUpdateWorkspaceConfig({
+                                      types: [
+                                        ...workspaceConfig.types,
+                                        { id: label, label, color },
+                                      ],
+                                    })
+                                  }
+                                  onOpenManage={() =>
+                                    onOpenSettingsTab("customize")
+                                  }
+                                />
+                              </td>
+
+                              {/* 4. Priority Custom Dark Popover Dropdown */}
+                              <td className="px-3 py-2 align-middle">
+                                <PillPopoverDropdown
+                                  value={t.priority}
+                                  options={workspaceConfig.priorities}
+                                  placeholder="New priority..."
+                                  onSelect={(nextPriority) =>
+                                    onUpdateTask(t.id, {
+                                      priority: nextPriority,
+                                    })
+                                  }
+                                  onAddNewOption={(label, color) =>
+                                    onUpdateWorkspaceConfig({
+                                      priorities: [
+                                        ...workspaceConfig.priorities,
+                                        { id: label, label, color },
+                                      ],
+                                    })
+                                  }
+                                  onOpenManage={() =>
+                                    onOpenSettingsTab("customize")
+                                  }
+                                />
+                              </td>
+
+                              {/* 5. Due Date Inline Picker */}
+                              <td className="px-3 py-2 align-middle">
+                                <div className="inline-flex items-center gap-1.5">
+                                  <input
+                                    type="date"
+                                    value={dateVal}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      onUpdateTask(t.id, {
+                                        due_date: val
+                                          ? new Date(
+                                              `${val}T23:59:00`
+                                            ).toISOString()
+                                          : null,
+                                      });
+                                    }}
+                                    className="cursor-pointer rounded-md border border-white/15 bg-black/45 px-2 py-1 text-xs text-white/90 hover:border-primary/50 focus:border-primary focus:outline-none"
+                                    title={dueLabel}
+                                  />
+                                  {isOverdue && (
+                                    <span title={dueLabel}>
+                                      <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                                    </span>
+                                  )}
+                                  {isToday && !isOverdue && (
+                                    <span className="rounded bg-primary/20 border border-primary/40 px-1.5 py-0.5 text-[10px] font-semibold text-highlight">
+                                      Today
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* 6. Est. Time Custom Dark Popover */}
+                              <td className="px-3 py-2 align-middle">
+                                <DurationPopoverCell
+                                  minutes={t.estimated_minutes || 30}
+                                  onChange={(mins) =>
+                                    onUpdateTask(t.id, {
+                                      estimated_minutes: mins,
+                                    })
+                                  }
+                                />
+                              </td>
+
+                              {/* 7. Tags Custom Dark Multi-Select Popover */}
+                              <td className="px-3 py-2 align-middle">
+                                <div className="relative min-w-[140px]">
+                                  <div
+                                    onClick={() =>
+                                      setOpenTagDropdownTaskId(
+                                        isTagMenuOpen ? null : t.id
+                                      )
+                                    }
+                                    className="cursor-pointer flex flex-wrap items-center gap-1 rounded-md border border-transparent hover:border-white/20 hover:bg-black/35 px-1.5 py-1 min-h-[28px] transition-colors"
+                                    title="Click to select or add tags"
+                                  >
+                                    {t.is_canvas_assignment &&
+                                      t.canvas_course_code && (
+                                        <span className="rounded border border-orange-500/40 bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-orange-300">
+                                          {t.canvas_course_code}
+                                        </span>
+                                      )}
+                                    {t.tags.map((tag) => {
+                                      const tagColor = getOptionColor(
+                                        workspaceConfig.tags,
+                                        tag,
+                                        "cyan"
+                                      );
+                                      return (
+                                        <span
+                                          key={tag}
+                                          className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${getBadgeClasses(
+                                            tagColor
+                                          )}`}
+                                        >
+                                          {tag}
+                                        </span>
+                                      );
+                                    })}
+                                    <span className="inline-flex items-center gap-0.5 rounded border border-dashed border-white/20 px-1.5 py-0.5 text-[10px] text-white/50 hover:text-white hover:border-primary/60">
+                                      <Plus className="w-2.5 h-2.5" />
+                                      {t.tags.length === 0 ? "Tags" : ""}
+                                    </span>
+                                  </div>
+
+                                  {isTagMenuOpen && (
+                                    <div
+                                      className="absolute left-0 top-full mt-1.5 w-64 rounded-xl border theme-popover p-2.5 z-50 space-y-2.5 backdrop-blur-2xl"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+                                        <span className="text-[11px] font-bold text-white flex items-center gap-1">
+                                          <Tag className="w-3 h-3 text-primary" />
+                                          Select or Create Tags
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setOpenTagDropdownTaskId(null)
+                                          }
+                                          className="text-[10px] text-white/60 hover:text-white"
+                                        >
+                                          Done
+                                        </button>
+                                      </div>
+
+                                      <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                                        {workspaceConfig.tags.map((tagOpt) => {
+                                          const active = t.tags.includes(
+                                            tagOpt.label
+                                          );
+                                          return (
+                                            <button
+                                              key={tagOpt.id}
+                                              type="button"
+                                              onClick={() =>
+                                                toggleTagOnTask(tagOpt.label)
+                                              }
+                                              className={`w-full flex items-center justify-between rounded-lg px-2 py-1.5 text-xs transition-colors ${
+                                                active
+                                                  ? "bg-white/15 text-white font-semibold"
+                                                  : "text-white/75 hover:bg-white/10 hover:text-white"
+                                              }`}
+                                            >
+                                              <span
+                                                className={`rounded border px-1.5 py-0.5 text-[10px] ${getBadgeClasses(
+                                                  tagOpt.color
+                                                )}`}
+                                              >
+                                                {tagOpt.label}
+                                              </span>
+                                              {active && (
+                                                <Check className="w-3.5 h-3.5 text-primary" />
+                                              )}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+
+                                      <form
+                                        onSubmit={handleCreateNewTagInline}
+                                        className="border-t border-white/10 pt-2 space-y-1.5"
+                                      >
+                                        <div className="flex items-center gap-1">
+                                          <input
+                                            type="text"
+                                            value={newTagName}
+                                            onChange={(e) =>
+                                              setNewTagName(e.target.value)
+                                            }
+                                            placeholder="New #tag name..."
+                                            className="flex-1 rounded-lg border border-white/15 bg-black/75 px-2 py-1 text-[11px] text-white placeholder-white/40 focus:border-primary focus:outline-none"
+                                          />
+                                          <button
+                                            type="submit"
+                                            className="rounded-lg bg-primary px-2 py-1 text-[11px] font-bold text-black hover:brightness-110"
+                                          >
+                                            Add
+                                          </button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1 pt-0.5">
+                                          {BADGE_COLOR_KEYS.slice(0, 10).map(
+                                            (ck) => (
+                                              <button
+                                                key={ck}
+                                                type="button"
+                                                onClick={() =>
+                                                  setNewTagColor(ck)
+                                                }
+                                                className={`h-3.5 w-3.5 rounded-full border ${
+                                                  newTagColor === ck
+                                                    ? "ring-2 ring-white scale-110"
+                                                    : "opacity-60 hover:opacity-100"
+                                                }`}
+                                                style={{
+                                                  backgroundColor:
+                                                    BADGE_COLOR_MAP[ck].dot,
+                                                }}
+                                                title={
+                                                  BADGE_COLOR_MAP[ck].label
+                                                }
+                                              />
+                                            )
+                                          )}
+                                        </div>
+                                      </form>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setOpenTagDropdownTaskId(null);
+                                          onOpenSettingsTab("customize");
+                                        }}
+                                        className="w-full flex items-center justify-center gap-1 border-t border-white/10 pt-1.5 text-[11px] text-primary hover:underline"
+                                      >
+                                        <Settings2 className="w-3 h-3" />
+                                        <span>Manage All Tags in Settings</span>
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* 8. Notes Inline Text Cell */}
+                              <td className="px-3 py-2 align-middle">
+                                <div className="min-w-[140px] max-w-[220px]">
+                                  <InlineTextCell
+                                    value={t.notes || ""}
+                                    placeholder="Add quick note..."
+                                    onCommit={(val) =>
+                                      onUpdateTask(t.id, { notes: val })
+                                    }
+                                    className="text-white/80"
+                                  />
+                                </div>
+                              </td>
+
+                              {/* 9. Row Actions: Move Up / Move Down / Insert Below / Delete */}
+                              <td className="px-3 py-2 align-middle text-right whitespace-nowrap">
+                                <div className="inline-flex items-center gap-0.5">
+                                  <button
+                                    type="button"
+                                    disabled={rowIndex === 0}
+                                    onClick={() => moveRowStep(t.id, -1)}
+                                    className="p-1 rounded text-white/35 hover:text-white hover:bg-white/10 disabled:opacity-15"
+                                    title="Move row up"
+                                  >
+                                    <ArrowUp className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      rowIndex === visibleRows.length - 1
+                                    }
+                                    onClick={() => moveRowStep(t.id, 1)}
+                                    className="p-1 rounded text-white/35 hover:text-white hover:bg-white/10 disabled:opacity-15"
+                                    title="Move row down"
+                                  >
+                                    <ArrowDown className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDeleteTask(t.id);
+                                    }}
+                                    className="p-1 rounded text-white/40 hover:text-red-400 hover:bg-red-950/30 transition-colors"
+                                    title="Delete Task"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </SortableDocumentRow>
+
+                        {/* Inline Rich-Text Editor if viewMode === inline */}
+                        {viewMode === "inline" &&
+                          selectedTaskId === t.id &&
+                          selectedTaskObj && (
+                            <tr>
+                              <td colSpan={10} className="px-4 py-2">
+                                <TaskDocumentEditor
+                                  task={selectedTaskObj}
+                                  viewMode="inline"
+                                  workspaceConfig={workspaceConfig}
+                                  onClose={() => onSelectTask(null)}
+                                  onUpdateTask={onUpdateTask}
+                                  onDeleteTask={onDeleteTask}
+                                />
+                              </td>
                             </tr>
-                          </>
-                        )}
+                          )}
                       </React.Fragment>
                     );
                   })}
 
-                  {/* Bottom of Table: Prominent "+ New Task" & "+ Add Section" Bar */}
-                  <tr className="border-t border-white/15 bg-black/30">
-                    <td colSpan={10} className="p-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2 px-2">
+                  {/* Bottom of Document Table: Click to Add New Task Row or New Header Row */}
+                  <tr className="border-t border-white/15 bg-black/35">
+                    <td colSpan={10} className="p-2.5">
+                      <div className="flex flex-wrap items-center gap-2.5 px-2">
                         <button
                           type="button"
-                          onClick={() =>
-                            handleTriggerNewRow(sections[0]?.id || "TODAY")
-                          }
-                          className="inline-flex items-center gap-2 rounded-lg bg-primary/20 border border-primary/50 px-4 py-2 text-xs font-bold text-highlight hover:bg-primary hover:text-black transition-all shadow-sm"
+                          onClick={() => handleCreateTaskClick()}
+                          className="flex-1 min-w-[200px] flex items-center gap-2 rounded-lg border border-dashed border-primary/50 bg-primary/10 hover:bg-primary/20 px-4 py-2.5 text-xs font-bold text-highlight transition-all text-left"
                         >
-                          <Plus className="w-4 h-4 stroke-[2.5]" />
+                          <Plus className="w-4 h-4 text-primary stroke-[2.5]" />
                           <span>
-                            + Click to Add New Task Row
+                            New Task — Click to add a row and start typing
                           </span>
                         </button>
 
-                        {addingNewSection ? (
-                          <form
-                            onSubmit={handleAddNewSection}
-                            className="inline-flex items-center gap-1.5"
-                          >
-                            <input
-                              type="text"
-                              autoFocus
-                              value={newSectionName}
-                              onChange={(e) =>
-                                setNewSectionName(e.target.value)
-                              }
-                              placeholder="Section title (e.g. EXAMS)..."
-                              className="rounded-lg border border-primary bg-black/70 px-2.5 py-1.5 text-xs text-white focus:outline-none"
-                            />
-                            <button
-                              type="submit"
-                              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-black"
-                            >
-                              Add
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setAddingNewSection(false)}
-                              className="rounded-lg border border-white/15 px-2.5 py-1.5 text-xs text-white/60 hover:text-white"
-                            >
-                              Cancel
-                            </button>
-                          </form>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setAddingNewSection(true)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/75 hover:text-white hover:border-primary/50 transition-colors"
-                          >
-                            <FolderPlus className="w-3.5 h-3.5 text-primary" />
-                            <span>+ Add Section Header</span>
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleCreateHeaderClick()}
+                          className="inline-flex items-center gap-2 rounded-lg border border-dashed border-white/25 bg-white/5 hover:bg-white/10 hover:border-primary/50 px-4 py-2.5 text-xs font-semibold text-white/85 hover:text-white transition-all"
+                        >
+                          <Heading className="w-4 h-4 text-primary" />
+                          <span>+ Add Movable Header Row</span>
+                        </button>
                       </div>
                     </td>
                   </tr>
