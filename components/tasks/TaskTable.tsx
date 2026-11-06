@@ -49,6 +49,7 @@ import {
   Heading,
   ArrowUp,
   ArrowDown,
+  RotateCcw,
 } from "lucide-react";
 import { TaskDocumentEditor } from "@/components/editor/TaskDocumentEditor";
 
@@ -595,6 +596,28 @@ const SortableDocumentRow: React.FC<{
   );
 };
 
+export const DEFAULT_COLUMN_WIDTHS: Record<keyof ColumnHeadersConfig, number> = {
+  title: 320,
+  status: 140,
+  type: 140,
+  priority: 130,
+  due_date: 140,
+  estimated_minutes: 110,
+  tags: 180,
+  notes: 220,
+};
+
+export const MIN_COLUMN_WIDTHS: Record<keyof ColumnHeadersConfig, number> = {
+  title: 180,
+  status: 110,
+  type: 110,
+  priority: 100,
+  due_date: 110,
+  estimated_minutes: 90,
+  tags: 120,
+  notes: 130,
+};
+
 export const TaskTable: React.FC<TaskTableProps> = ({
   tasks,
   selectedTaskId,
@@ -617,6 +640,123 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   const [newlyCreatedRowId, setNewlyCreatedRowId] = useState<string | null>(
     null
   );
+
+  // Column resizing state (persisted to localStorage)
+  const [colWidths, setColWidths] = useState<
+    Record<keyof ColumnHeadersConfig, number>
+  >(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("taskit_column_widths_v1");
+        if (saved) {
+          return { ...DEFAULT_COLUMN_WIDTHS, ...JSON.parse(saved) };
+        }
+      } catch {}
+    }
+    return DEFAULT_COLUMN_WIDTHS;
+  });
+
+  const resizingColRef = useRef<{
+    colKey: keyof ColumnHeadersConfig;
+    startX: number;
+    startWidth: number;
+  } | null>(null);
+
+  const [activeResizingCol, setActiveResizingCol] = useState<
+    keyof ColumnHeadersConfig | null
+  >(null);
+
+  const startResize = (
+    colKey: keyof ColumnHeadersConfig,
+    e: React.MouseEvent | React.TouchEvent
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    resizingColRef.current = {
+      colKey,
+      startX: clientX,
+      startWidth: colWidths[colKey] || DEFAULT_COLUMN_WIDTHS[colKey],
+    };
+    setActiveResizingCol(colKey);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const onMouseMove = (moveEvent: MouseEvent | TouchEvent) => {
+      if (!resizingColRef.current) return;
+      const currentX =
+        "touches" in moveEvent
+          ? moveEvent.touches[0].clientX
+          : moveEvent.clientX;
+      const delta = currentX - resizingColRef.current.startX;
+      const minW =
+        MIN_COLUMN_WIDTHS[resizingColRef.current.colKey] || 90;
+      const newWidth = Math.max(
+        minW,
+        resizingColRef.current.startWidth + delta
+      );
+
+      setColWidths((prev) => ({
+        ...prev,
+        [resizingColRef.current!.colKey]: newWidth,
+      }));
+    };
+
+    const onMouseUp = () => {
+      setActiveResizingCol(null);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("touchmove", onMouseMove);
+      window.removeEventListener("touchend", onMouseUp);
+
+      if (resizingColRef.current) {
+        setColWidths((prev) => {
+          try {
+            localStorage.setItem(
+              "taskit_column_widths_v1",
+              JSON.stringify(prev)
+            );
+          } catch {}
+          return prev;
+        });
+        resizingColRef.current = null;
+      }
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("touchmove", onMouseMove, { passive: false });
+    window.addEventListener("touchend", onMouseUp);
+  };
+
+  const resetColumnWidth = (colKey: keyof ColumnHeadersConfig) => {
+    setColWidths((prev) => {
+      const next = { ...prev, [colKey]: DEFAULT_COLUMN_WIDTHS[colKey] };
+      try {
+        localStorage.setItem(
+          "taskit_column_widths_v1",
+          JSON.stringify(next)
+        );
+      } catch {}
+      return next;
+    });
+  };
+
+  const resetAllColumnWidths = () => {
+    setColWidths(DEFAULT_COLUMN_WIDTHS);
+    try {
+      localStorage.removeItem("taskit_column_widths_v1");
+    } catch {}
+  };
+
+  const isAnyColumnResized = useMemo(() => {
+    return (
+      Object.keys(DEFAULT_COLUMN_WIDTHS) as Array<keyof ColumnHeadersConfig>
+    ).some((k) => colWidths[k] !== DEFAULT_COLUMN_WIDTHS[k]);
+  }, [colWidths]);
 
   // Column header inline editing
   const [editingColKey, setEditingColKey] = useState<
@@ -1030,6 +1170,18 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               <Settings2 className="w-3.5 h-3.5 text-primary" />
               <span>Customize</span>
             </button>
+
+            {isAnyColumnResized && (
+              <button
+                type="button"
+                onClick={resetAllColumnWidths}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                title="Reset all column widths to default"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-primary" />
+                <span>Reset Widths</span>
+              </button>
+            )}
           </div>
 
         {/* Right: Quick Add Task or Header Buttons */}
@@ -1056,9 +1208,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       </div>
     </div>
 
-      {/* Main Document-Style Table */}
-      <div className="rounded-xl border theme-panel overflow-visible backdrop-blur-xl">
-        <div className="overflow-x-auto overflow-y-visible">
+      {/* Main Document-Style Table Container with smooth horizontal scrolling */}
+      <div className="rounded-xl border theme-panel overflow-hidden backdrop-blur-xl shadow-2xl">
+        <div
+          tabIndex={0}
+          role="region"
+          aria-label="Tasks document table"
+          className="w-full overflow-x-auto overflow-y-visible custom-scrollbar focus:outline-none focus:ring-1 focus:ring-primary/40"
+        >
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -1068,82 +1225,140 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               items={visibleRows.map((t) => t.id)}
               strategy={verticalListSortingStrategy}
             >
-              <table className="w-full text-left border-collapse">
-                {/* Editable Column Headers */}
+              <table
+                className="text-left border-collapse"
+                style={{
+                  width: "max-content",
+                  minWidth: "100%",
+                  tableLayout: "fixed",
+                }}
+              >
+                {/* Fixed column definitions matching user-stretched widths */}
+                <colgroup>
+                  <col style={{ width: 44, minWidth: 44, maxWidth: 44 }} />
+                  {columnDefs.map(({ key }) => (
+                    <col
+                      key={key}
+                      style={{
+                        width: colWidths[key] || DEFAULT_COLUMN_WIDTHS[key],
+                        minWidth:
+                          colWidths[key] || DEFAULT_COLUMN_WIDTHS[key],
+                      }}
+                    />
+                  ))}
+                  <col style={{ width: 96, minWidth: 96, maxWidth: 96 }} />
+                </colgroup>
+
+                {/* Editable & Resizable Column Headers */}
                 <thead>
                   <tr className="border-b theme-header-bg text-[11px] font-semibold uppercase tracking-wider text-highlight/90">
-                    <th className="w-10 pl-3 pr-1 py-3" />
+                    <th
+                      className="w-10 pl-3 pr-1 py-3"
+                      style={{ width: 44, minWidth: 44 }}
+                    />
                     {columnDefs.map(({ key: colKey, sortable }) => {
                       const isEditingThisCol = editingColKey === colKey;
+                      const currentW =
+                        colWidths[colKey] || DEFAULT_COLUMN_WIDTHS[colKey];
                       return (
-                        <th key={colKey} className="px-3 py-3 select-none">
-                          <div className="inline-flex items-center gap-1.5 group/col">
-                            {isEditingThisCol ? (
-                              <input
-                                type="text"
-                                autoFocus
-                                value={colHeaderDraft}
-                                onChange={(e) =>
-                                  setColHeaderDraft(e.target.value)
-                                }
-                                onBlur={() => commitColumnHeader(colKey)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter")
-                                    commitColumnHeader(colKey);
-                                  if (e.key === "Escape")
-                                    setEditingColKey(null);
-                                }}
-                                className="w-28 rounded border border-primary bg-black/85 px-1.5 py-0.5 text-[11px] font-bold text-white focus:outline-none"
-                              />
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setColHeaderDraft(
-                                    workspaceConfig.columnHeaders[colKey]
-                                  );
-                                  setEditingColKey(colKey);
-                                }}
-                                className="inline-flex items-center gap-1 hover:text-white transition-colors"
-                                title="Click to rename column header"
-                              >
-                                <span>
-                                  {workspaceConfig.columnHeaders[colKey]}
-                                </span>
-                                <Pencil className="w-2.5 h-2.5 opacity-0 group-hover/col:opacity-80 text-primary transition-opacity" />
-                              </button>
-                            )}
-
-                            {sortable && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (sortField === colKey) {
-                                    if (!sortAsc) {
-                                      setSortField(null);
-                                    } else {
-                                      setSortAsc(false);
-                                    }
-                                  } else {
-                                    setSortField(colKey);
-                                    setSortAsc(true);
+                        <th
+                          key={colKey}
+                          style={{ width: currentW, minWidth: currentW }}
+                          className={`relative px-3 py-3 select-none group/th overflow-visible ${
+                            activeResizingCol === colKey ? "bg-white/10" : ""
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-1.5 pr-2">
+                            <div className="inline-flex items-center gap-1.5 group/col min-w-0">
+                              {isEditingThisCol ? (
+                                <input
+                                  type="text"
+                                  autoFocus
+                                  value={colHeaderDraft}
+                                  onChange={(e) =>
+                                    setColHeaderDraft(e.target.value)
                                   }
-                                }}
-                                className={`p-0.5 rounded hover:bg-white/10 transition-colors ${
-                                  sortField === colKey
-                                    ? "text-primary"
-                                    : "text-white/35 hover:text-white"
-                                }`}
-                                title="Sort by column"
-                              >
-                                <ArrowUpDown className="w-3 h-3" />
-                              </button>
-                            )}
+                                  onBlur={() => commitColumnHeader(colKey)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter")
+                                      commitColumnHeader(colKey);
+                                    if (e.key === "Escape")
+                                      setEditingColKey(null);
+                                  }}
+                                  className="w-24 rounded border border-primary bg-black/85 px-1.5 py-0.5 text-[11px] font-bold text-white focus:outline-none"
+                                />
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setColHeaderDraft(
+                                      workspaceConfig.columnHeaders[colKey]
+                                    );
+                                    setEditingColKey(colKey);
+                                  }}
+                                  className="inline-flex items-center gap-1 hover:text-white transition-colors truncate"
+                                  title="Click to rename column header"
+                                >
+                                  <span className="truncate">
+                                    {workspaceConfig.columnHeaders[colKey]}
+                                  </span>
+                                  <Pencil className="w-2.5 h-2.5 opacity-0 group-hover/col:opacity-80 text-primary transition-opacity shrink-0" />
+                                </button>
+                              )}
+
+                              {sortable && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (sortField === colKey) {
+                                      if (!sortAsc) {
+                                        setSortField(null);
+                                      } else {
+                                        setSortAsc(false);
+                                      }
+                                    } else {
+                                      setSortField(colKey);
+                                      setSortAsc(true);
+                                    }
+                                  }}
+                                  className={`p-0.5 rounded hover:bg-white/10 transition-colors shrink-0 ${
+                                    sortField === colKey
+                                      ? "text-primary"
+                                      : "text-white/35 hover:text-white"
+                                  }`}
+                                  title="Sort by column"
+                                >
+                                  <ArrowUpDown className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Interactive Column Stretch Resizer Handle */}
+                          <div
+                            onMouseDown={(e) => startResize(colKey, e)}
+                            onTouchStart={(e) => startResize(colKey, e)}
+                            onDoubleClick={() => resetColumnWidth(colKey)}
+                            className="absolute right-0 top-0 bottom-0 w-3.5 cursor-col-resize select-none touch-none flex items-center justify-center z-20 group/handle hover:bg-primary/25 transition-colors"
+                            title="Drag right edge to stretch or shrink column (Double-click to reset)"
+                          >
+                            <div
+                              className={`w-[2px] transition-all rounded-full ${
+                                activeResizingCol === colKey
+                                  ? "bg-primary h-full shadow-neon scale-x-125"
+                                  : "h-3.5 bg-white/20 group-hover/handle:bg-primary group-hover/handle:h-full"
+                              }`}
+                            />
                           </div>
                         </th>
                       );
                     })}
-                    <th className="w-24 px-3 py-3 text-right">Actions</th>
+                    <th
+                      className="px-3 py-3 text-right"
+                      style={{ width: 96, minWidth: 96 }}
+                    >
+                      Actions
+                    </th>
                   </tr>
                 </thead>
 
@@ -1341,7 +1556,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
                               {/* 1. Task Title + Complete Toggle + Doc Drawer Button */}
                               <td className="px-3 py-2 align-middle">
-                                <div className="flex items-center gap-2 min-w-[230px] max-w-[400px]">
+                                <div className="flex items-center gap-2 w-full min-w-0">
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -1532,7 +1747,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
                               {/* 7. Tags Custom Dark Multi-Select Popover */}
                               <td className="px-3 py-2 align-middle">
-                                <div className="relative min-w-[140px]">
+                                <div className="relative w-full min-w-0">
                                   <div
                                     onClick={() =>
                                       setOpenTagDropdownTaskId(
@@ -1691,7 +1906,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
                               {/* 8. Notes Inline Text Cell */}
                               <td className="px-3 py-2 align-middle">
-                                <div className="min-w-[140px] max-w-[220px]">
+                                <div className="w-full min-w-0">
                                   <InlineTextCell
                                     value={t.notes || ""}
                                     placeholder="Add quick note..."
