@@ -738,7 +738,10 @@ export default function TaskItWorkspacePage() {
 
   // 10. Sync Canvas (autofills due date, priority, tags, section_group; filters today/tmr/day-after)
   const handleSyncCanvasTasks = useCallback(
-    async (feedUrl: string, isAutoSync: boolean = false) => {
+    async (
+      feedUrl: string,
+      isAutoSync: boolean = false
+    ): Promise<{ count: number; usedDemoFeed: boolean }> => {
       setIsSyncingCanvas(true);
       try {
         const clientDate = new Date().toISOString();
@@ -758,7 +761,7 @@ export default function TaskItWorkspacePage() {
         const data = await res.json();
         if (!data.success) {
           if (!isAutoSync) throw new Error(data.error || "Sync failed");
-          return;
+          return { count: 0, usedDemoFeed: false };
         }
 
         const incoming: TaskItem[] = data.tasks || [];
@@ -813,7 +816,9 @@ export default function TaskItWorkspacePage() {
         const errMsg = err instanceof Error ? err.message : "Sync error";
         if (!isAutoSync) {
           showToast(`Canvas sync error: ${errMsg}`);
+          throw err;
         }
+        return { count: 0, usedDemoFeed: false };
       } finally {
         setIsSyncingCanvas(false);
       }
