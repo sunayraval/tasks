@@ -16,7 +16,7 @@ import { TaskTable } from "@/components/tasks/TaskTable";
 import { CopilotSidebar } from "@/components/ai/CopilotSidebar";
 import { SettingsModal } from "@/components/settings/SettingsModal";
 import { QuickCreateTaskModal } from "@/components/tasks/QuickCreateTaskModal";
-import { CheckCircle2, Sparkles } from "lucide-react";
+import { CheckCircle2, LogIn, ShieldAlert, Sparkles } from "lucide-react";
 
 const LOCAL_STORAGE_TASKS_KEY = "taskit_tasks_v1";
 const LOCAL_STORAGE_PROFILE_KEY = "taskit_profile_v1";
@@ -32,6 +32,7 @@ export default function TaskItWorkspacePage() {
     useState<SectionGroup>("TODAY");
   const [customVideoVersion, setCustomVideoVersion] = useState<number>(0);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [authChecked, setAuthChecked] = useState<boolean>(false);
   const [isSyncingCanvas, setIsSyncingCanvas] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -39,65 +40,89 @@ export default function TaskItWorkspacePage() {
     setToastMessage(msg);
     const timer = setTimeout(() => {
       setToastMessage((prev) => (prev === msg ? null : prev));
-    }, 3800);
+    }, 3500);
     return () => clearTimeout(timer);
   }, []);
 
-  // 1. Load saved local state + check Supabase session & Realtime channel
+  // 1. Check Supabase session & fetch user data
   useEffect(() => {
-    try {
-      const savedProfile = localStorage.getItem(LOCAL_STORAGE_PROFILE_KEY);
-      if (savedProfile) {
-        const parsed = JSON.parse(savedProfile);
-        setProfile((prev) => ({ ...prev, ...parsed }));
-      }
-      const savedTasks = localStorage.getItem(LOCAL_STORAGE_TASKS_KEY);
-      if (savedTasks) {
-        const parsedTasks = JSON.parse(savedTasks);
-        if (Array.isArray(parsedTasks) && parsedTasks.length > 0) {
-          setTasks(parsedTasks);
-        }
-      }
-    } catch {
-      // Ignore storage parse errors
+    if (!isSupabaseConfigured()) {
+      setAuthChecked(true);
+      return;
     }
-
-    if (!isSupabaseConfigured()) return;
 
     const supabase = createClient();
 
-    async function initSupabaseSession() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
+    async function initSession() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      setIsAuthenticated(true);
+        if (user) {
+          setIsAuthenticated(true);
 
-      const { data: dbProfile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .maybeSingle();
+          const { data: dbProfile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", user.id)
+            .maybeSingle();
 
-      if (dbProfile) {
-        setProfile((prev) => ({ ...prev, ...dbProfile }));
-      }
+          if (dbProfile) {
+            setProfile((prev) => ({ ...prev, ...dbProfile }));
+          } else {
+            setProfile((prev) => ({
+              ...prev,
+              id: user.id,
+              email: user.email || "",
+              full_name:
+                user.user_metadata?.full_name ||
+                user.user_metadata?.name ||
+                null,
+            }));
+          }
 
-      const { data: dbTasks } = await supabase
-        .from("tasks")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("order_index", { ascending: true });
+          const { data: dbTasks } = await supabase
+            .from("tasks")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("order_index", { ascending: true });
 
-      if (dbTasks && dbTasks.length > 0) {
-        setTasks(dbTasks as TaskItem[]);
+          if (dbTasks) {
+            setTasks(dbTasks as TaskItem[]);
+          }
+        } else {
+          setIsAuthenticated(false);
+          setTasks([]);
+        }
+      } catch (err) {
+        console.error("Auth init error:", err);
+      } finally {
+        setAuthChecked(true);
       }
     }
 
-    initSupabaseSession();
+    initSession();
 
-    // Realtime subscription for instant task state updates
+    // Listen to Auth State Changes
+    const {
+      data: { subscription: authListener },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setIsAuthenticated(true);
+        const { data: dbTasks } = await supabase
+          .from("tasks")
+          .select("*")
+          .eq("user_id", session.user.id)
+          .order("order_index", { ascending: true });
+        if (dbTasks) setTasks(dbTasks as TaskItem[]);
+      } else {
+        setIsAuthenticated(false);
+        setTasks([]);
+      }
+    });
+
+    // Realtime channel for tasks
     const channel = supabase
       .channel("tasks-realtime")
       .on(
@@ -113,58 +138,39 @@ export default function TaskItWorkspacePage() {
             .select("*")
             .eq("user_id", user.id)
             .order("order_index", { ascending: true });
-          if (latest) {
-            setTasks(latest as TaskItem[]);
-          }
+          if (latest) setTasks(latest as TaskItem[]);
         }
       )
       .subscribe();
 
     return () => {
+      authListener.unsubscribe();
       supabase.removeChannel(channel);
     };
   }, []);
 
-  // 2. Apply CSS theme variable attribute to <html> whenever profile.theme changes
+  // 2. Set theme data-theme on html
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", profile.theme);
   }, [profile.theme]);
 
-  // 3. Global Keyboard Shortcuts: Cmd+K (new task), Cmd+/ (toggle Copilot)
+  // 3. Keyboard shortcuts: Cmd+K (new task)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        if (!isAuthenticated) return;
         e.preventDefault();
         setIsNewTaskModalOpen((prev) => !prev);
-      } else if ((e.metaKey || e.ctrlKey) && e.key === "/") {
-        e.preventDefault();
-        setIsCopilotOpen((prev) => !prev);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [isAuthenticated]);
 
-  // Persist tasks helper
-  const persistTasks = useCallback((nextTasks: TaskItem[]) => {
-    setTasks(nextTasks);
-    try {
-      localStorage.setItem(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(nextTasks));
-    } catch {
-      // Ignore quota errors
-    }
-  }, []);
-
-  // Update Profile handler
+  // Update Profile
   const handleUpdateProfile = useCallback(
     async (updates: Partial<UserProfile>) => {
-      setProfile((prev) => {
-        const next = { ...prev, ...updates };
-        try {
-          localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(next));
-        } catch {}
-        return next;
-      });
+      setProfile((prev) => ({ ...prev, ...updates }));
 
       if (isSupabaseConfigured() && isAuthenticated) {
         try {
@@ -179,54 +185,67 @@ export default function TaskItWorkspacePage() {
     [isAuthenticated, profile.id]
   );
 
-  // Create Task handler
+  // Create Task
   const handleCreateTask = useCallback(
     async (newTaskInput: Omit<TaskItem, "id" | "created_at" | "updated_at">) => {
       const nowISO = new Date().toISOString();
+      const tempId = `task-${Date.now()}`;
       const created: TaskItem = {
         ...newTaskInput,
-        id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: tempId,
         created_at: nowISO,
         updated_at: nowISO,
       };
 
-      const next = [created, ...tasks];
-      persistTasks(next);
-      showToast(`Created task: "${created.title}"`);
+      setTasks((prev) => [created, ...prev]);
+      showToast(`Created: "${created.title}"`);
 
       if (isSupabaseConfigured() && isAuthenticated) {
         try {
           const supabase = createClient();
-          await supabase.from("tasks").insert({
-            user_id: profile.id,
-            title: created.title,
-            content: created.content,
-            status: created.status,
-            type: created.type,
-            priority: created.priority,
-            due_date: created.due_date,
-            estimated_minutes: created.estimated_minutes,
-            tags: created.tags,
-            notes: created.notes,
-            is_canvas_assignment: created.is_canvas_assignment,
-            canvas_course_code: created.canvas_course_code,
-            section_group: created.section_group,
-            order_index: created.order_index,
-          });
-        } catch {}
+          const { data } = await supabase
+            .from("tasks")
+            .insert({
+              user_id: profile.id,
+              title: created.title,
+              content: created.content,
+              status: created.status,
+              type: created.type,
+              priority: created.priority,
+              due_date: created.due_date,
+              estimated_minutes: created.estimated_minutes,
+              tags: created.tags,
+              notes: created.notes,
+              is_canvas_assignment: created.is_canvas_assignment,
+              canvas_course_code: created.canvas_course_code,
+              section_group: created.section_group,
+              order_index: created.order_index,
+            })
+            .select()
+            .single();
+
+          if (data?.id) {
+            setTasks((prev) =>
+              prev.map((t) => (t.id === tempId ? (data as TaskItem) : t))
+            );
+          }
+        } catch (err) {
+          console.error("Create task error:", err);
+        }
       }
     },
-    [tasks, persistTasks, showToast, isAuthenticated, profile.id]
+    [showToast, isAuthenticated, profile.id]
   );
 
-  // Update Task handler
+  // Update Task
   const handleUpdateTask = useCallback(
     async (taskId: string, updates: Partial<TaskItem>) => {
       const nowISO = new Date().toISOString();
-      const next = tasks.map((t) =>
-        t.id === taskId ? { ...t, ...updates, updated_at: nowISO } : t
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId ? { ...t, ...updates, updated_at: nowISO } : t
+        )
       );
-      persistTasks(next);
 
       if (isSupabaseConfigured() && isAuthenticated) {
         try {
@@ -238,15 +257,17 @@ export default function TaskItWorkspacePage() {
         } catch {}
       }
     },
-    [tasks, persistTasks, isAuthenticated]
+    [isAuthenticated]
   );
 
-  // Delete Task handler
+  // Delete Task
   const handleDeleteTask = useCallback(
     async (taskId: string) => {
       const target = tasks.find((t) => t.id === taskId);
-      const next = tasks.filter((t) => t.id !== taskId);
-      persistTasks(next);
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      if (selectedTaskId === taskId) {
+        setSelectedTaskId(null);
+      }
       if (target) {
         showToast(`Deleted "${target.title}"`);
       }
@@ -255,13 +276,23 @@ export default function TaskItWorkspacePage() {
         try {
           const supabase = createClient();
           await supabase.from("tasks").delete().eq("id", taskId);
-        } catch {}
+        } catch (err) {
+          console.error("Delete task error:", err);
+        }
       }
     },
-    [tasks, persistTasks, showToast, isAuthenticated]
+    [tasks, selectedTaskId, showToast, isAuthenticated]
   );
 
-  // Sync HCPSS Canvas iCal Feed
+  // Reorder Tasks
+  const handleReorderTasks = useCallback(
+    (newTasks: TaskItem[]) => {
+      setTasks(newTasks);
+    },
+    []
+  );
+
+  // Sync Canvas
   const handleSyncCanvasTasks = useCallback(
     async (feedUrl: string) => {
       setIsSyncingCanvas(true);
@@ -278,30 +309,16 @@ export default function TaskItWorkspacePage() {
 
         const incoming: Partial<TaskItem>[] = data.tasks || [];
         const nowISO = new Date().toISOString();
-
-        // Merge & deduplicate by title
         const updatedList = [...tasks];
-        let addedOrUpdatedCount = 0;
+        let addedCount = 0;
 
         for (const item of incoming) {
           const existingIdx = updatedList.findIndex(
-            (t) =>
-              t.title.toLowerCase() === (item.title || "").toLowerCase()
+            (t) => t.title.toLowerCase() === (item.title || "").toLowerCase()
           );
-          if (existingIdx !== -1) {
-            updatedList[existingIdx] = {
-              ...updatedList[existingIdx],
-              due_date: item.due_date || updatedList[existingIdx].due_date,
-              canvas_course_code:
-                item.canvas_course_code ||
-                updatedList[existingIdx].canvas_course_code,
-              is_canvas_assignment: true,
-              updated_at: nowISO,
-            };
-            addedOrUpdatedCount++;
-          } else {
-            updatedList.unshift({
-              id: item.id || `canvas-${Date.now()}-${addedOrUpdatedCount}`,
+          if (existingIdx === -1) {
+            const newItem: TaskItem = {
+              id: item.id || `canvas-${Date.now()}-${addedCount}`,
               user_id: profile.id,
               title: item.title || "Canvas Assignment",
               content: item.content || "",
@@ -320,28 +337,23 @@ export default function TaskItWorkspacePage() {
               completed_at: null,
               created_at: nowISO,
               updated_at: nowISO,
-            });
-            addedOrUpdatedCount++;
+            };
+            updatedList.unshift(newItem);
+            addedCount++;
           }
         }
 
-        persistTasks(updatedList);
-        showToast(
-          `Synced ${addedOrUpdatedCount} HCPSS Canvas assignments into your board!`
-        );
-
-        return {
-          count: addedOrUpdatedCount,
-          usedDemoFeed: Boolean(data.usedDemoFeed),
-        };
+        setTasks(updatedList);
+        showToast(`Synced ${addedCount} Canvas assignments into your workspace.`);
+        return { count: addedCount, usedDemoFeed: Boolean(data.usedDemoFeed) };
       } finally {
         setIsSyncingCanvas(false);
       }
     },
-    [tasks, profile.id, persistTasks, showToast]
+    [tasks, profile.id, showToast]
   );
 
-  // Strict Action Confirmation Card execution handler
+  // Confirm Copilot Proposals
   const handleConfirmActionProposal = useCallback(
     async (proposal: ActionProposalPayload) => {
       const nowISO = new Date().toISOString();
@@ -357,33 +369,41 @@ export default function TaskItWorkspacePage() {
           proposal.newDueDate ||
           new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
 
-        const next = tasks.map((t) => {
-          if (targetIds.has(t.id) || targetTitles.has(t.title.toLowerCase())) {
-            return {
-              ...t,
-              due_date: nextDue,
-              section_group: "SOON" as SectionGroup,
-              updated_at: nowISO,
-            };
-          }
-          return t;
-        });
-
-        persistTasks(next);
-        showToast(`Confirmed: ${proposal.description}`);
+        setTasks((prev) =>
+          prev.map((t) => {
+            if (targetIds.has(t.id) || targetTitles.has(t.title.toLowerCase())) {
+              const updated = {
+                ...t,
+                due_date: nextDue,
+                section_group: "SOON" as SectionGroup,
+                updated_at: nowISO,
+              };
+              if (isAuthenticated) {
+                createClient()
+                  .from("tasks")
+                  .update({ due_date: nextDue, section_group: "SOON" })
+                  .eq("id", t.id)
+                  .then();
+              }
+              return updated;
+            }
+            return t;
+          })
+        );
+        showToast(`Rescheduled tasks to ${proposal.newDueDate ? "selected date" : "Saturday"}`);
       } else if (proposal.actionType === "BATCH_CREATE") {
         const newItems: TaskItem[] = proposal.changes.map((c, idx) => ({
-          id: `ai-task-${Date.now()}-${idx}`,
+          id: `ai-${Date.now()}-${idx}`,
           user_id: profile.id,
           title: c.title,
-          content: `<p>Generated via TaskIt Copilot Action Card (${proposal.description}).</p>`,
+          content: "<p>Created via Copilot.</p>",
           status: "To Do",
           type: c.type || "School",
           priority: c.priority || "High",
           due_date: proposal.newDueDate || nowISO,
-          estimated_minutes: c.estimated_minutes || 40,
-          tags: ["#Copilot", "#Sprint"],
-          notes: "Added via Copilot Batch Action",
+          estimated_minutes: c.estimated_minutes || 30,
+          tags: ["#Copilot"],
+          notes: "",
           is_canvas_assignment: false,
           canvas_course_code: null,
           custom_properties: {},
@@ -394,46 +414,25 @@ export default function TaskItWorkspacePage() {
           updated_at: nowISO,
         }));
 
-        persistTasks([...newItems, ...tasks]);
-        showToast(`Confirmed: Added ${newItems.length} new tasks to board!`);
-      } else if (proposal.actionType === "PRIORITIZE_AND_TAG") {
-        const targetIds = new Set(
-          proposal.changes.map((c) => c.id).filter(Boolean)
-        );
-        const next = tasks.map((t) =>
-          targetIds.has(t.id)
-            ? {
-                ...t,
-                priority: "Urgent" as const,
-                tags: t.tags.includes("#HighROI")
-                  ? t.tags
-                  : [...t.tags, "#HighROI"],
-                updated_at: nowISO,
-              }
-            : t
-        );
-        persistTasks(next);
-        showToast(`Confirmed: ${proposal.description}`);
+        setTasks((prev) => [...newItems, ...prev]);
+        showToast(`Added ${newItems.length} tasks!`);
       }
     },
-    [tasks, profile.id, persistTasks, showToast]
+    [profile.id, isAuthenticated, showToast]
   );
 
-  // Supabase Google OAuth Sign-In
+  // Google OAuth Sign In
   const handleGoogleSignIn = async () => {
     if (!isSupabaseConfigured()) {
-      showToast(
-        "Demo Mode Active: Add NEXT_PUBLIC_SUPABASE_URL & ANON_KEY in .env.local for live Google OAuth."
-      );
-      setIsSettingsOpen(true);
+      showToast("Supabase is not configured yet.");
       return;
     }
-
     const supabase = createClient();
+    const origin = window.location.origin;
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${origin}/auth/callback`,
         queryParams: {
           access_type: "offline",
           prompt: "consent",
@@ -448,12 +447,13 @@ export default function TaskItWorkspacePage() {
       await supabase.auth.signOut();
     }
     setIsAuthenticated(false);
-    showToast("Signed out of Supabase session.");
+    setTasks([]);
+    showToast("Signed out.");
   };
 
   return (
-    <div className="relative min-h-screen flex flex-col">
-      {/* 1. Zero-Bandwidth Fullscreen Video & Procedural Glass Background */}
+    <div className="relative min-h-screen flex flex-col bg-zinc-950 text-zinc-100">
+      {/* Background (Controlled dimming) */}
       <VideoBackground
         preset={profile.video_bg_preset}
         dim={profile.video_bg_dim}
@@ -461,7 +461,7 @@ export default function TaskItWorkspacePage() {
         customVideoVersion={customVideoVersion}
       />
 
-      {/* 2. Top Navigation Bar */}
+      {/* Top Navbar */}
       <TopNavBar
         profile={profile}
         isAuthenticated={isAuthenticated}
@@ -477,70 +477,112 @@ export default function TaskItWorkspacePage() {
         onSignOut={handleSignOut}
       />
 
-      {/* 3. Main Dashboard Workspace Container */}
+      {/* Main Content Area */}
       <main
-        className={`flex-1 mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8 py-6 space-y-6 transition-all duration-300 ${
-          isCopilotOpen ? " lg:pr-[450px]" : ""
+        className={`flex-1 mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8 py-6 space-y-5 transition-all duration-300 ${
+          isCopilotOpen ? " lg:pr-[440px]" : ""
         }`}
       >
-        {/* Motivational Header & Futuristic Radial Progress Ring */}
-        <CircularProgress tasks={tasks} streakDays={14} />
+        {!isAuthenticated && authChecked ? (
+          /* Sign-In Gate: Clean Minimal Wall */
+          <div className="my-12 mx-auto max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/90 p-8 text-center shadow-2xl backdrop-blur-xl space-y-6">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-black font-extrabold text-2xl shadow-sm">
+              T
+            </div>
+            
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold tracking-tight text-white">
+                Welcome to TaskIt
+              </h2>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Your private AI productivity workspace and Notion-style task database.
+                Sign in with Google to create and sync your personal tasks.
+              </p>
+            </div>
 
-        {/* Notion-Style Document Task Table with Section Dividers & Drag-and-Drop */}
-        <TaskTable
-          tasks={tasks}
-          selectedTaskId={selectedTaskId}
-          viewMode={profile.view_mode}
-          onSelectTask={setSelectedTaskId}
-          onUpdateTask={handleUpdateTask}
-          onDeleteTask={handleDeleteTask}
-          onReorderTasks={persistTasks}
-          onOpenNewTaskModal={(sec) => {
-            setNewTaskDefaultSection(sec || "TODAY");
-            setIsNewTaskModalOpen(true);
-          }}
-        />
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-white py-3 px-4 text-sm font-semibold text-black hover:bg-zinc-200 transition-colors shadow-sm"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Continue with Google</span>
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-zinc-800/80 text-[11px] text-zinc-500">
+              Personal Supabase PostgreSQL database with Row Level Security.
+            </div>
+          </div>
+        ) : (
+          /* Authenticated Workspace */
+          <>
+            {/* Header Telemetry */}
+            <CircularProgress tasks={tasks} streakDays={1} />
+
+            {/* Task Table */}
+            <TaskTable
+              tasks={tasks}
+              selectedTaskId={selectedTaskId}
+              viewMode={profile.view_mode}
+              onSelectTask={setSelectedTaskId}
+              onUpdateTask={handleUpdateTask}
+              onDeleteTask={handleDeleteTask}
+              onReorderTasks={handleReorderTasks}
+              onOpenNewTaskModal={(sec) => {
+                setNewTaskDefaultSection(sec || "TODAY");
+                setIsNewTaskModalOpen(true);
+              }}
+            />
+          </>
+        )}
       </main>
 
-      {/* 4. AI Side-Agent ("TaskIt Copilot") with Action Confirmation Card Protocol */}
-      <CopilotSidebar
-        isOpen={isCopilotOpen}
-        onToggle={() => setIsCopilotOpen((prev) => !prev)}
-        tasks={tasks}
-        aiTone={profile.ai_tone}
-        customApiKey={profile.custom_ai_api_key}
-        onChangeTone={(tone) => handleUpdateProfile({ ai_tone: tone })}
-        onConfirmActionProposal={handleConfirmActionProposal}
-      />
+      {/* AI Copilot Side Drawer */}
+      {isAuthenticated && (
+        <CopilotSidebar
+          isOpen={isCopilotOpen}
+          onToggle={() => setIsCopilotOpen((prev) => !prev)}
+          tasks={tasks}
+          aiTone={profile.ai_tone}
+          customApiKey={profile.custom_ai_api_key}
+          onChangeTone={(tone) => handleUpdateProfile({ ai_tone: tone })}
+          onConfirmActionProposal={handleConfirmActionProposal}
+        />
+      )}
 
-      {/* 5. User Settings & Customization Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        profile={profile}
-        tasks={tasks}
-        onUpdateProfile={handleUpdateProfile}
-        onCustomVideoUploaded={() => setCustomVideoVersion((v) => v + 1)}
-        onSyncCanvasTasks={handleSyncCanvasTasks}
-      />
+      {/* Settings Modal */}
+      {isAuthenticated && (
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          profile={profile}
+          tasks={tasks}
+          onUpdateProfile={handleUpdateProfile}
+          onCustomVideoUploaded={() => setCustomVideoVersion((v) => v + 1)}
+          onSyncCanvasTasks={handleSyncCanvasTasks}
+        />
+      )}
 
-      {/* 6. Quick Create Task Modal (Cmd+K) */}
-      <QuickCreateTaskModal
-        isOpen={isNewTaskModalOpen}
-        defaultSection={newTaskDefaultSection}
-        onClose={() => setIsNewTaskModalOpen(false)}
-        onCreateTask={handleCreateTask}
-        userId={profile.id}
-      />
+      {/* Quick Create Task Modal (Cmd+K) */}
+      {isAuthenticated && (
+        <QuickCreateTaskModal
+          isOpen={isNewTaskModalOpen}
+          defaultSection={newTaskDefaultSection}
+          onClose={() => setIsNewTaskModalOpen(false)}
+          onCreateTask={handleCreateTask}
+          userId={profile.id}
+        />
+      )}
 
-      {/* Toast Notification Banner */}
+      {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 rounded-2xl border border-primary/50 bg-[#051014]/95 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-neon backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200">
-          <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-xs font-medium text-white shadow-xl">
+          <CheckCircle2 className="w-4 h-4 text-white" />
           <span>{toastMessage}</span>
         </div>
       )}
     </div>
   );
 }
-

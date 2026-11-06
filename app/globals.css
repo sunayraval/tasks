@@ -2,8 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 1. Cyber Ocean (Default) */
+/* 0. Monochrome (Default - Pure Clean Black & White) */
 :root,
+[data-theme="monochrome"] {
+  --bg-base: #09090b;
+  --surface: #18181b;
+  --accent: #27272a;
+  --primary: #ffffff;
+  --highlight: #f4f4f5;
+}
+
+/* 1. Cyber Ocean */
 [data-theme="cyber_ocean"] {
   --bg-base: #003135;
   --surface: #024950;
@@ -55,7 +64,7 @@
 html,
 body {
   background-color: var(--bg-base);
-  color: #f8fafc;
+  color: #f4f4f5;
   min-height: 100vh;
   overflow-x: hidden;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -72,13 +81,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--primary);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 9999px;
-  opacity: 0.5;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--highlight);
+  background: rgba(255, 255, 255, 0.4);
 }
 
 /* TipTap Rich Text Editor Styling */
@@ -189,4 +197,3 @@ body {
   font-style: italic;
   margin: 0.75rem 0;
 }
-

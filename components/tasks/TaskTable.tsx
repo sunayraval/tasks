@@ -46,9 +46,9 @@ import {
   Search,
   ChevronDown,
   ChevronRight,
-  Sparkles,
   Filter,
   AlertCircle,
+  Trash2,
 } from "lucide-react";
 import { TaskDocumentEditor } from "@/components/editor/TaskDocumentEditor";
 
@@ -63,7 +63,10 @@ interface TaskTableProps {
   onOpenNewTaskModal: (defaultSection?: SectionGroup) => void;
 }
 
-export function formatRelativeDueDate(dueDateISO: string | null, status: TaskStatus): {
+export function formatRelativeDueDate(
+  dueDateISO: string | null,
+  status: TaskStatus
+): {
   label: string;
   isOverdue: boolean;
   isToday: boolean;
@@ -118,44 +121,29 @@ export function formatEstimatedTime(minutes: number): string {
   return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
 }
 
+// Clean Monochrome Badges with clear contrast
 const STATUS_STYLES: Record<TaskStatus, string> = {
-  "To Do": "bg-slate-500/20 text-slate-200 border-slate-400/30",
-  "In Progress": "bg-sky-500/20 text-sky-300 border-sky-400/40",
-  Blocked: "bg-rose-500/25 text-rose-300 border-rose-400/40",
-  Done: "bg-emerald-500/25 text-emerald-300 border-emerald-400/40",
+  "To Do": "bg-zinc-800 text-zinc-300 border-zinc-700",
+  "In Progress": "bg-white/10 text-white border-white/20 font-medium",
+  Blocked: "bg-red-950/40 text-red-300 border-red-800/50",
+  Done: "bg-emerald-950/40 text-emerald-300 border-emerald-800/50",
 };
 
 const PRIORITY_STYLES: Record<TaskPriority, string> = {
-  Urgent: "bg-red-500/25 text-red-300 border-red-500/45",
-  High: "bg-orange-500/25 text-orange-300 border-orange-500/45",
-  Medium: "bg-yellow-500/20 text-yellow-200 border-yellow-400/40",
-  Low: "bg-blue-500/20 text-blue-300 border-blue-400/40",
+  Urgent: "bg-red-500/15 text-red-300 border-red-500/40",
+  High: "bg-orange-500/15 text-orange-300 border-orange-500/40",
+  Medium: "bg-zinc-800 text-zinc-300 border-zinc-700",
+  Low: "bg-zinc-900 text-zinc-400 border-zinc-800",
 };
 
 const TYPE_STYLES: Record<TaskType, string> = {
-  College: "bg-purple-500/20 text-purple-200 border-purple-400/35",
-  School: "bg-cyan-500/20 text-cyan-200 border-cyan-400/35",
-  Personal: "bg-teal-500/20 text-teal-200 border-teal-400/35",
-  Club: "bg-pink-500/20 text-pink-200 border-pink-400/35",
-  Work: "bg-indigo-500/20 text-indigo-200 border-indigo-400/35",
-  General: "bg-white/10 text-white/80 border-white/20",
+  College: "bg-zinc-800 text-zinc-200 border-zinc-700",
+  School: "bg-zinc-800 text-zinc-200 border-zinc-700",
+  Personal: "bg-zinc-800 text-zinc-200 border-zinc-700",
+  Club: "bg-zinc-800 text-zinc-200 border-zinc-700",
+  Work: "bg-zinc-800 text-zinc-200 border-zinc-700",
+  General: "bg-zinc-800 text-zinc-200 border-zinc-700",
 };
-
-const TAG_PALETTE = [
-  "bg-cyan-500/15 text-cyan-200 border-cyan-400/30",
-  "bg-fuchsia-500/15 text-fuchsia-200 border-fuchsia-400/30",
-  "bg-amber-500/15 text-amber-200 border-amber-400/30",
-  "bg-emerald-500/15 text-emerald-200 border-emerald-400/30",
-  "bg-violet-500/15 text-violet-200 border-violet-400/30",
-];
-
-function getTagColor(tag: string) {
-  let hash = 0;
-  for (let i = 0; i < tag.length; i++) {
-    hash = tag.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return TAG_PALETTE[Math.abs(hash) % TAG_PALETTE.length];
-}
 
 interface SortableTaskRowProps {
   task: TaskItem;
@@ -180,19 +168,19 @@ const SortableTaskRow: React.FC<SortableTaskRowProps> = ({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.55 : 1,
+    opacity: isDragging ? 0.5 : 1,
   };
 
   return (
     <tr
       ref={setNodeRef}
       style={style}
-      className={`group border-b border-white/[0.06] transition-colors ${
+      className={`group border-b border-zinc-800/80 transition-colors ${
         isSelected
-          ? "bg-primary/15"
+          ? "bg-zinc-800/50"
           : task.status === "Done"
-          ? "bg-white/[0.01] opacity-65 hover:opacity-95"
-          : "hover:bg-white/[0.05]"
+          ? "bg-black/20 opacity-60 hover:opacity-90"
+          : "hover:bg-zinc-900/60"
       }`}
     >
       <td className="w-8 pl-3 pr-1 py-3 align-middle">
@@ -200,7 +188,7 @@ const SortableTaskRow: React.FC<SortableTaskRowProps> = ({
           type="button"
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing text-white/25 hover:text-white/70 p-1 rounded"
+          className="cursor-grab active:cursor-grabbing text-zinc-600 hover:text-zinc-300 p-1 rounded"
           title="Drag to reorder"
         >
           <GripVertical className="w-3.5 h-3.5" />
@@ -266,7 +254,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           const t = row.original;
           const isDone = t.status === "Done";
           return (
-            <div className="flex items-center gap-2.5 min-w-[230px] max-w-[380px]">
+            <div className="flex items-center gap-2.5 min-w-[240px] max-w-[420px]">
               <button
                 type="button"
                 onClick={(e) => {
@@ -278,13 +266,13 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                       nextStatus === "Done" ? new Date().toISOString() : null,
                   });
                 }}
-                className="shrink-0 text-white/60 hover:text-primary transition-colors"
+                className="shrink-0 text-zinc-500 hover:text-white transition-colors"
                 title={isDone ? "Mark as To Do" : "Complete Task"}
               >
                 {isDone ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                 ) : (
-                  <Circle className="w-4 h-4" />
+                  <Circle className="w-4 h-4 text-zinc-600 hover:text-white" />
                 )}
               </button>
 
@@ -293,14 +281,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 onClick={() =>
                   onSelectTask(selectedTaskId === t.id ? null : t.id)
                 }
-                className="group/title flex items-center gap-2 text-left font-medium text-sm text-white hover:text-highlight transition-colors truncate"
+                className="group/title flex items-center gap-2 text-left font-medium text-sm text-zinc-200 hover:text-white transition-colors truncate"
               >
-                <span className={isDone ? "line-through text-white/45" : ""}>
+                <span className={isDone ? "line-through text-zinc-500" : ""}>
                   {t.title}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/60 opacity-75 group-hover/title:opacity-100 group-hover/title:border-primary/50 group-hover/title:text-highlight transition-all shrink-0">
+                <span className="inline-flex items-center gap-1 rounded border border-zinc-700 bg-zinc-800/80 px-1.5 py-0.5 text-[10px] text-zinc-400 opacity-60 group-hover/title:opacity-100 group-hover/title:text-white transition-all shrink-0">
                   <FileText className="w-3 h-3" />
-                  Open
+                  Notes
                 </span>
               </button>
             </div>
@@ -331,7 +319,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     nextStatus === "Done" ? new Date().toISOString() : null,
                 });
               }}
-              className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap transition-transform active:scale-95 ${
+              className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs transition-transform active:scale-95 ${
                 STATUS_STYLES[t.status]
               }`}
               title="Click to cycle status"
@@ -343,12 +331,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       },
       {
         accessorKey: "type",
-        header: "Type",
+        header: "Category",
         cell: ({ row }) => {
           const t = row.original;
           return (
             <span
-              className={`inline-flex items-center rounded-lg border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${
+              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs text-zinc-300 font-medium ${
                 TYPE_STYLES[t.type] || TYPE_STYLES.General
               }`}
             >
@@ -397,15 +385,15 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           );
           return (
             <span
-              className={`inline-flex items-center gap-1 text-xs font-medium whitespace-nowrap ${
+              className={`inline-flex items-center gap-1 text-xs whitespace-nowrap ${
                 isOverdue
-                  ? "text-rose-400 font-semibold"
+                  ? "text-red-400 font-semibold"
                   : isToday
-                  ? "text-amber-300 font-semibold"
-                  : "text-white/70"
+                  ? "text-white font-semibold"
+                  : "text-zinc-400"
               }`}
             >
-              {isOverdue && <AlertCircle className="w-3.5 h-3.5 text-rose-400" />}
+              {isOverdue && <AlertCircle className="w-3.5 h-3.5 text-red-400" />}
               {label}
             </span>
           );
@@ -413,9 +401,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       },
       {
         accessorKey: "estimated_minutes",
-        header: "Estimated Time",
+        header: "Est. Time",
         cell: ({ row }) => (
-          <span className="text-xs font-mono text-white/70 whitespace-nowrap">
+          <span className="text-xs font-mono text-zinc-400 whitespace-nowrap">
             {formatEstimatedTime(row.original.estimated_minutes)}
           </span>
         ),
@@ -426,18 +414,16 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         cell: ({ row }) => {
           const t = row.original;
           return (
-            <div className="flex flex-wrap items-center gap-1 min-w-[140px]">
+            <div className="flex flex-wrap items-center gap-1 min-w-[130px]">
               {t.is_canvas_assignment && t.canvas_course_code && (
-                <span className="rounded-full border border-orange-400/40 bg-orange-500/20 px-2 py-0.5 text-[10px] font-semibold text-orange-200">
+                <span className="rounded border border-orange-500/30 bg-orange-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-orange-300">
                   {t.canvas_course_code}
                 </span>
               )}
               {t.tags.map((tag) => (
                 <span
                   key={tag}
-                  className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${getTagColor(
-                    tag
-                  )}`}
+                  className="rounded border border-zinc-700 bg-zinc-800/80 px-1.5 py-0.5 text-[10px] text-zinc-300"
                 >
                   {tag}
                 </span>
@@ -450,13 +436,36 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         accessorKey: "notes",
         header: "Notes",
         cell: ({ row }) => (
-          <p className="text-xs text-white/55 truncate max-w-[200px]">
+          <p className="text-xs text-zinc-400 truncate max-w-[160px]">
             {row.original.notes || "—"}
           </p>
         ),
       },
+      // Direct Delete Action Column
+      {
+        id: "actions",
+        header: "",
+        cell: ({ row }) => {
+          const t = row.original;
+          return (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm(`Delete "${t.title}"?`)) {
+                  onDeleteTask(t.id);
+                }
+              }}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-950/30 transition-colors"
+              title="Delete Task"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          );
+        },
+      },
     ],
-    [onSelectTask, onUpdateTask, selectedTaskId]
+    [onSelectTask, onUpdateTask, onDeleteTask, selectedTaskId]
   );
 
   const table = useReactTable({
@@ -508,28 +517,28 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Table Controls & Filter Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-2xl border border-white/15 bg-black/40 backdrop-blur-xl p-4 shadow-glass">
+      {/* Clean Monochrome Filter & Actions Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950/80 p-3.5 backdrop-blur-md">
         <div className="flex flex-wrap items-center gap-2.5 flex-1">
           {/* Search Input */}
           <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <Search className="w-4 h-4 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
-              placeholder="Filter tasks, #tags, courses..."
-              className="w-full rounded-xl border border-white/15 bg-white/[0.05] pl-9 pr-3 py-2 text-xs sm:text-sm text-white placeholder-white/40 focus:border-primary focus:outline-none"
+              placeholder="Search tasks, #tags, categories..."
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-900/90 pl-9 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
             />
           </div>
 
           {/* Status Filter */}
           <div className="flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-white/45 hidden sm:inline" />
+            <Filter className="w-3.5 h-3.5 text-zinc-500 hidden sm:inline" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-white/15 bg-black/60 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none"
+              className="rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-300 focus:border-zinc-500 focus:outline-none"
             >
               <option value="ALL">All Statuses</option>
               <option value="To Do">To Do</option>
@@ -543,7 +552,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="rounded-xl border border-white/15 bg-black/60 px-3 py-2 text-xs text-white focus:border-primary focus:outline-none"
+            className="rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-300 focus:border-zinc-500 focus:outline-none"
           >
             <option value="ALL">All Categories</option>
             <option value="College">College</option>
@@ -554,24 +563,24 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           </select>
         </div>
 
-        {/* Right: Quick Add Button with Cmd+K hint */}
+        {/* Right: Add Task Button */}
         <div className="flex items-center gap-2 self-end md:self-center">
           <button
             type="button"
             onClick={() => onOpenNewTaskModal("TODAY")}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs sm:text-sm font-semibold text-black shadow-neon hover:brightness-110 transition-all"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-1.5 text-xs font-semibold text-black hover:bg-zinc-200 transition-colors"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>New Task</span>
-            <kbd className="hidden sm:inline-block rounded bg-black/25 px-1.5 py-0.5 text-[10px] font-mono text-black/80">
+            <span>Add Task</span>
+            <kbd className="hidden sm:inline-block rounded bg-zinc-200/80 px-1 py-0.5 text-[9px] font-mono text-zinc-800">
               ⌘K
             </kbd>
           </button>
         </div>
       </div>
 
-      {/* Main Notion-Style Document Table */}
-      <div className="rounded-2xl border border-white/15 bg-black/45 backdrop-blur-xl shadow-glass overflow-hidden">
+      {/* Main Clean Table */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950/90 overflow-hidden backdrop-blur-md">
         <div className="overflow-x-auto">
           <DndContext
             sensors={sensors}
@@ -587,7 +596,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   {table.getHeaderGroups().map((headerGroup) => (
                     <tr
                       key={headerGroup.id}
-                      className="border-b border-white/15 bg-white/[0.04] text-[11px] font-semibold uppercase tracking-wider text-white/60"
+                      className="border-b border-zinc-800 bg-zinc-900/60 text-[11px] font-semibold uppercase tracking-wider text-zinc-400"
                     >
                       <th className="w-8 pl-3 pr-1 py-3" />
                       {headerGroup.headers.map((header) => (
@@ -602,7 +611,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                 header.column.columnDef.header,
                                 header.getContext()
                               )}
-                              <ArrowUpDown className="w-3 h-3 opacity-50" />
+                              <ArrowUpDown className="w-3 h-3 opacity-40" />
                             </button>
                           )}
                         </th>
@@ -623,9 +632,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
                     return (
                       <React.Fragment key={secId}>
-                        {/* Styled Section Divider Row */}
-                        <tr className="border-y border-white/15 bg-gradient-to-r from-surface/55 via-black/60 to-surface/55">
-                          <td colSpan={9} className="px-4 py-2.5">
+                        {/* Section Header Row */}
+                        <tr className="border-y border-zinc-800 bg-zinc-900/40">
+                          <td colSpan={10} className="px-4 py-2.5">
                             <div className="flex items-center justify-between">
                               <button
                                 type="button"
@@ -635,19 +644,16 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                     [secId]: !prev[secId],
                                   }))
                                 }
-                                className="flex items-center gap-3 text-xs sm:text-sm font-bold tracking-widest text-highlight hover:text-white transition-colors"
+                                className="flex items-center gap-2 text-xs sm:text-sm font-semibold tracking-wider text-zinc-200 hover:text-white transition-colors"
                               >
                                 {isCollapsed ? (
-                                  <ChevronRight className="w-4 h-4 text-primary" />
+                                  <ChevronRight className="w-4 h-4 text-zinc-400" />
                                 ) : (
-                                  <ChevronDown className="w-4 h-4 text-primary" />
+                                  <ChevronDown className="w-4 h-4 text-zinc-400" />
                                 )}
                                 <span>{secMeta.label}</span>
-                                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium tracking-normal text-white/75">
+                                <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-normal text-zinc-400">
                                   {sectionRows.length}
-                                </span>
-                                <span className="hidden md:inline text-[11px] font-normal tracking-normal text-white/45">
-                                  {secMeta.badge}
                                 </span>
                               </button>
 
@@ -655,15 +661,15 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => onOpenNewTaskModal(secId)}
-                                  className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/70 hover:bg-primary/20 hover:text-highlight transition-colors"
+                                  className="rounded border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
                                 >
-                                  + Add Here
+                                  + New
                                 </button>
                                 <button
                                   type="button"
                                   disabled={secIndex === 0}
                                   onClick={() => moveSectionOrder(-1, secId)}
-                                  className="rounded p-1 text-xs text-white/40 hover:text-white disabled:opacity-20"
+                                  className="rounded p-1 text-xs text-zinc-500 hover:text-zinc-200 disabled:opacity-20"
                                   title="Move section up"
                                 >
                                   ↑
@@ -674,7 +680,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                     secIndex === sectionOrder.length - 1
                                   }
                                   onClick={() => moveSectionOrder(1, secId)}
-                                  className="rounded p-1 text-xs text-white/40 hover:text-white disabled:opacity-20"
+                                  className="rounded p-1 text-xs text-zinc-500 hover:text-zinc-200 disabled:opacity-20"
                                   title="Move section down"
                                 >
                                   ↓
@@ -684,16 +690,15 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                           </td>
                         </tr>
 
-                        {/* Tasks inside this section */}
+                        {/* Section Tasks */}
                         {!isCollapsed &&
                           (sectionRows.length === 0 ? (
-                            <tr className="border-b border-white/5">
+                            <tr className="border-b border-zinc-900">
                               <td
-                                colSpan={9}
-                                className="px-6 py-4 text-center text-xs text-white/35 italic"
+                                colSpan={10}
+                                className="px-6 py-3.5 text-center text-xs text-zinc-600 italic"
                               >
-                                No tasks in {secId}. Click &ldquo;+ Add Here&rdquo;
-                                or drag a task row into this section.
+                                No tasks in {secId}. Click &ldquo;+ New&rdquo; to add your first item.
                               </td>
                             </tr>
                           ) : (
@@ -706,7 +711,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                   {row.getVisibleCells().map((cell) => (
                                     <td
                                       key={cell.id}
-                                      className="px-3 py-3 align-middle"
+                                      className="px-3 py-2.5 align-middle"
                                     >
                                       {flexRender(
                                         cell.column.columnDef.cell,
@@ -716,12 +721,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                   ))}
                                 </SortableTaskRow>
 
-                                {/* If View Mode is Inline and this row is selected, expand editor inline */}
+                                {/* Inline Editor if viewMode === inline */}
                                 {viewMode === "inline" &&
                                   selectedTaskId === row.original.id &&
                                   selectedTaskObj && (
                                     <tr>
-                                      <td colSpan={9} className="px-4 py-2">
+                                      <td colSpan={10} className="px-4 py-2">
                                         <TaskDocumentEditor
                                           task={selectedTaskObj}
                                           viewMode="inline"
@@ -745,7 +750,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         </div>
       </div>
 
-      {/* Render Slide Drawer or Center Modal when viewMode !== 'inline' */}
+      {/* Slide Drawer or Center Modal */}
       {viewMode !== "inline" && selectedTaskObj && (
         <TaskDocumentEditor
           task={selectedTaskObj}
@@ -758,4 +763,3 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     </div>
   );
 };
-

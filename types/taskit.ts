@@ -1,4 +1,5 @@
 export type ThemeName =
+  | "monochrome"
   | "cyber_ocean"
   | "warm_slate"
   | "electric_lavender"
@@ -89,6 +90,18 @@ export const THEME_OPTIONS: Array<{
   };
 }> = [
   {
+    id: "monochrome",
+    name: "Minimal Monochrome",
+    subtitle: "High contrast pure black & white, distraction-free",
+    colors: {
+      bgBase: "#09090b",
+      surface: "#18181b",
+      accent: "#27272a",
+      primary: "#ffffff",
+      highlight: "#f4f4f5",
+    },
+  },
+  {
     id: "cyber_ocean",
     name: "Cyber Ocean",
     subtitle: "Deep abyssal teal & neon cyan glow",
@@ -155,10 +168,9 @@ export const SECTION_DIVIDERS: Array<{
   label: string;
   badge: string;
 }> = [
-  { id: "COLLEGE", label: "——— COLLEGE ———", badge: "🎓 Applications & Portals" },
-  { id: "TODAY", label: "——— 📅 TODAY 📅 ———", badge: "⚡ Immediate Execution" },
-  { id: "TMR", label: "——— 📅 TMR 📅 ———", badge: "🌅 Tomorrow's Lineup" },
-  { id: "SOON", label: "——— ⏰ SOON ⏰ ———", badge: "🔭 Upcoming This Week" },
-  { id: "REMEMBER", label: "——— 🔔 REMEMBER 🔔 ———", badge: "📌 Radar & Long-Term" },
+  { id: "COLLEGE", label: "——— COLLEGE ———", badge: "Applications & Deadlines" },
+  { id: "TODAY", label: "——— 📅 TODAY 📅 ———", badge: "Immediate Focus" },
+  { id: "TMR", label: "——— 📅 TMR 📅 ———", badge: "Tomorrow" },
+  { id: "SOON", label: "——— ⏰ SOON ⏰ ———", badge: "Upcoming" },
+  { id: "REMEMBER", label: "——— 🔔 REMEMBER 🔔 ———", badge: "Notes & Reminders" },
 ];
-
