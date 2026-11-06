@@ -4,6 +4,9 @@ import { createClient } from "@/utils/supabase/server";
 import { isSupabaseConfigured } from "@/utils/supabase/client";
 import { TaskItem } from "@/types/taskit";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // Blacklist of non-class clutter, school-wide groups, counseling, and non-instructional events
 const NON_CLASS_KEYWORDS = [
   // Grade / Schoolwide cohorts

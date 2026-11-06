@@ -744,7 +744,12 @@ export default function TaskItWorkspacePage() {
         const clientDate = new Date().toISOString();
         const res = await fetch("/api/sync/canvas", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+          },
+          cache: "no-store",
           body: JSON.stringify({
             canvasFeedUrl: feedUrl,
             clientDate,
