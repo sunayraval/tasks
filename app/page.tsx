@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   ActionProposalPayload,
   DEFAULT_WORKSPACE_CONFIG,
@@ -27,6 +27,20 @@ import { CheckCircle2, LogIn } from "lucide-react";
 const LOCAL_STORAGE_CONFIG_KEY = "taskit_workspace_config_v1";
 const HEADERS_SEEDED_STORAGE_KEY = "taskit_doc_headers_seeded_v1";
 
+function generateUUID(): string {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 function buildDefaultHeaderRowsForTasks(
   userId: string,
   existingTasks: TaskItem[],
@@ -37,9 +51,9 @@ function buildDefaultHeaderRowsForTasks(
   const createdHeaders: TaskItem[] = [];
   const placedTaskIds = new Set<string>();
 
-  sections.forEach((sec, idx) => {
+  sections.forEach((sec) => {
     const headerItem: TaskItem = {
-      id: `header-seed-${Date.now()}-${idx}`,
+      id: generateUUID(),
       user_id: userId,
       title: `——— ${sec.label} ———`,
       content: "",
@@ -104,6 +118,14 @@ export default function TaskItWorkspacePage() {
   const [authChecked, setAuthChecked] = useState<boolean>(false);
   const [isSyncingCanvas, setIsSyncingCanvas] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Persistent tracking of deleted task IDs to eliminate any re-query flicker
+  const deletedTaskIdsRef = useRef<Set<string>>(new Set());
+
+  // Ref to trigger canvas sync in parallel from auth initialization without circular dependency
+  const syncCanvasParallelRef = useRef<
+    (feedUrl: string, isAutoSync?: boolean) => Promise<unknown>
+  >(async () => {});
 
   const workspaceConfig = useMemo(() => getWorkspaceConfig(profile), [profile]);
 
@@ -192,7 +214,10 @@ export default function TaskItWorkspacePage() {
             .eq("user_id", user.id)
             .order("order_index", { ascending: true });
 
-          const loadedTasks = (dbTasks || []) as TaskItem[];
+          const loadedTasks = ((dbTasks || []) as TaskItem[]).filter(
+            (t) => !deletedTaskIdsRef.current.has(t.id)
+          );
+
           const hasAnyHeaderRow = loadedTasks.some((t) =>
             Boolean(t.custom_properties?.is_header)
           );
@@ -220,9 +245,10 @@ export default function TaskItWorkspacePage() {
             );
             setTasks(combined);
 
-            // Insert movable header rows into Supabase tasks table
+            // Insert movable header rows into Supabase tasks table with exact UUIDs
             if (createdHeaders.length > 0) {
               const payload = createdHeaders.map((h) => ({
+                id: h.id,
                 user_id: user.id,
                 title: h.title,
                 content: "",
@@ -240,31 +266,11 @@ export default function TaskItWorkspacePage() {
                 order_index: h.order_index,
               }));
 
-              const { data: insertedHeaders } = await supabase
-                .from("tasks")
-                .insert(payload)
-                .select();
-
-              if (insertedHeaders && insertedHeaders.length > 0) {
-                setTasks((prev) => {
-                  let insertIdx = 0;
-                  return prev.map((row) => {
-                    if (
-                      row.id.startsWith("header-seed-") &&
-                      insertedHeaders[insertIdx]
-                    ) {
-                      const real = insertedHeaders[insertIdx] as TaskItem;
-                      insertIdx++;
-                      return real;
-                    }
-                    return row;
-                  });
-                });
-              }
+              await supabase.from("tasks").insert(payload);
 
               // Also persist updated order_index for existing tasks
               for (const item of combined) {
-                if (!item.id.startsWith("header-seed-")) {
+                if (!createdHeaders.some((h) => h.id === item.id)) {
                   supabase
                     .from("tasks")
                     .update({ order_index: item.order_index })
@@ -275,6 +281,22 @@ export default function TaskItWorkspacePage() {
             }
           } else {
             setTasks(loadedTasks);
+          }
+
+          // Auto-sync Canvas in parallel in background if it hasn't synced already this session
+          const autoSyncKey = `canvas_autosynced_${user.id}`;
+          const alreadyAutoSynced =
+            typeof window !== "undefined" &&
+            sessionStorage.getItem(autoSyncKey) === "true";
+
+          if (!alreadyAutoSynced) {
+            if (typeof window !== "undefined") {
+              sessionStorage.setItem(autoSyncKey, "true");
+            }
+            // Trigger in parallel without awaiting to keep page load instant
+            const feedUrl =
+              dbProfile?.canvas_feed_url || profile.canvas_feed_url || "";
+            syncCanvasParallelRef.current(feedUrl, true).catch(() => {});
           }
         } else {
           setIsAuthenticated(false);
@@ -299,29 +321,65 @@ export default function TaskItWorkspacePage() {
           .select("*")
           .eq("user_id", session.user.id)
           .order("order_index", { ascending: true });
-        if (dbTasks) setTasks(dbTasks as TaskItem[]);
+        if (dbTasks) {
+          setTasks(
+            (dbTasks as TaskItem[]).filter(
+              (t) => !deletedTaskIdsRef.current.has(t.id)
+            )
+          );
+        }
       } else {
         setIsAuthenticated(false);
         setTasks([]);
       }
     });
 
+    // Granular Real-time Subscription: avoids full-table refetches that cause flicker/resurrection
     const channel = supabase
       .channel("tasks-realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "tasks" },
-        async () => {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          if (!user) return;
-          const { data: latest } = await supabase
-            .from("tasks")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("order_index", { ascending: true });
-          if (latest) setTasks(latest as TaskItem[]);
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            const deletedId = (payload.old as { id?: string })?.id;
+            if (deletedId) {
+              deletedTaskIdsRef.current.add(deletedId);
+              setTasks((prev) => prev.filter((t) => t.id !== deletedId));
+            }
+            return;
+          }
+
+          if (payload.eventType === "INSERT") {
+            const newItem = payload.new as TaskItem;
+            if (
+              !newItem?.id ||
+              deletedTaskIdsRef.current.has(newItem.id)
+            ) {
+              return;
+            }
+            setTasks((prev) => {
+              if (prev.some((t) => t.id === newItem.id)) return prev;
+              return [...prev, newItem];
+            });
+            return;
+          }
+
+          if (payload.eventType === "UPDATE") {
+            const updatedItem = payload.new as TaskItem;
+            if (
+              !updatedItem?.id ||
+              deletedTaskIdsRef.current.has(updatedItem.id)
+            ) {
+              return;
+            }
+            setTasks((prev) =>
+              prev.map((t) =>
+                t.id === updatedItem.id ? { ...t, ...updatedItem } : t
+              )
+            );
+            return;
+          }
         }
       )
       .subscribe();
@@ -330,7 +388,7 @@ export default function TaskItWorkspacePage() {
       authListener.unsubscribe();
       supabase.removeChannel(channel);
     };
-  }, [showToast]);
+  }, [showToast, profile.canvas_feed_url]);
 
   // 2. Apply theme & custom colors to html element
   useEffect(() => {
@@ -414,14 +472,14 @@ export default function TaskItWorkspacePage() {
     [isAuthenticated]
   );
 
-  // 5. Create Task (from Modal or Copilot)
+  // 5. Create Task (from Modal or Copilot) with real UUID
   const handleCreateTask = useCallback(
     async (newTaskInput: Omit<TaskItem, "id" | "created_at" | "updated_at">) => {
       const nowISO = new Date().toISOString();
-      const tempId = `task-${Date.now()}`;
+      const newUuid = generateUUID();
       const created: TaskItem = {
         ...newTaskInput,
-        id: tempId,
+        id: newUuid,
         created_at: nowISO,
         updated_at: nowISO,
       };
@@ -432,33 +490,24 @@ export default function TaskItWorkspacePage() {
       if (isSupabaseConfigured() && isAuthenticated) {
         try {
           const supabase = createClient();
-          const { data } = await supabase
-            .from("tasks")
-            .insert({
-              user_id: profile.id,
-              title: created.title,
-              content: created.content,
-              status: created.status,
-              type: created.type,
-              priority: created.priority,
-              due_date: created.due_date,
-              estimated_minutes: created.estimated_minutes,
-              tags: created.tags,
-              notes: created.notes,
-              is_canvas_assignment: created.is_canvas_assignment,
-              canvas_course_code: created.canvas_course_code,
-              custom_properties: created.custom_properties || {},
-              section_group: created.section_group,
-              order_index: created.order_index,
-            })
-            .select()
-            .single();
-
-          if (data?.id) {
-            setTasks((prev) =>
-              prev.map((t) => (t.id === tempId ? (data as TaskItem) : t))
-            );
-          }
+          await supabase.from("tasks").insert({
+            id: newUuid,
+            user_id: profile.id,
+            title: created.title,
+            content: created.content,
+            status: created.status,
+            type: created.type,
+            priority: created.priority,
+            due_date: created.due_date,
+            estimated_minutes: created.estimated_minutes,
+            tags: created.tags,
+            notes: created.notes,
+            is_canvas_assignment: created.is_canvas_assignment,
+            canvas_course_code: created.canvas_course_code,
+            custom_properties: created.custom_properties || {},
+            section_group: created.section_group,
+            order_index: created.order_index,
+          });
         } catch (err) {
           console.error("Create task error:", err);
         }
@@ -471,7 +520,7 @@ export default function TaskItWorkspacePage() {
   const handleInlineCreateTask = useCallback(
     (afterRowId?: string): string => {
       const nowISO = new Date().toISOString();
-      const tempId = `task-${Date.now()}`;
+      const newUuid = generateUUID();
       const defaultStatus = workspaceConfig.statuses[0]?.label || "To Do";
       const defaultType = workspaceConfig.types[0]?.label || "General";
       const defaultPriority = workspaceConfig.priorities[2]?.label || "Medium";
@@ -485,7 +534,7 @@ export default function TaskItWorkspacePage() {
       }
 
       const created: TaskItem = {
-        id: tempId,
+        id: newUuid,
         user_id: profile.id,
         title: "New Task",
         content: "",
@@ -525,6 +574,7 @@ export default function TaskItWorkspacePage() {
         supabase
           .from("tasks")
           .insert({
+            id: newUuid,
             user_id: profile.id,
             title: created.title,
             content: created.content,
@@ -541,22 +591,10 @@ export default function TaskItWorkspacePage() {
             section_group: created.section_group,
             order_index: insertOrderIndex,
           })
-          .select()
-          .single()
-          .then(({ data }) => {
-            if (data?.id) {
-              setTasks((prev) =>
-                prev.map((t) =>
-                  t.id === tempId
-                    ? { ...(data as TaskItem), title: t.title }
-                    : t
-                )
-              );
-            }
-          });
+          .then();
       }
 
-      return tempId;
+      return newUuid;
     },
     [workspaceConfig, profile.id, tasks, isAuthenticated]
   );
@@ -565,7 +603,7 @@ export default function TaskItWorkspacePage() {
   const handleInlineCreateHeader = useCallback(
     (afterRowId?: string, defaultTitle?: string): string => {
       const nowISO = new Date().toISOString();
-      const tempId = `header-${Date.now()}`;
+      const newUuid = generateUUID();
       const headerTitle = defaultTitle || "——— ✨ NEW HEADER ✨ ———";
 
       let insertOrderIndex = tasks.length;
@@ -577,7 +615,7 @@ export default function TaskItWorkspacePage() {
       }
 
       const createdHeader: TaskItem = {
-        id: tempId,
+        id: newUuid,
         user_id: profile.id,
         title: headerTitle,
         content: "",
@@ -617,6 +655,7 @@ export default function TaskItWorkspacePage() {
         supabase
           .from("tasks")
           .insert({
+            id: newUuid,
             user_id: profile.id,
             title: createdHeader.title,
             content: "",
@@ -633,22 +672,10 @@ export default function TaskItWorkspacePage() {
             section_group: createdHeader.section_group,
             order_index: insertOrderIndex,
           })
-          .select()
-          .single()
-          .then(({ data }) => {
-            if (data?.id) {
-              setTasks((prev) =>
-                prev.map((t) =>
-                  t.id === tempId
-                    ? { ...(data as TaskItem), title: t.title }
-                    : t
-                )
-              );
-            }
-          });
+          .then();
       }
 
-      return tempId;
+      return newUuid;
     },
     [profile.id, tasks, isAuthenticated]
   );
@@ -676,9 +703,12 @@ export default function TaskItWorkspacePage() {
     [isAuthenticated]
   );
 
-  // 8. Delete Task or Header Row
+  // 8. Delete Task or Header Row - flicker-free and permanent
   const handleDeleteTask = useCallback(
     async (taskId: string) => {
+      // Instantly track in deleted set so no real-time or sync payload brings it back
+      deletedTaskIdsRef.current.add(taskId);
+
       const target = tasks.find((t) => t.id === taskId);
       setTasks((prev) => prev.filter((t) => t.id !== taskId));
       if (selectedTaskId === taskId) {
@@ -691,13 +721,27 @@ export default function TaskItWorkspacePage() {
       if (isSupabaseConfigured() && isAuthenticated) {
         try {
           const supabase = createClient();
-          await supabase.from("tasks").delete().eq("id", taskId);
+          const isUuid =
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+              taskId
+            );
+
+          if (isUuid) {
+            await supabase.from("tasks").delete().eq("id", taskId);
+          } else if (target) {
+            // Delete legacy non-UUID items by title
+            await supabase
+              .from("tasks")
+              .delete()
+              .eq("user_id", profile.id)
+              .eq("title", target.title);
+          }
         } catch (err) {
           console.error("Delete task error:", err);
         }
       }
     },
-    [tasks, selectedTaskId, showToast, isAuthenticated]
+    [tasks, selectedTaskId, showToast, isAuthenticated, profile.id]
   );
 
   // 9. Reorder Tasks & Movable Headers (persists order_index to Supabase)
@@ -712,10 +756,11 @@ export default function TaskItWorkspacePage() {
       if (isSupabaseConfigured() && isAuthenticated) {
         const supabase = createClient();
         for (const item of indexed) {
-          if (
-            !item.id.startsWith("task-") &&
-            !item.id.startsWith("header-")
-          ) {
+          const isUuid =
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+              item.id
+            );
+          if (isUuid) {
             supabase
               .from("tasks")
               .update({ order_index: item.order_index })
@@ -728,68 +773,97 @@ export default function TaskItWorkspacePage() {
     [isAuthenticated]
   );
 
-  // 10. Sync Canvas
+  // 10. Sync Canvas (autofills due date, priority, tags, section_group; filters today/tmr/day-after)
   const handleSyncCanvasTasks = useCallback(
-    async (feedUrl: string) => {
+    async (feedUrl: string, isAutoSync: boolean = false) => {
       setIsSyncingCanvas(true);
       try {
+        const clientDate = new Date().toISOString();
         const res = await fetch("/api/sync/canvas", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ canvasFeedUrl: feedUrl }),
+          body: JSON.stringify({
+            canvasFeedUrl: feedUrl,
+            clientDate,
+          }),
         });
         const data = await res.json();
         if (!data.success) {
-          throw new Error(data.error || "Sync failed");
+          if (!isAutoSync) throw new Error(data.error || "Sync failed");
+          return;
         }
 
-        const incoming: Partial<TaskItem>[] = data.tasks || [];
-        const nowISO = new Date().toISOString();
-        const updatedList = [...tasks];
-        let addedCount = 0;
-
-        for (const item of incoming) {
-          const existingIdx = updatedList.findIndex(
-            (t) => t.title.toLowerCase() === (item.title || "").toLowerCase()
-          );
-          if (existingIdx === -1) {
-            const newItem: TaskItem = {
-              id: item.id || `canvas-${Date.now()}-${addedCount}`,
-              user_id: profile.id,
-              title: item.title || "Canvas Assignment",
-              content: item.content || "",
-              status: "To Do",
-              type: "School",
-              priority: item.priority || "High",
-              due_date: item.due_date || nowISO,
-              estimated_minutes: item.estimated_minutes || 45,
-              tags: item.tags || ["#Canvas"],
-              notes: item.notes || "",
-              is_canvas_assignment: true,
-              canvas_course_code: item.canvas_course_code || "HCPSS",
-              custom_properties: item.custom_properties || {},
-              section_group: item.section_group || "TODAY",
-              order_index: updatedList.length,
-              completed_at: null,
-              created_at: nowISO,
-              updated_at: nowISO,
-            };
-            updatedList.push(newItem);
-            addedCount++;
+        const incoming: TaskItem[] = data.tasks || [];
+        if (incoming.length === 0) {
+          if (!isAutoSync) {
+            showToast(
+              "Canvas feed up to date (no items due today, tomorrow, or day after)."
+            );
           }
+          return { count: 0, usedDemoFeed: Boolean(data.usedDemoFeed) };
         }
 
-        setTasks(updatedList);
-        showToast(
-          `Synced ${addedCount} Canvas assignments into your workspace.`
-        );
+        let addedCount = 0;
+        setTasks((prev) => {
+          const updatedList = [...prev];
+          for (const item of incoming) {
+            // If already deleted in this session, never restore
+            if (deletedTaskIdsRef.current.has(item.id)) continue;
+
+            const existingIdx = updatedList.findIndex(
+              (t) =>
+                t.id === item.id ||
+                (t.is_canvas_assignment &&
+                  t.title.toLowerCase() === item.title.toLowerCase())
+            );
+
+            if (existingIdx !== -1) {
+              updatedList[existingIdx] = {
+                ...updatedList[existingIdx],
+                due_date: item.due_date,
+                priority: item.priority,
+                estimated_minutes: item.estimated_minutes,
+                section_group: item.section_group,
+                canvas_course_code: item.canvas_course_code,
+                tags: Array.from(
+                  new Set([...updatedList[existingIdx].tags, ...item.tags])
+                ),
+              };
+            } else {
+              updatedList.push(item);
+              addedCount++;
+            }
+          }
+          return updatedList;
+        });
+
+        if (addedCount > 0 || !isAutoSync) {
+          showToast(
+            addedCount > 0
+              ? `Synced ${addedCount} Canvas assignment${
+                  addedCount > 1 ? "s" : ""
+                } due soon!`
+              : "Canvas assignments up to date."
+          );
+        }
+
         return { count: addedCount, usedDemoFeed: Boolean(data.usedDemoFeed) };
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : "Sync error";
+        if (!isAutoSync) {
+          showToast(`Canvas sync error: ${errMsg}`);
+        }
       } finally {
         setIsSyncingCanvas(false);
       }
     },
-    [tasks, profile.id, showToast]
+    [showToast]
   );
+
+  // Keep ref up to date for parallel autosync invocation
+  useEffect(() => {
+    syncCanvasParallelRef.current = handleSyncCanvasTasks;
+  }, [handleSyncCanvasTasks]);
 
   // 11. Confirm Copilot Proposals
   const handleConfirmActionProposal = useCallback(
@@ -809,7 +883,10 @@ export default function TaskItWorkspacePage() {
 
         setTasks((prev) =>
           prev.map((t) => {
-            if (targetIds.has(t.id) || targetTitles.has(t.title.toLowerCase())) {
+            if (
+              targetIds.has(t.id) ||
+              targetTitles.has(t.title.toLowerCase())
+            ) {
               const updated = {
                 ...t,
                 due_date: nextDue,
@@ -835,7 +912,7 @@ export default function TaskItWorkspacePage() {
         );
       } else if (proposal.actionType === "BATCH_CREATE") {
         const newItems: TaskItem[] = proposal.changes.map((c, idx) => ({
-          id: `ai-${Date.now()}-${idx}`,
+          id: generateUUID(),
           user_id: profile.id,
           title: c.title,
           content: "<p>Created via Copilot.</p>",
