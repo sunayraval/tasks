@@ -46,12 +46,16 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
     // Exclude movable header divider rows from task statistics
     const realTasks = tasks.filter((t) => !t.custom_properties?.is_header);
     const total = realTasks.length;
-    const done = realTasks.filter((t) => t.status === "Done").length;
+    const isCompleted = (t: TaskItem) => {
+      const s = (t.status || "").toLowerCase().trim();
+      return s === "done" || s === "completed" || Boolean(t.completed_at);
+    };
+    const done = realTasks.filter(isCompleted).length;
     const remaining = Math.max(0, total - done);
     const percentage = total > 0 ? Math.round((done / total) * 100) : 0;
 
     const totalRemainingMinutes = realTasks
-      .filter((t) => t.status !== "Done")
+      .filter((t) => !isCompleted(t))
       .reduce((acc, t) => acc + (t.estimated_minutes || 30), 0);
 
     return {

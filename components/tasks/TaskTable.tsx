@@ -73,6 +73,29 @@ export function isTaskHeaderRow(task: TaskItem): boolean {
   return Boolean(task.custom_properties?.is_header);
 }
 
+export function isTaskCompleted(t: TaskItem): boolean {
+  if (isTaskHeaderRow(t)) return false;
+  const s = (t.status || "").toLowerCase().trim();
+  return s === "done" || s === "completed" || Boolean(t.completed_at);
+}
+
+export function isTaskInProgress(t: TaskItem): boolean {
+  if (isTaskHeaderRow(t)) return false;
+  const s = (t.status || "").toLowerCase().trim();
+  return (
+    s === "in progress" ||
+    s === "in_progress" ||
+    s === "doing" ||
+    s === "working"
+  );
+}
+
+export function isTaskToDo(t: TaskItem): boolean {
+  if (isTaskHeaderRow(t)) return false;
+  const s = (t.status || "").toLowerCase().trim();
+  return s === "to do" || s === "todo" || s === "backlog";
+}
+
 export function formatRelativeDueDate(
   dueDateISO: string | null,
   status: TaskStatus
@@ -615,6 +638,36 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     })
   );
 
+  // Calculate task counts for segmented status filter bar
+  const counts = useMemo(() => {
+    let totalActive = 0;
+    let totalTodo = 0;
+    let totalInProgress = 0;
+    let totalCompleted = 0;
+
+    for (const t of tasks) {
+      if (isTaskHeaderRow(t)) continue;
+      if (isTaskCompleted(t)) {
+        totalCompleted++;
+      } else {
+        totalActive++;
+        if (isTaskInProgress(t)) {
+          totalInProgress++;
+        } else if (isTaskToDo(t)) {
+          totalTodo++;
+        }
+      }
+    }
+
+    return {
+      all: tasks.filter((t) => !isTaskHeaderRow(t)).length,
+      active: totalActive,
+      todo: totalTodo,
+      inProgress: totalInProgress,
+      completed: totalCompleted,
+    };
+  }, [tasks]);
+
   // Filter rows: Header rows stay visible unless searching/filtering hides them
   const visibleRows = useMemo(() => {
     let list = [...tasks];
@@ -629,6 +682,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
     list = list.filter((t) => {
       if (isTaskHeaderRow(t)) return true;
+      // Never drop completed tasks here so user can view them in the Completed list
+      if (isTaskCompleted(t)) return true;
       if (t.due_date) {
         const dueTime = new Date(t.due_date).getTime();
         if (!isNaN(dueTime) && dueTime < startOfTodayTime) {
@@ -638,33 +693,70 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       return true;
     });
 
+    list = list.filter((t) => {
+      if (isTaskHeaderRow(t)) return true;
+
+      // Status filtering logic
+      if (statusFilter === "ALL") {
+        if (!workspaceConfig.showCompletedTasks && isTaskCompleted(t)) {
+          return false;
+        }
+      } else if (statusFilter === "TODO") {
+        if (!isTaskToDo(t)) return false;
+      } else if (statusFilter === "IN_PROGRESS") {
+        if (!isTaskInProgress(t)) return false;
+      } else if (statusFilter === "COMPLETED") {
+        if (!isTaskCompleted(t)) return false;
+      } else {
+        if (t.status.toLowerCase() !== statusFilter.toLowerCase()) return false;
+      }
+
+      // Category / Type filter
+      if (typeFilter !== "ALL" && t.type !== typeFilter) return false;
+
+      // Global text search
+      if (globalFilter.trim()) {
+        const q = globalFilter.toLowerCase();
+        const matchTitle = t.title.toLowerCase().includes(q);
+        const matchNotes = (t.notes || "").toLowerCase().includes(q);
+        const matchTags = t.tags.some((tag) =>
+          tag.toLowerCase().includes(q)
+        );
+        return matchTitle || matchNotes || matchTags;
+      }
+
+      return true;
+    });
+
+    // When filtering by status, category, or search, prune empty headers
     if (
       statusFilter !== "ALL" ||
       typeFilter !== "ALL" ||
       globalFilter.trim() !== ""
     ) {
-      list = list.filter((t) => {
-        if (isTaskHeaderRow(t)) {
-          if (globalFilter.trim()) {
-            return t.title
-              .toLowerCase()
-              .includes(globalFilter.trim().toLowerCase());
+      const pruned: TaskItem[] = [];
+      let pendingHeader: TaskItem | null = null;
+
+      for (const item of list) {
+        if (isTaskHeaderRow(item)) {
+          if (
+            globalFilter.trim() &&
+            item.title.toLowerCase().includes(globalFilter.trim().toLowerCase())
+          ) {
+            pruned.push(item);
+            pendingHeader = null;
+          } else {
+            pendingHeader = item;
           }
-          return true;
+        } else {
+          if (pendingHeader) {
+            pruned.push(pendingHeader);
+            pendingHeader = null;
+          }
+          pruned.push(item);
         }
-        if (statusFilter !== "ALL" && t.status !== statusFilter) return false;
-        if (typeFilter !== "ALL" && t.type !== typeFilter) return false;
-        if (globalFilter.trim()) {
-          const q = globalFilter.toLowerCase();
-          const matchTitle = t.title.toLowerCase().includes(q);
-          const matchNotes = (t.notes || "").toLowerCase().includes(q);
-          const matchTags = t.tags.some((tag) =>
-            tag.toLowerCase().includes(q)
-          );
-          return matchTitle || matchNotes || matchTags;
-        }
-        return true;
-      });
+      }
+      list = pruned;
     }
 
     if (sortField) {
@@ -679,7 +771,15 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     }
 
     return list;
-  }, [tasks, statusFilter, typeFilter, globalFilter, sortField, sortAsc]);
+  }, [
+    tasks,
+    statusFilter,
+    typeFilter,
+    globalFilter,
+    sortField,
+    sortAsc,
+    workspaceConfig.showCompletedTasks,
+  ]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -768,46 +868,169 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   return (
     <div className="space-y-4">
       {/* Top Filter & Quick Actions Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-xl border theme-panel p-3.5 backdrop-blur-xl">
-        <div className="flex flex-wrap items-center gap-2.5 flex-1">
-          {/* Search Input */}
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <Search className="w-4 h-4 text-white/45 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
-              placeholder="Search document rows, #tags, notes..."
-              className="w-full rounded-lg border theme-input pl-9 pr-3 py-1.5 text-xs text-white placeholder-white/40 focus:outline-none"
+      <div className="flex flex-col gap-3 rounded-xl border theme-panel p-3.5 backdrop-blur-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 flex-1">
+            {/* Search Input */}
+            <div className="relative flex-1 min-w-[180px] max-w-xs">
+              <Search className="w-4 h-4 text-white/45 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={globalFilter}
+                onChange={(e) => setGlobalFilter(e.target.value)}
+                placeholder="Search tasks, #tags, notes..."
+                className="w-full rounded-lg border theme-input pl-9 pr-3 py-1.5 text-xs text-white placeholder-white/40 focus:outline-none"
+              />
+            </div>
+
+            {/* Quick Status Segmented Filter Bar: All/Active | To Do | In Progress | Completed */}
+            <div className="flex items-center gap-1 p-0.5 rounded-lg border border-white/10 bg-black/40 backdrop-blur-md">
+              <button
+                type="button"
+                onClick={() => setStatusFilter("ALL")}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-all ${
+                  statusFilter === "ALL"
+                    ? "bg-primary text-black font-bold shadow-sm"
+                    : "text-white/65 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <span>
+                  {workspaceConfig.showCompletedTasks ? "All" : "Active"}
+                </span>
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                    statusFilter === "ALL"
+                      ? "bg-black/20 text-black font-bold"
+                      : "bg-white/10 text-white/50"
+                  }`}
+                >
+                  {workspaceConfig.showCompletedTasks
+                    ? counts.all
+                    : counts.active}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStatusFilter("TODO")}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-all ${
+                  statusFilter === "TODO"
+                    ? "bg-slate-200 text-slate-900 font-bold shadow-sm"
+                    : "text-white/65 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <span>To Do</span>
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                    statusFilter === "TODO"
+                      ? "bg-slate-900/20 text-slate-900 font-bold"
+                      : "bg-white/10 text-white/50"
+                  }`}
+                >
+                  {counts.todo}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStatusFilter("IN_PROGRESS")}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-all ${
+                  statusFilter === "IN_PROGRESS"
+                    ? "bg-sky-400 text-sky-950 font-bold shadow-sm"
+                    : "text-white/65 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <span>In Progress</span>
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                    statusFilter === "IN_PROGRESS"
+                      ? "bg-sky-950/20 text-sky-950 font-bold"
+                      : "bg-white/10 text-white/50"
+                  }`}
+                >
+                  {counts.inProgress}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStatusFilter("COMPLETED")}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-all ${
+                  statusFilter === "COMPLETED"
+                    ? "bg-emerald-400 text-emerald-950 font-bold shadow-sm"
+                    : "text-white/65 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Completed</span>
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                    statusFilter === "COMPLETED"
+                      ? "bg-emerald-950/20 text-emerald-950 font-bold"
+                      : "bg-emerald-400/15 text-emerald-300"
+                  }`}
+                >
+                  {counts.completed}
+                </span>
+              </button>
+            </div>
+
+            {/* Show Completed Tasks Setting Toggle Button */}
+            <button
+              type="button"
+              onClick={() =>
+                onUpdateWorkspaceConfig({
+                  showCompletedTasks: !workspaceConfig.showCompletedTasks,
+                })
+              }
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all ${
+                workspaceConfig.showCompletedTasks
+                  ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-300"
+                  : "border-white/10 bg-white/5 text-white/55 hover:text-white hover:bg-white/10"
+              }`}
+              title={
+                workspaceConfig.showCompletedTasks
+                  ? "Show completed tasks: ON (completed tasks stay visible in the table). Click to hide."
+                  : "Show completed tasks: OFF (checked off tasks disappear into Completed). Click to show."
+              }
+            >
+              <CheckCircle2
+                className={`w-3.5 h-3.5 ${
+                  workspaceConfig.showCompletedTasks
+                    ? "text-emerald-400"
+                    : "text-white/40"
+                }`}
+              />
+              <span className="hidden sm:inline">Show completed</span>
+              <span
+                className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                  workspaceConfig.showCompletedTasks
+                    ? "bg-emerald-400/20 text-emerald-200"
+                    : "bg-white/10 text-white/45"
+                }`}
+              >
+                {counts.completed}
+              </span>
+            </button>
+
+            {/* Custom Dark-Glass Category Filter */}
+            <FilterDropdown
+              label={workspaceConfig.columnHeaders.type}
+              value={typeFilter}
+              options={workspaceConfig.types}
+              onChange={setTypeFilter}
             />
+
+            <button
+              type="button"
+              onClick={() => onOpenSettingsTab("customize")}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-highlight hover:border-primary/50 hover:bg-primary/10 transition-colors"
+              title="Edit tags, statuses, categories & colors in Settings"
+            >
+              <Settings2 className="w-3.5 h-3.5 text-primary" />
+              <span>Customize</span>
+            </button>
           </div>
-
-          {/* Custom Dark-Glass Status Filter */}
-          <FilterDropdown
-            label={workspaceConfig.columnHeaders.status}
-            value={statusFilter}
-            options={workspaceConfig.statuses}
-            onChange={setStatusFilter}
-          />
-
-          {/* Custom Dark-Glass Category Filter */}
-          <FilterDropdown
-            label={workspaceConfig.columnHeaders.type}
-            value={typeFilter}
-            options={workspaceConfig.types}
-            onChange={setTypeFilter}
-          />
-
-          <button
-            type="button"
-            onClick={() => onOpenSettingsTab("customize")}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-highlight hover:border-primary/50 hover:bg-primary/10 transition-colors"
-            title="Edit tags, statuses, categories & colors in Settings"
-          >
-            <Settings2 className="w-3.5 h-3.5 text-primary" />
-            <span>Customize Tags &amp; Types</span>
-          </button>
-        </div>
 
         {/* Right: Quick Add Task or Header Buttons */}
         <div className="flex items-center gap-2 self-end md:self-center">
@@ -831,6 +1054,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           </button>
         </div>
       </div>
+    </div>
 
       {/* Main Document-Style Table */}
       <div className="rounded-xl border theme-panel overflow-visible backdrop-blur-xl">
@@ -1046,7 +1270,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
                     // Normal Task Row
                     const t = rowItem;
-                    const isDone = t.status === "Done";
+                    const isDone = isTaskCompleted(t);
                     const isTagMenuOpen = openTagDropdownTaskId === t.id;
                     const {
                       label: dueLabel,
@@ -1122,7 +1346,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      const nextStatus: TaskStatus = isDone
+                                      const isCompleted = isTaskCompleted(t);
+                                      const nextStatus: TaskStatus = isCompleted
                                         ? workspaceConfig.statuses[0]?.label ||
                                           "To Do"
                                         : "Done";
@@ -1188,15 +1413,17 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                   value={t.status}
                                   options={workspaceConfig.statuses}
                                   placeholder="New status..."
-                                  onSelect={(nextStatus) =>
+                                  onSelect={(nextStatus) => {
+                                    const isNowDone =
+                                      nextStatus.toLowerCase() === "done" ||
+                                      nextStatus.toLowerCase() === "completed";
                                     onUpdateTask(t.id, {
                                       status: nextStatus,
-                                      completed_at:
-                                        nextStatus === "Done"
-                                          ? new Date().toISOString()
-                                          : null,
-                                    })
-                                  }
+                                      completed_at: isNowDone
+                                        ? new Date().toISOString()
+                                        : null,
+                                    });
+                                  }}
                                   onAddNewOption={(label, color) =>
                                     onUpdateWorkspaceConfig({
                                       statuses: [
@@ -1536,6 +1763,26 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                       </React.Fragment>
                     );
                   })}
+
+                  {/* Empty Filter State */}
+                  {visibleRows.length === 0 && (
+                    <tr>
+                      <td colSpan={10} className="py-12 text-center">
+                        <div className="flex flex-col items-center justify-center gap-2 text-white/50">
+                          <CheckCircle2 className="w-8 h-8 text-white/20" />
+                          <p className="text-xs font-medium">
+                            {statusFilter === "COMPLETED"
+                              ? "No completed tasks yet. Check off a task to move it here!"
+                              : statusFilter === "IN_PROGRESS"
+                              ? "No tasks currently in progress."
+                              : statusFilter === "TODO"
+                              ? "No tasks in To Do."
+                              : "No tasks found matching your filter."}
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
 
                   {/* Bottom of Document Table: Click to Add New Task Row or New Header Row */}
                   <tr className="border-t border-white/15 bg-black/35">

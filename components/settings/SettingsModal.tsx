@@ -41,6 +41,7 @@ import {
   X,
   ExternalLink,
   RotateCcw,
+  CheckCircle2,
 } from "lucide-react";
 
 export type SettingsTabId =
@@ -963,6 +964,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                   );
                 })}
+              </div>
+
+              {/* Show Completed Tasks Preference */}
+              <div className="rounded-xl border border-white/15 bg-black/40 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      Show completed tasks
+                    </h4>
+                    <p className="text-[11px] text-white/55">
+                      Display finished and checked-off tasks directly in the document table. When turned off, checking off a task automatically moves it to the Completed list.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onUpdateWorkspaceConfig({
+                        showCompletedTasks: !workspaceConfig.showCompletedTasks,
+                      })
+                    }
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      workspaceConfig.showCompletedTasks
+                        ? "bg-primary"
+                        : "bg-white/20"
+                    }`}
+                    role="switch"
+                    aria-checked={Boolean(workspaceConfig.showCompletedTasks)}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full shadow ring-0 transition duration-200 ease-in-out ${
+                        workspaceConfig.showCompletedTasks
+                          ? "translate-x-5 bg-black"
+                          : "translate-x-0 bg-white"
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
             </div>
           )}

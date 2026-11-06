@@ -76,6 +76,7 @@ export interface WorkspaceConfig {
   workspaceSubtitle: string;
   brandName: string;
   brandBadge: string;
+  showCompletedTasks?: boolean;
   columnHeaders: ColumnHeadersConfig;
   sections: CustomSectionItem[];
   statuses: CustomOptionItem[];
@@ -413,6 +414,7 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
     { id: "#Essay", label: "#Essay", color: "amber" },
     { id: "#Lab", label: "#Lab", color: "emerald" },
   ],
+  showCompletedTasks: false,
   customThemeColors: null,
 };
 
@@ -435,6 +437,10 @@ export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
       typeof raw.brandBadge === "string"
         ? raw.brandBadge
         : DEFAULT_WORKSPACE_CONFIG.brandBadge,
+    showCompletedTasks:
+      typeof raw.showCompletedTasks === "boolean"
+        ? raw.showCompletedTasks
+        : false,
     columnHeaders: {
       ...DEFAULT_WORKSPACE_CONFIG.columnHeaders,
       ...(raw.columnHeaders || {}),
