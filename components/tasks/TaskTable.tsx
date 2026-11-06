@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -33,8 +33,13 @@ import {
   TaskStatus,
   TaskType,
   SectionGroup,
-  SECTION_DIVIDERS,
   ViewMode,
+  WorkspaceConfig,
+  ColumnHeadersConfig,
+  BadgeColorKey,
+  BADGE_COLOR_KEYS,
+  BADGE_COLOR_MAP,
+  getBadgeClasses,
 } from "@/types/taskit";
 import {
   ArrowUpDown,
@@ -49,6 +54,11 @@ import {
   Filter,
   AlertCircle,
   Trash2,
+  Pencil,
+  Check,
+  Tag,
+  Settings2,
+  FolderPlus,
 } from "lucide-react";
 import { TaskDocumentEditor } from "@/components/editor/TaskDocumentEditor";
 
@@ -56,11 +66,16 @@ interface TaskTableProps {
   tasks: TaskItem[];
   selectedTaskId: string | null;
   viewMode: ViewMode;
+  workspaceConfig: WorkspaceConfig;
   onSelectTask: (taskId: string | null) => void;
   onUpdateTask: (taskId: string, updates: Partial<TaskItem>) => void;
   onDeleteTask: (taskId: string) => void;
   onReorderTasks: (newTasks: TaskItem[]) => void;
-  onOpenNewTaskModal: (defaultSection?: SectionGroup) => void;
+  onInlineCreateTask: (sectionId?: SectionGroup) => string;
+  onUpdateWorkspaceConfig: (updates: Partial<WorkspaceConfig>) => void;
+  onOpenSettingsTab: (
+    tab: "appearance" | "customize" | "view" | "ai" | "integrations"
+  ) => void;
 }
 
 export function formatRelativeDueDate(
@@ -72,11 +87,15 @@ export function formatRelativeDueDate(
   isToday: boolean;
 } {
   if (!dueDateISO) {
-    return { label: "No Date", isOverdue: false, isToday: false };
+    return { label: "Set Date", isOverdue: false, isToday: false };
   }
   const due = new Date(dueDateISO);
   const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  );
   const startOfDue = new Date(due.getFullYear(), due.getMonth(), due.getDate());
 
   const diffDays = Math.round(
@@ -104,7 +123,7 @@ export function formatRelativeDueDate(
     };
   }
   if (diffDays <= 7) {
-    return { label: `In ${diffDays} days`, isOverdue: false, isToday: false };
+    return { label: `In ${diffDays}d`, isOverdue: false, isToday: false };
   }
   return {
     label: due.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
@@ -120,30 +139,6 @@ export function formatEstimatedTime(minutes: number): string {
   const mins = minutes % 60;
   return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
 }
-
-// Clean Monochrome Badges with clear contrast
-const STATUS_STYLES: Record<TaskStatus, string> = {
-  "To Do": "bg-zinc-800 text-zinc-300 border-zinc-700",
-  "In Progress": "bg-white/10 text-white border-white/20 font-medium",
-  Blocked: "bg-red-950/40 text-red-300 border-red-800/50",
-  Done: "bg-emerald-950/40 text-emerald-300 border-emerald-800/50",
-};
-
-const PRIORITY_STYLES: Record<TaskPriority, string> = {
-  Urgent: "bg-red-500/15 text-red-300 border-red-500/40",
-  High: "bg-orange-500/15 text-orange-300 border-orange-500/40",
-  Medium: "bg-zinc-800 text-zinc-300 border-zinc-700",
-  Low: "bg-zinc-900 text-zinc-400 border-zinc-800",
-};
-
-const TYPE_STYLES: Record<TaskType, string> = {
-  College: "bg-zinc-800 text-zinc-200 border-zinc-700",
-  School: "bg-zinc-800 text-zinc-200 border-zinc-700",
-  Personal: "bg-zinc-800 text-zinc-200 border-zinc-700",
-  Club: "bg-zinc-800 text-zinc-200 border-zinc-700",
-  Work: "bg-zinc-800 text-zinc-200 border-zinc-700",
-  General: "bg-zinc-800 text-zinc-200 border-zinc-700",
-};
 
 interface SortableTaskRowProps {
   task: TaskItem;
@@ -175,20 +170,20 @@ const SortableTaskRow: React.FC<SortableTaskRowProps> = ({
     <tr
       ref={setNodeRef}
       style={style}
-      className={`group border-b border-zinc-800/80 transition-colors ${
+      className={`group border-b border-white/10 transition-colors ${
         isSelected
-          ? "bg-zinc-800/50"
+          ? "bg-primary/15"
           : task.status === "Done"
-          ? "bg-black/20 opacity-60 hover:opacity-90"
-          : "hover:bg-zinc-900/60"
+          ? "bg-black/25 opacity-60 hover:opacity-95"
+          : "theme-row-hover"
       }`}
     >
-      <td className="w-8 pl-3 pr-1 py-3 align-middle">
+      <td className="w-8 pl-3 pr-1 py-2 align-middle">
         <button
           type="button"
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing text-zinc-600 hover:text-zinc-300 p-1 rounded"
+          className="cursor-grab active:cursor-grabbing text-white/35 hover:text-white p-1 rounded"
           title="Drag to reorder"
         >
           <GripVertical className="w-3.5 h-3.5" />
@@ -199,15 +194,72 @@ const SortableTaskRow: React.FC<SortableTaskRowProps> = ({
   );
 };
 
+// Inline Title & Notes Input Cell
+const InlineTextCell: React.FC<{
+  value: string;
+  placeholder: string;
+  isDone?: boolean;
+  autoFocus?: boolean;
+  onCommit: (val: string) => void;
+  className?: string;
+}> = ({ value, placeholder, isDone, autoFocus, onCommit, className = "" }) => {
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  useEffect(() => {
+    if (autoFocus && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [autoFocus]);
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed !== value) {
+      onCommit(trimmed);
+    }
+  };
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      value={draft}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.currentTarget.blur();
+        }
+        if (e.key === "Escape") {
+          setDraft(value);
+          e.currentTarget.blur();
+        }
+      }}
+      className={`w-full rounded-md bg-transparent px-1.5 py-1 text-xs sm:text-sm focus:bg-black/50 focus:outline-none focus:ring-1 focus:ring-primary/70 transition-all ${
+        isDone ? "line-through text-white/40" : "text-white"
+      } placeholder-white/30 ${className}`}
+    />
+  );
+};
+
 export const TaskTable: React.FC<TaskTableProps> = ({
   tasks,
   selectedTaskId,
   viewMode,
+  workspaceConfig,
   onSelectTask,
   onUpdateTask,
   onDeleteTask,
   onReorderTasks,
-  onOpenNewTaskModal,
+  onInlineCreateTask,
+  onUpdateWorkspaceConfig,
+  onOpenSettingsTab,
 }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -216,9 +268,30 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   const [collapsedSections, setCollapsedSections] = useState<
     Record<string, boolean>
   >({});
-  const [sectionOrder, setSectionOrder] = useState<SectionGroup[]>(
-    SECTION_DIVIDERS.map((s) => s.id)
+  const [newlyCreatedTaskId, setNewlyCreatedTaskId] = useState<string | null>(
+    null
   );
+
+  // Header inline editing state
+  const [editingColKey, setEditingColKey] = useState<
+    keyof ColumnHeadersConfig | null
+  >(null);
+  const [colHeaderDraft, setColHeaderDraft] = useState("");
+
+  // Section header inline editing state
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [sectionLabelDraft, setSectionLabelDraft] = useState("");
+
+  // New section creation inline state
+  const [addingNewSection, setAddingNewSection] = useState(false);
+  const [newSectionName, setNewSectionName] = useState("");
+
+  // Open Tag Popover row ID
+  const [openTagDropdownTaskId, setOpenTagDropdownTaskId] = useState<
+    string | null
+  >(null);
+  const [newTagName, setNewTagName] = useState("");
+  const [newTagColor, setNewTagColor] = useState<BadgeColorKey>("cyan");
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -226,6 +299,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  const sections = workspaceConfig.sections;
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
@@ -245,51 +320,145 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     });
   }, [tasks, statusFilter, typeFilter, globalFilter]);
 
+  const handleTriggerNewRow = (secId?: SectionGroup) => {
+    const targetSection = secId || sections[0]?.id || "TODAY";
+    setCollapsedSections((prev) => ({ ...prev, [targetSection]: false }));
+    const createdId = onInlineCreateTask(targetSection);
+    setNewlyCreatedTaskId(createdId);
+  };
+
+  const commitColumnHeader = (colKey: keyof ColumnHeadersConfig) => {
+    setEditingColKey(null);
+    const cleaned =
+      colHeaderDraft.trim() || workspaceConfig.columnHeaders[colKey];
+    if (cleaned !== workspaceConfig.columnHeaders[colKey]) {
+      onUpdateWorkspaceConfig({
+        columnHeaders: {
+          ...workspaceConfig.columnHeaders,
+          [colKey]: cleaned,
+        },
+      });
+    }
+  };
+
+  const commitSectionLabel = (secId: string) => {
+    setEditingSectionId(null);
+    const cleaned = sectionLabelDraft.trim();
+    if (!cleaned) return;
+    const updatedSections = sections.map((s) =>
+      s.id === secId ? { ...s, label: cleaned } : s
+    );
+    onUpdateWorkspaceConfig({ sections: updatedSections });
+  };
+
+  const handleAddNewSection = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleaned = newSectionName.trim();
+    if (!cleaned) return;
+    const id = cleaned.toUpperCase().replace(/\s+/g, "_");
+    if (!sections.some((s) => s.id === id)) {
+      onUpdateWorkspaceConfig({
+        sections: [...sections, { id, label: cleaned, badge: "Custom Section" }],
+      });
+    }
+    setNewSectionName("");
+    setAddingNewSection(false);
+  };
+
+  const handleDeleteSection = (secId: string) => {
+    if (sections.length <= 1) return;
+    const fallbackSec = sections.find((s) => s.id !== secId)?.id || "TODAY";
+    tasks.forEach((t) => {
+      if (t.section_group === secId) {
+        onUpdateTask(t.id, { section_group: fallbackSec });
+      }
+    });
+    onUpdateWorkspaceConfig({
+      sections: sections.filter((s) => s.id !== secId),
+    });
+  };
+
+  const moveSectionOrder = (dir: -1 | 1, sectionId: SectionGroup) => {
+    const idx = sections.findIndex((s) => s.id === sectionId);
+    const targetIdx = idx + dir;
+    if (targetIdx < 0 || targetIdx >= sections.length) return;
+    onUpdateWorkspaceConfig({
+      sections: arrayMove(sections, idx, targetIdx),
+    });
+  };
+
+  const getOptionColor = (
+    list: Array<{ id: string; label: string; color: BadgeColorKey }>,
+    value: string,
+    fallback: BadgeColorKey = "slate"
+  ): BadgeColorKey => {
+    const found = list.find(
+      (item) =>
+        item.id.toLowerCase() === value.toLowerCase() ||
+        item.label.toLowerCase() === value.toLowerCase()
+    );
+    return found ? found.color : fallback;
+  };
+
   const columns = useMemo<ColumnDef<TaskItem>[]>(
     () => [
       {
         accessorKey: "title",
-        header: "Task",
+        header: workspaceConfig.columnHeaders.title,
         cell: ({ row }) => {
           const t = row.original;
           const isDone = t.status === "Done";
           return (
-            <div className="flex items-center gap-2.5 min-w-[240px] max-w-[420px]">
+            <div className="flex items-center gap-2 min-w-[230px] max-w-[400px]">
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  const nextStatus: TaskStatus = isDone ? "To Do" : "Done";
+                  const nextStatus: TaskStatus = isDone
+                    ? workspaceConfig.statuses[0]?.label || "To Do"
+                    : "Done";
                   onUpdateTask(t.id, {
                     status: nextStatus,
                     completed_at:
                       nextStatus === "Done" ? new Date().toISOString() : null,
                   });
                 }}
-                className="shrink-0 text-zinc-500 hover:text-white transition-colors"
+                className="shrink-0 text-white/45 hover:text-primary transition-colors"
                 title={isDone ? "Mark as To Do" : "Complete Task"}
               >
                 {isDone ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                 ) : (
-                  <Circle className="w-4 h-4 text-zinc-600 hover:text-white" />
+                  <Circle className="w-4 h-4 hover:text-primary" />
                 )}
               </button>
+
+              <div className="flex-1 min-w-0">
+                <InlineTextCell
+                  value={t.title}
+                  placeholder="Type task name..."
+                  isDone={isDone}
+                  autoFocus={newlyCreatedTaskId === t.id}
+                  onCommit={(val) => {
+                    onUpdateTask(t.id, { title: val || "Untitled Task" });
+                    if (newlyCreatedTaskId === t.id) {
+                      setNewlyCreatedTaskId(null);
+                    }
+                  }}
+                  className="font-medium"
+                />
+              </div>
 
               <button
                 type="button"
                 onClick={() =>
                   onSelectTask(selectedTaskId === t.id ? null : t.id)
                 }
-                className="group/title flex items-center gap-2 text-left font-medium text-sm text-zinc-200 hover:text-white transition-colors truncate"
+                className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/60 hover:border-primary/60 hover:text-highlight transition-all shrink-0"
+                title="Open rich-text document & details"
               >
-                <span className={isDone ? "line-through text-zinc-500" : ""}>
-                  {t.title}
-                </span>
-                <span className="inline-flex items-center gap-1 rounded border border-zinc-700 bg-zinc-800/80 px-1.5 py-0.5 text-[10px] text-zinc-400 opacity-60 group-hover/title:opacity-100 group-hover/title:text-white transition-all shrink-0">
-                  <FileText className="w-3 h-3" />
-                  Notes
-                </span>
+                <FileText className="w-3 h-3" />
+                <span className="hidden sm:inline">Doc</span>
               </button>
             </div>
           );
@@ -297,151 +466,428 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       },
       {
         accessorKey: "status",
-        header: "Status",
+        header: workspaceConfig.columnHeaders.status,
         cell: ({ row }) => {
           const t = row.original;
-          const statuses: TaskStatus[] = [
-            "To Do",
-            "In Progress",
-            "Blocked",
-            "Done",
-          ];
+          const colorKey = getOptionColor(
+            workspaceConfig.statuses,
+            t.status,
+            "slate"
+          );
+          const badgeCls = getBadgeClasses(colorKey);
+          const allStatuses = workspaceConfig.statuses.some(
+            (s) => s.label === t.status
+          )
+            ? workspaceConfig.statuses
+            : [
+                ...workspaceConfig.statuses,
+                { id: t.status, label: t.status, color: "slate" as BadgeColorKey },
+              ];
+
           return (
-            <button
-              type="button"
-              onClick={() => {
-                const nextIdx =
-                  (statuses.indexOf(t.status) + 1) % statuses.length;
-                const nextStatus = statuses[nextIdx];
+            <select
+              value={t.status}
+              onChange={(e) => {
+                if (e.target.value === "__MANAGE__") {
+                  onOpenSettingsTab("customize");
+                  return;
+                }
+                const nextStatus = e.target.value;
                 onUpdateTask(t.id, {
                   status: nextStatus,
                   completed_at:
                     nextStatus === "Done" ? new Date().toISOString() : null,
                 });
               }}
-              className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs transition-transform active:scale-95 ${
-                STATUS_STYLES[t.status]
-              }`}
-              title="Click to cycle status"
+              className={`cursor-pointer rounded-md border px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary transition-colors ${badgeCls}`}
             >
-              {t.status}
-            </button>
+              {allStatuses.map((s) => (
+                <option
+                  key={s.id}
+                  value={s.label}
+                  className="bg-zinc-900 text-white"
+                >
+                  {s.label}
+                </option>
+              ))}
+              <option value="__MANAGE__" className="bg-zinc-900 text-primary">
+                ⚙️ Edit Statuses...
+              </option>
+            </select>
           );
         },
       },
       {
         accessorKey: "type",
-        header: "Category",
+        header: workspaceConfig.columnHeaders.type,
         cell: ({ row }) => {
           const t = row.original;
+          const colorKey = getOptionColor(
+            workspaceConfig.types,
+            t.type,
+            "violet"
+          );
+          const badgeCls = getBadgeClasses(colorKey);
+          const allTypes = workspaceConfig.types.some((item) => item.label === t.type)
+            ? workspaceConfig.types
+            : [
+                ...workspaceConfig.types,
+                { id: t.type, label: t.type, color: "slate" as BadgeColorKey },
+              ];
+
           return (
-            <span
-              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs text-zinc-300 font-medium ${
-                TYPE_STYLES[t.type] || TYPE_STYLES.General
-              }`}
+            <select
+              value={t.type}
+              onChange={(e) => {
+                if (e.target.value === "__MANAGE__") {
+                  onOpenSettingsTab("customize");
+                  return;
+                }
+                onUpdateTask(t.id, { type: e.target.value });
+              }}
+              className={`cursor-pointer rounded-md border px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary transition-colors ${badgeCls}`}
             >
-              {t.type}
-            </span>
+              {allTypes.map((item) => (
+                <option
+                  key={item.id}
+                  value={item.label}
+                  className="bg-zinc-900 text-white"
+                >
+                  {item.label}
+                </option>
+              ))}
+              <option value="__MANAGE__" className="bg-zinc-900 text-primary">
+                ⚙️ Edit Categories...
+              </option>
+            </select>
           );
         },
       },
       {
         accessorKey: "priority",
-        header: "Priority",
+        header: workspaceConfig.columnHeaders.priority,
         cell: ({ row }) => {
           const t = row.original;
-          const priorities: TaskPriority[] = [
-            "Urgent",
-            "High",
-            "Medium",
-            "Low",
-          ];
+          const colorKey = getOptionColor(
+            workspaceConfig.priorities,
+            t.priority,
+            "amber"
+          );
+          const badgeCls = getBadgeClasses(colorKey);
+          const allPriorities = workspaceConfig.priorities.some(
+            (p) => p.label === t.priority
+          )
+            ? workspaceConfig.priorities
+            : [
+                ...workspaceConfig.priorities,
+                {
+                  id: t.priority,
+                  label: t.priority,
+                  color: "slate" as BadgeColorKey,
+                },
+              ];
+
           return (
-            <button
-              type="button"
-              onClick={() => {
-                const nextIdx =
-                  (priorities.indexOf(t.priority) + 1) % priorities.length;
-                onUpdateTask(t.id, { priority: priorities[nextIdx] });
+            <select
+              value={t.priority}
+              onChange={(e) => {
+                if (e.target.value === "__MANAGE__") {
+                  onOpenSettingsTab("customize");
+                  return;
+                }
+                onUpdateTask(t.id, { priority: e.target.value });
               }}
-              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${
-                PRIORITY_STYLES[t.priority]
-              }`}
-              title="Click to cycle priority"
+              className={`cursor-pointer rounded-md border px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary transition-colors ${badgeCls}`}
             >
-              {t.priority}
-            </button>
+              {allPriorities.map((p) => (
+                <option
+                  key={p.id}
+                  value={p.label}
+                  className="bg-zinc-900 text-white"
+                >
+                  {p.label}
+                </option>
+              ))}
+              <option value="__MANAGE__" className="bg-zinc-900 text-primary">
+                ⚙️ Edit Priorities...
+              </option>
+            </select>
           );
         },
       },
       {
         accessorKey: "due_date",
-        header: "Due Date",
+        header: workspaceConfig.columnHeaders.due_date,
         cell: ({ row }) => {
           const t = row.original;
           const { label, isOverdue, isToday } = formatRelativeDueDate(
             t.due_date,
             t.status
           );
+          const dateVal = t.due_date
+            ? new Date(t.due_date).toISOString().split("T")[0]
+            : "";
+
           return (
-            <span
-              className={`inline-flex items-center gap-1 text-xs whitespace-nowrap ${
-                isOverdue
-                  ? "text-red-400 font-semibold"
-                  : isToday
-                  ? "text-white font-semibold"
-                  : "text-zinc-400"
-              }`}
-            >
-              {isOverdue && <AlertCircle className="w-3.5 h-3.5 text-red-400" />}
-              {label}
-            </span>
+            <div className="relative inline-flex items-center gap-1.5 group/date">
+              <input
+                type="date"
+                value={dateVal}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  onUpdateTask(t.id, {
+                    due_date: val
+                      ? new Date(`${val}T23:59:00`).toISOString()
+                      : null,
+                  });
+                }}
+                className="cursor-pointer rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs text-white/90 hover:border-primary/50 focus:border-primary focus:outline-none"
+                title={label}
+              />
+              {isOverdue && (
+                <span title={label}>
+                  <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                </span>
+              )}
+              {isToday && !isOverdue && (
+                <span className="rounded bg-primary/20 border border-primary/40 px-1.5 py-0.5 text-[10px] font-semibold text-highlight">
+                  Today
+                </span>
+              )}
+            </div>
           );
         },
       },
       {
         accessorKey: "estimated_minutes",
-        header: "Est. Time",
-        cell: ({ row }) => (
-          <span className="text-xs font-mono text-zinc-400 whitespace-nowrap">
-            {formatEstimatedTime(row.original.estimated_minutes)}
-          </span>
-        ),
+        header: workspaceConfig.columnHeaders.estimated_minutes,
+        cell: ({ row }) => {
+          const t = row.original;
+          const presets = [15, 30, 45, 60, 90, 120, 180];
+          const currentMins = t.estimated_minutes || 30;
+          const options = presets.includes(currentMins)
+            ? presets
+            : [...presets, currentMins].sort((a, b) => a - b);
+
+          return (
+            <select
+              value={currentMins}
+              onChange={(e) =>
+                onUpdateTask(t.id, {
+                  estimated_minutes: parseInt(e.target.value, 10) || 30,
+                })
+              }
+              className="cursor-pointer rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs font-mono text-white/85 hover:border-primary/50 focus:border-primary focus:outline-none"
+            >
+              {options.map((mins) => (
+                <option
+                  key={mins}
+                  value={mins}
+                  className="bg-zinc-900 text-white"
+                >
+                  {formatEstimatedTime(mins)}
+                </option>
+              ))}
+            </select>
+          );
+        },
       },
       {
         accessorKey: "tags",
-        header: "Tags",
+        header: workspaceConfig.columnHeaders.tags,
         cell: ({ row }) => {
           const t = row.original;
+          const isDropdownOpen = openTagDropdownTaskId === t.id;
+
+          const toggleTagOnTask = (tagLabel: string) => {
+            const exists = t.tags.includes(tagLabel);
+            const nextTags = exists
+              ? t.tags.filter((tg) => tg !== tagLabel)
+              : [...t.tags, tagLabel];
+            onUpdateTask(t.id, { tags: nextTags });
+          };
+
+          const handleCreateNewTagInline = (e: React.FormEvent) => {
+            e.preventDefault();
+            const raw = newTagName.trim();
+            if (!raw) return;
+            const formatted = raw.startsWith("#") ? raw : `#${raw}`;
+            if (
+              !workspaceConfig.tags.some(
+                (tg) => tg.label.toLowerCase() === formatted.toLowerCase()
+              )
+            ) {
+              onUpdateWorkspaceConfig({
+                tags: [
+                  ...workspaceConfig.tags,
+                  { id: formatted, label: formatted, color: newTagColor },
+                ],
+              });
+            }
+            if (!t.tags.includes(formatted)) {
+              onUpdateTask(t.id, { tags: [...t.tags, formatted] });
+            }
+            setNewTagName("");
+          };
+
           return (
-            <div className="flex flex-wrap items-center gap-1 min-w-[130px]">
-              {t.is_canvas_assignment && t.canvas_course_code && (
-                <span className="rounded border border-orange-500/30 bg-orange-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-orange-300">
-                  {t.canvas_course_code}
+            <div className="relative min-w-[150px]">
+              <div
+                onClick={() =>
+                  setOpenTagDropdownTaskId(isDropdownOpen ? null : t.id)
+                }
+                className="cursor-pointer flex flex-wrap items-center gap-1 rounded-md border border-transparent hover:border-white/20 hover:bg-black/30 px-1.5 py-1 min-h-[28px] transition-colors"
+                title="Click to select or edit tags"
+              >
+                {t.is_canvas_assignment && t.canvas_course_code && (
+                  <span className="rounded border border-orange-500/40 bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-orange-300">
+                    {t.canvas_course_code}
+                  </span>
+                )}
+                {t.tags.map((tag) => {
+                  const tagColor = getOptionColor(
+                    workspaceConfig.tags,
+                    tag,
+                    "cyan"
+                  );
+                  return (
+                    <span
+                      key={tag}
+                      className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${getBadgeClasses(
+                        tagColor
+                      )}`}
+                    >
+                      {tag}
+                    </span>
+                  );
+                })}
+                <span className="inline-flex items-center gap-0.5 rounded border border-dashed border-white/20 px-1.5 py-0.5 text-[10px] text-white/50 hover:text-white hover:border-primary/60">
+                  <Plus className="w-2.5 h-2.5" />
+                  {t.tags.length === 0 ? "Tags" : ""}
                 </span>
-              )}
-              {t.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded border border-zinc-700 bg-zinc-800/80 px-1.5 py-0.5 text-[10px] text-zinc-300"
+              </div>
+
+              {isDropdownOpen && (
+                <div
+                  className="absolute left-0 top-full mt-1 w-64 rounded-xl border theme-panel p-2.5 shadow-2xl backdrop-blur-2xl z-50 space-y-2.5"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  {tag}
-                </span>
-              ))}
+                  <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+                    <span className="text-[11px] font-bold text-white flex items-center gap-1">
+                      <Tag className="w-3 h-3 text-primary" />
+                      Select Tags
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setOpenTagDropdownTaskId(null)}
+                      className="text-[10px] text-white/50 hover:text-white"
+                    >
+                      Done
+                    </button>
+                  </div>
+
+                  {/* Tag Options List */}
+                  <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                    {workspaceConfig.tags.map((tagOpt) => {
+                      const active = t.tags.includes(tagOpt.label);
+                      return (
+                        <button
+                          key={tagOpt.id}
+                          type="button"
+                          onClick={() => toggleTagOnTask(tagOpt.label)}
+                          className={`w-full flex items-center justify-between rounded-lg px-2 py-1 text-xs transition-colors ${
+                            active
+                              ? "bg-white/15 text-white font-semibold"
+                              : "text-white/70 hover:bg-white/10 hover:text-white"
+                          }`}
+                        >
+                          <span
+                            className={`rounded border px-1.5 py-0.5 text-[10px] ${getBadgeClasses(
+                              tagOpt.color
+                            )}`}
+                          >
+                            {tagOpt.label}
+                          </span>
+                          {active && (
+                            <Check className="w-3.5 h-3.5 text-primary" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Quick Create New Tag Inline */}
+                  <form
+                    onSubmit={handleCreateNewTagInline}
+                    className="border-t border-white/10 pt-2 space-y-1.5"
+                  >
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={newTagName}
+                        onChange={(e) => setNewTagName(e.target.value)}
+                        placeholder="New #tag name..."
+                        className="flex-1 rounded-lg border border-white/15 bg-black/60 px-2 py-1 text-[11px] text-white placeholder-white/35 focus:border-primary focus:outline-none"
+                      />
+                      <button
+                        type="submit"
+                        className="rounded-lg bg-primary px-2 py-1 text-[11px] font-bold text-black hover:brightness-110"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1 pt-0.5">
+                      {BADGE_COLOR_KEYS.slice(0, 10).map((ck) => (
+                        <button
+                          key={ck}
+                          type="button"
+                          onClick={() => setNewTagColor(ck)}
+                          className={`h-3.5 w-3.5 rounded-full border ${
+                            newTagColor === ck
+                              ? "ring-2 ring-white scale-110"
+                              : "opacity-60 hover:opacity-100"
+                          }`}
+                          style={{ backgroundColor: BADGE_COLOR_MAP[ck].dot }}
+                          title={BADGE_COLOR_MAP[ck].label}
+                        />
+                      ))}
+                    </div>
+                  </form>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenTagDropdownTaskId(null);
+                      onOpenSettingsTab("customize");
+                    }}
+                    className="w-full flex items-center justify-center gap-1 border-t border-white/10 pt-2 text-[11px] text-primary hover:underline"
+                  >
+                    <Settings2 className="w-3 h-3" />
+                    <span>Manage All Tags in Settings</span>
+                  </button>
+                </div>
+              )}
             </div>
           );
         },
       },
       {
         accessorKey: "notes",
-        header: "Notes",
-        cell: ({ row }) => (
-          <p className="text-xs text-zinc-400 truncate max-w-[160px]">
-            {row.original.notes || "—"}
-          </p>
-        ),
+        header: workspaceConfig.columnHeaders.notes,
+        cell: ({ row }) => {
+          const t = row.original;
+          return (
+            <div className="min-w-[150px] max-w-[220px]">
+              <InlineTextCell
+                value={t.notes || ""}
+                placeholder="Add quick note..."
+                onCommit={(val) => onUpdateTask(t.id, { notes: val })}
+                className="text-white/75"
+              />
+            </div>
+          );
+        },
       },
-      // Direct Delete Action Column
       {
         id: "actions",
         header: "",
@@ -452,11 +898,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                if (window.confirm(`Delete "${t.title}"?`)) {
-                  onDeleteTask(t.id);
-                }
+                onDeleteTask(t.id);
               }}
-              className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-950/30 transition-colors"
+              className="p-1.5 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-950/30 transition-colors"
               title="Delete Task"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -465,7 +909,19 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         },
       },
     ],
-    [onSelectTask, onUpdateTask, onDeleteTask, selectedTaskId]
+    [
+      workspaceConfig,
+      newlyCreatedTaskId,
+      selectedTaskId,
+      openTagDropdownTaskId,
+      newTagName,
+      newTagColor,
+      onSelectTask,
+      onUpdateTask,
+      onDeleteTask,
+      onUpdateWorkspaceConfig,
+      onOpenSettingsTab,
+    ]
   );
 
   const table = useReactTable({
@@ -502,49 +958,56 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     }
   };
 
-  const moveSectionOrder = (dir: -1 | 1, sectionId: SectionGroup) => {
-    const idx = sectionOrder.indexOf(sectionId);
-    const targetIdx = idx + dir;
-    if (targetIdx < 0 || targetIdx >= sectionOrder.length) return;
-    setSectionOrder(arrayMove(sectionOrder, idx, targetIdx));
-  };
-
   const allSortedRows = table.getRowModel().rows;
   const selectedTaskObj = useMemo(
     () => tasks.find((t) => t.id === selectedTaskId) || null,
     [tasks, selectedTaskId]
   );
 
+  const headerKeyMap: Record<string, keyof ColumnHeadersConfig> = {
+    title: "title",
+    status: "status",
+    type: "type",
+    priority: "priority",
+    due_date: "due_date",
+    estimated_minutes: "estimated_minutes",
+    tags: "tags",
+    notes: "notes",
+  };
+
   return (
     <div className="space-y-4">
-      {/* Clean Monochrome Filter & Actions Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950/80 p-3.5 backdrop-blur-md">
+      {/* Filter & Actions Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-xl border theme-panel p-3.5 backdrop-blur-xl">
         <div className="flex flex-wrap items-center gap-2.5 flex-1">
           {/* Search Input */}
           <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-white/45 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
               placeholder="Search tasks, #tags, categories..."
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-900/90 pl-9 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
+              className="w-full rounded-lg border theme-input pl-9 pr-3 py-1.5 text-xs text-white placeholder-white/40 focus:outline-none"
             />
           </div>
 
           {/* Status Filter */}
           <div className="flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-zinc-500 hidden sm:inline" />
+            <Filter className="w-3.5 h-3.5 text-primary hidden sm:inline" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-300 focus:border-zinc-500 focus:outline-none"
+              className="rounded-lg border theme-input px-2.5 py-1.5 text-xs text-white/90 focus:outline-none"
             >
-              <option value="ALL">All Statuses</option>
-              <option value="To Do">To Do</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Blocked">Blocked</option>
-              <option value="Done">Done</option>
+              <option value="ALL" className="bg-zinc-900">
+                All {workspaceConfig.columnHeaders.status}es
+              </option>
+              {workspaceConfig.statuses.map((s) => (
+                <option key={s.id} value={s.label} className="bg-zinc-900">
+                  {s.label}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -552,35 +1015,44 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-300 focus:border-zinc-500 focus:outline-none"
+            className="rounded-lg border theme-input px-2.5 py-1.5 text-xs text-white/90 focus:outline-none"
           >
-            <option value="ALL">All Categories</option>
-            <option value="College">College</option>
-            <option value="School">School</option>
-            <option value="Personal">Personal</option>
-            <option value="Club">Club</option>
-            <option value="Work">Work</option>
+            <option value="ALL" className="bg-zinc-900">
+              All {workspaceConfig.columnHeaders.type}s
+            </option>
+            {workspaceConfig.types.map((t) => (
+              <option key={t.id} value={t.label} className="bg-zinc-900">
+                {t.label}
+              </option>
+            ))}
           </select>
+
+          <button
+            type="button"
+            onClick={() => onOpenSettingsTab("customize")}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-highlight hover:border-primary/50 hover:bg-primary/10 transition-colors"
+            title="Customize tags, categories, statuses & headers"
+          >
+            <Settings2 className="w-3.5 h-3.5 text-primary" />
+            <span>Edit Tags &amp; Options</span>
+          </button>
         </div>
 
-        {/* Right: Add Task Button */}
+        {/* Right: Quick Add Row Button */}
         <div className="flex items-center gap-2 self-end md:self-center">
           <button
             type="button"
-            onClick={() => onOpenNewTaskModal("TODAY")}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-1.5 text-xs font-semibold text-black hover:bg-zinc-200 transition-colors"
+            onClick={() => handleTriggerNewRow(sections[0]?.id || "TODAY")}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-black shadow-neon hover:brightness-110 transition-all"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>Add Task</span>
-            <kbd className="hidden sm:inline-block rounded bg-zinc-200/80 px-1 py-0.5 text-[9px] font-mono text-zinc-800">
-              ⌘K
-            </kbd>
+            <span>New Task Row</span>
           </button>
         </div>
       </div>
 
-      {/* Main Clean Table */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-950/90 overflow-hidden backdrop-blur-md">
+      {/* Main Customizable Table */}
+      <div className="rounded-xl border theme-panel overflow-visible backdrop-blur-xl">
         <div className="overflow-x-auto">
           <DndContext
             sensors={sensors}
@@ -596,122 +1068,197 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   {table.getHeaderGroups().map((headerGroup) => (
                     <tr
                       key={headerGroup.id}
-                      className="border-b border-zinc-800 bg-zinc-900/60 text-[11px] font-semibold uppercase tracking-wider text-zinc-400"
+                      className="border-b theme-header-bg text-[11px] font-semibold uppercase tracking-wider text-highlight/90"
                     >
                       <th className="w-8 pl-3 pr-1 py-3" />
-                      {headerGroup.headers.map((header) => (
-                        <th key={header.id} className="px-3 py-3 select-none">
-                          {header.isPlaceholder ? null : (
-                            <button
-                              type="button"
-                              onClick={header.column.getToggleSortingHandler()}
-                              className="inline-flex items-center gap-1 hover:text-white transition-colors"
-                            >
-                              {flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                              <ArrowUpDown className="w-3 h-3 opacity-40" />
-                            </button>
-                          )}
-                        </th>
-                      ))}
+                      {headerGroup.headers.map((header) => {
+                        const colKey = headerKeyMap[header.column.id];
+                        const isEditingThisCol =
+                          colKey && editingColKey === colKey;
+
+                        return (
+                          <th key={header.id} className="px-3 py-3 select-none">
+                            {header.isPlaceholder ? null : colKey ? (
+                              <div className="inline-flex items-center gap-1.5 group/col">
+                                {isEditingThisCol ? (
+                                  <input
+                                    type="text"
+                                    autoFocus
+                                    value={colHeaderDraft}
+                                    onChange={(e) =>
+                                      setColHeaderDraft(e.target.value)
+                                    }
+                                    onBlur={() => commitColumnHeader(colKey)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter")
+                                        commitColumnHeader(colKey);
+                                      if (e.key === "Escape")
+                                        setEditingColKey(null);
+                                    }}
+                                    className="w-28 rounded border border-primary bg-black/80 px-1.5 py-0.5 text-[11px] font-bold text-white focus:outline-none"
+                                  />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setColHeaderDraft(
+                                        workspaceConfig.columnHeaders[colKey]
+                                      );
+                                      setEditingColKey(colKey);
+                                    }}
+                                    className="inline-flex items-center gap-1 hover:text-white transition-colors"
+                                    title="Click to rename column header"
+                                  >
+                                    <span>
+                                      {workspaceConfig.columnHeaders[colKey]}
+                                    </span>
+                                    <Pencil className="w-2.5 h-2.5 opacity-0 group-hover/col:opacity-70 text-primary transition-opacity" />
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={header.column.getToggleSortingHandler()}
+                                  className="p-0.5 rounded hover:bg-white/10 text-white/40 hover:text-white transition-colors"
+                                  title="Sort by column"
+                                >
+                                  <ArrowUpDown className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ) : null}
+                          </th>
+                        );
+                      })}
                     </tr>
                   ))}
                 </thead>
 
                 <tbody>
-                  {sectionOrder.map((secId, secIndex) => {
-                    const secMeta = SECTION_DIVIDERS.find(
-                      (s) => s.id === secId
-                    )!;
+                  {sections.map((secMeta, secIndex) => {
+                    const secId = secMeta.id;
                     const sectionRows = allSortedRows.filter(
                       (r) => r.original.section_group === secId
                     );
                     const isCollapsed = Boolean(collapsedSections[secId]);
+                    const isEditingSec = editingSectionId === secId;
 
                     return (
                       <React.Fragment key={secId}>
-                        {/* Section Header Row */}
-                        <tr className="border-y border-zinc-800 bg-zinc-900/40">
+                        {/* Editable Section Header Row */}
+                        <tr className="border-y theme-section-bg">
                           <td colSpan={10} className="px-4 py-2.5">
-                            <div className="flex items-center justify-between">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setCollapsedSections((prev) => ({
-                                    ...prev,
-                                    [secId]: !prev[secId],
-                                  }))
-                                }
-                                className="flex items-center gap-2 text-xs sm:text-sm font-semibold tracking-wider text-zinc-200 hover:text-white transition-colors"
-                              >
-                                {isCollapsed ? (
-                                  <ChevronRight className="w-4 h-4 text-zinc-400" />
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setCollapsedSections((prev) => ({
+                                      ...prev,
+                                      [secId]: !prev[secId],
+                                    }))
+                                  }
+                                  className="p-0.5 text-primary hover:text-white transition-colors"
+                                >
+                                  {isCollapsed ? (
+                                    <ChevronRight className="w-4 h-4" />
+                                  ) : (
+                                    <ChevronDown className="w-4 h-4" />
+                                  )}
+                                </button>
+
+                                {isEditingSec ? (
+                                  <input
+                                    type="text"
+                                    autoFocus
+                                    value={sectionLabelDraft}
+                                    onChange={(e) =>
+                                      setSectionLabelDraft(e.target.value)
+                                    }
+                                    onBlur={() => commitSectionLabel(secId)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter")
+                                        commitSectionLabel(secId);
+                                      if (e.key === "Escape")
+                                        setEditingSectionId(null);
+                                    }}
+                                    className="rounded border border-primary bg-black/70 px-2 py-0.5 text-xs sm:text-sm font-bold text-white focus:outline-none"
+                                  />
                                 ) : (
-                                  <ChevronDown className="w-4 h-4 text-zinc-400" />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSectionLabelDraft(secMeta.label);
+                                      setEditingSectionId(secId);
+                                    }}
+                                    className="group/sec flex items-center gap-1.5 text-xs sm:text-sm font-bold tracking-wider text-highlight hover:text-white transition-colors"
+                                    title="Click to rename section header"
+                                  >
+                                    <span>{secMeta.label}</span>
+                                    <Pencil className="w-3 h-3 opacity-0 group-hover/sec:opacity-80 text-primary transition-opacity" />
+                                  </button>
                                 )}
-                                <span>{secMeta.label}</span>
-                                <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-normal text-zinc-400">
+
+                                <span className="rounded-full bg-black/40 border border-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/70">
                                   {sectionRows.length}
                                 </span>
-                              </button>
+                              </div>
 
                               <div className="flex items-center gap-1.5">
                                 <button
                                   type="button"
-                                  onClick={() => onOpenNewTaskModal(secId)}
-                                  className="rounded border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                                  onClick={() => handleTriggerNewRow(secId)}
+                                  className="rounded-lg border border-primary/40 bg-primary/15 px-2.5 py-0.5 text-[11px] font-semibold text-highlight hover:bg-primary hover:text-black transition-all"
                                 >
-                                  + New
+                                  + New Task
                                 </button>
                                 <button
                                   type="button"
                                   disabled={secIndex === 0}
                                   onClick={() => moveSectionOrder(-1, secId)}
-                                  className="rounded p-1 text-xs text-zinc-500 hover:text-zinc-200 disabled:opacity-20"
+                                  className="rounded p-1 text-xs text-white/50 hover:text-white disabled:opacity-20"
                                   title="Move section up"
                                 >
                                   ↑
                                 </button>
                                 <button
                                   type="button"
-                                  disabled={
-                                    secIndex === sectionOrder.length - 1
-                                  }
+                                  disabled={secIndex === sections.length - 1}
                                   onClick={() => moveSectionOrder(1, secId)}
-                                  className="rounded p-1 text-xs text-zinc-500 hover:text-zinc-200 disabled:opacity-20"
+                                  className="rounded p-1 text-xs text-white/50 hover:text-white disabled:opacity-20"
                                   title="Move section down"
                                 >
                                   ↓
                                 </button>
+                                {sections.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSection(secId)}
+                                    className="rounded p-1 text-xs text-white/35 hover:text-red-400 transition-colors"
+                                    title="Remove section"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </td>
                         </tr>
 
                         {/* Section Tasks */}
-                        {!isCollapsed &&
-                          (sectionRows.length === 0 ? (
-                            <tr className="border-b border-zinc-900">
-                              <td
-                                colSpan={10}
-                                className="px-6 py-3.5 text-center text-xs text-zinc-600 italic"
-                              >
-                                No tasks in {secId}. Click &ldquo;+ New&rdquo; to add your first item.
-                              </td>
-                            </tr>
-                          ) : (
-                            sectionRows.map((row) => (
+                        {!isCollapsed && (
+                          <>
+                            {sectionRows.map((row) => (
                               <React.Fragment key={row.id}>
                                 <SortableTaskRow
                                   task={row.original}
-                                  isSelected={selectedTaskId === row.original.id}
+                                  isSelected={
+                                    selectedTaskId === row.original.id
+                                  }
                                 >
                                   {row.getVisibleCells().map((cell) => (
                                     <td
                                       key={cell.id}
-                                      className="px-3 py-2.5 align-middle"
+                                      className="px-3 py-2 align-middle"
                                     >
                                       {flexRender(
                                         cell.column.columnDef.cell,
@@ -730,6 +1277,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                         <TaskDocumentEditor
                                           task={selectedTaskObj}
                                           viewMode="inline"
+                                          workspaceConfig={workspaceConfig}
                                           onClose={() => onSelectTask(null)}
                                           onUpdateTask={onUpdateTask}
                                           onDeleteTask={onDeleteTask}
@@ -738,11 +1286,91 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                     </tr>
                                   )}
                               </React.Fragment>
-                            ))
-                          ))}
+                            ))}
+
+                            {/* Notion-Style Bottom-of-Section "+ New task" Row */}
+                            <tr className="border-b border-white/5 hover:bg-white/[0.04] transition-colors">
+                              <td colSpan={10} className="p-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTriggerNewRow(secId)}
+                                  className="w-full flex items-center gap-2 px-10 py-2 text-xs text-white/45 hover:text-highlight transition-colors text-left"
+                                >
+                                  <Plus className="w-3.5 h-3.5 text-primary" />
+                                  <span>
+                                    New task in{" "}
+                                    <strong className="font-semibold">
+                                      {secMeta.label}
+                                    </strong>
+                                  </span>
+                                </button>
+                              </td>
+                            </tr>
+                          </>
+                        )}
                       </React.Fragment>
                     );
                   })}
+
+                  {/* Bottom of Table: Prominent "+ New Task" & "+ Add Section" Bar */}
+                  <tr className="border-t border-white/15 bg-black/30">
+                    <td colSpan={10} className="p-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2 px-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleTriggerNewRow(sections[0]?.id || "TODAY")
+                          }
+                          className="inline-flex items-center gap-2 rounded-lg bg-primary/20 border border-primary/50 px-4 py-2 text-xs font-bold text-highlight hover:bg-primary hover:text-black transition-all shadow-sm"
+                        >
+                          <Plus className="w-4 h-4 stroke-[2.5]" />
+                          <span>
+                            + Click to Add New Task Row
+                          </span>
+                        </button>
+
+                        {addingNewSection ? (
+                          <form
+                            onSubmit={handleAddNewSection}
+                            className="inline-flex items-center gap-1.5"
+                          >
+                            <input
+                              type="text"
+                              autoFocus
+                              value={newSectionName}
+                              onChange={(e) =>
+                                setNewSectionName(e.target.value)
+                              }
+                              placeholder="Section title (e.g. EXAMS)..."
+                              className="rounded-lg border border-primary bg-black/70 px-2.5 py-1.5 text-xs text-white focus:outline-none"
+                            />
+                            <button
+                              type="submit"
+                              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-black"
+                            >
+                              Add
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAddingNewSection(false)}
+                              className="rounded-lg border border-white/15 px-2.5 py-1.5 text-xs text-white/60 hover:text-white"
+                            >
+                              Cancel
+                            </button>
+                          </form>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setAddingNewSection(true)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/75 hover:text-white hover:border-primary/50 transition-colors"
+                          >
+                            <FolderPlus className="w-3.5 h-3.5 text-primary" />
+                            <span>+ Add Section Header</span>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </SortableContext>
@@ -755,6 +1383,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         <TaskDocumentEditor
           task={selectedTaskObj}
           viewMode={viewMode}
+          workspaceConfig={workspaceConfig}
           onClose={() => onSelectTask(null)}
           onUpdateTask={onUpdateTask}
           onDeleteTask={onDeleteTask}

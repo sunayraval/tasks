@@ -14,7 +14,9 @@ import {
   TaskType,
   SectionGroup,
   ViewMode,
-  SECTION_DIVIDERS,
+  WorkspaceConfig,
+  DEFAULT_WORKSPACE_CONFIG,
+  getBadgeClasses,
 } from "@/types/taskit";
 import {
   Bold,
@@ -30,7 +32,6 @@ import {
   Clock,
   Calendar,
   Tag,
-  Sparkles,
   Trash2,
   Check,
   BookOpen,
@@ -39,6 +40,7 @@ import {
 interface TaskDocumentEditorProps {
   task: TaskItem | null;
   viewMode: ViewMode;
+  workspaceConfig?: WorkspaceConfig;
   onClose: () => void;
   onUpdateTask: (taskId: string, updates: Partial<TaskItem>) => void;
   onDeleteTask: (taskId: string) => void;
@@ -47,6 +49,7 @@ interface TaskDocumentEditorProps {
 export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
   task,
   viewMode,
+  workspaceConfig = DEFAULT_WORKSPACE_CONFIG,
   onClose,
   onUpdateTask,
   onDeleteTask,
@@ -54,7 +57,9 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
   const [title, setTitle] = useState(task?.title || "");
   const [notes, setNotes] = useState(task?.notes || "");
   const [newTag, setNewTag] = useState("");
-  const [saveIndicator, setSaveIndicator] = useState<"saved" | "saving">("saved");
+  const [saveIndicator, setSaveIndicator] = useState<"saved" | "saving">(
+    "saved"
+  );
 
   useEffect(() => {
     if (task) {
@@ -102,7 +107,6 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
     },
   });
 
-  // Sync editor content when switching tasks
   useEffect(() => {
     if (editor && task) {
       const currentHTML = editor.getHTML();
@@ -110,7 +114,7 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
         editor.commands.setContent(task.content || "", false);
       }
     }
-  }, [task?.id, editor]);
+  }, [task?.id, editor, task]);
 
   if (!task) return null;
 
@@ -137,16 +141,22 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
     setNewTag("");
   };
 
-  const handleRemoveTag = (tagToRemove: string) => {
-    onUpdateTask(task.id, {
-      tags: task.tags.filter((t) => t !== tagToRemove),
-    });
+  const handleToggleTag = (tagLabel: string) => {
+    if (task.tags.includes(tagLabel)) {
+      onUpdateTask(task.id, {
+        tags: task.tags.filter((t) => t !== tagLabel),
+      });
+    } else {
+      onUpdateTask(task.id, {
+        tags: [...task.tags, tagLabel],
+      });
+    }
   };
 
   const innerContent = (
     <div className="flex flex-col h-full text-white">
       {/* Top Action Bar */}
-      <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-black/30">
+      <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 theme-header-bg">
         <div className="flex items-center gap-2.5 text-xs text-white/60">
           <BookOpen className="w-4 h-4 text-primary" />
           <span className="uppercase tracking-wider font-semibold text-highlight">
@@ -204,7 +214,9 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-xs">
           {/* Status */}
           <div className="flex items-center justify-between gap-2">
-            <span className="text-white/50 font-medium">Status</span>
+            <span className="text-white/50 font-medium">
+              {workspaceConfig.columnHeaders.status}
+            </span>
             <select
               value={task.status}
               onChange={(e) =>
@@ -216,16 +228,19 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
               }
               className="rounded-lg border border-white/15 bg-black/60 px-2.5 py-1.5 text-xs font-medium text-white focus:border-primary focus:outline-none"
             >
-              <option value="To Do">To Do</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Blocked">Blocked</option>
-              <option value="Done">Done</option>
+              {workspaceConfig.statuses.map((s) => (
+                <option key={s.id} value={s.label}>
+                  {s.label}
+                </option>
+              ))}
             </select>
           </div>
 
           {/* Priority */}
           <div className="flex items-center justify-between gap-2">
-            <span className="text-white/50 font-medium">Priority</span>
+            <span className="text-white/50 font-medium">
+              {workspaceConfig.columnHeaders.priority}
+            </span>
             <select
               value={task.priority}
               onChange={(e) =>
@@ -235,16 +250,19 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
               }
               className="rounded-lg border border-white/15 bg-black/60 px-2.5 py-1.5 text-xs font-medium text-white focus:border-primary focus:outline-none"
             >
-              <option value="Urgent">Urgent</option>
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
+              {workspaceConfig.priorities.map((p) => (
+                <option key={p.id} value={p.label}>
+                  {p.label}
+                </option>
+              ))}
             </select>
           </div>
 
-          {/* Type */}
+          {/* Type / Category */}
           <div className="flex items-center justify-between gap-2">
-            <span className="text-white/50 font-medium">Category</span>
+            <span className="text-white/50 font-medium">
+              {workspaceConfig.columnHeaders.type}
+            </span>
             <select
               value={task.type}
               onChange={(e) =>
@@ -252,12 +270,11 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
               }
               className="rounded-lg border border-white/15 bg-black/60 px-2.5 py-1.5 text-xs font-medium text-white focus:border-primary focus:outline-none"
             >
-              <option value="College">College</option>
-              <option value="School">School</option>
-              <option value="Personal">Personal</option>
-              <option value="Club">Club</option>
-              <option value="Work">Work</option>
-              <option value="General">General</option>
+              {workspaceConfig.types.map((t) => (
+                <option key={t.id} value={t.label}>
+                  {t.label}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -273,9 +290,9 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
               }
               className="rounded-lg border border-white/15 bg-black/60 px-2.5 py-1.5 text-xs font-medium text-white focus:border-primary focus:outline-none"
             >
-              {SECTION_DIVIDERS.map((sec) => (
+              {workspaceConfig.sections.map((sec) => (
                 <option key={sec.id} value={sec.id}>
-                  {sec.id}
+                  {sec.label}
                 </option>
               ))}
             </select>
@@ -284,7 +301,8 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
           {/* Due Date */}
           <div className="flex items-center justify-between gap-2">
             <span className="text-white/50 font-medium flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5" /> Due Date
+              <Calendar className="w-3.5 h-3.5" />{" "}
+              {workspaceConfig.columnHeaders.due_date}
             </span>
             <input
               type="date"
@@ -296,7 +314,9 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
               onChange={(e) => {
                 const val = e.target.value;
                 onUpdateTask(task.id, {
-                  due_date: val ? new Date(`${val}T23:59:00`).toISOString() : null,
+                  due_date: val
+                    ? new Date(`${val}T23:59:00`).toISOString()
+                    : null,
                 });
               }}
               className="rounded-lg border border-white/15 bg-black/60 px-2.5 py-1 text-xs text-white focus:border-primary focus:outline-none"
@@ -306,7 +326,8 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
           {/* Estimated Time */}
           <div className="flex items-center justify-between gap-2">
             <span className="text-white/50 font-medium flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" /> Est. Minutes
+              <Clock className="w-3.5 h-3.5" />{" "}
+              {workspaceConfig.columnHeaders.estimated_minutes}
             </span>
             <input
               type="number"
@@ -316,7 +337,10 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
               value={task.estimated_minutes || 30}
               onChange={(e) =>
                 onUpdateTask(task.id, {
-                  estimated_minutes: Math.max(5, parseInt(e.target.value) || 30),
+                  estimated_minutes: Math.max(
+                    5,
+                    parseInt(e.target.value) || 30
+                  ),
                 })
               }
               className="w-24 rounded-lg border border-white/15 bg-black/60 px-2.5 py-1 text-xs text-right text-white focus:border-primary focus:outline-none"
@@ -324,34 +348,38 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
           </div>
         </div>
 
-        {/* Tags Bar */}
-        <div className="space-y-2">
+        {/* Tags Bar with Dropdown Selection */}
+        <div className="space-y-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-xs text-white/50 flex items-center gap-1 mr-1">
-              <Tag className="w-3.5 h-3.5" /> Tags:
+              <Tag className="w-3.5 h-3.5" />{" "}
+              {workspaceConfig.columnHeaders.tags}:
             </span>
-            {task.tags.map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center gap-1 rounded-full bg-primary/20 border border-primary/40 px-2.5 py-0.5 text-xs font-medium text-highlight"
-              >
-                {tag}
+            {workspaceConfig.tags.map((tagOpt) => {
+              const isSelected = task.tags.includes(tagOpt.label);
+              return (
                 <button
+                  key={tagOpt.id}
                   type="button"
-                  onClick={() => handleRemoveTag(tag)}
-                  className="hover:text-white text-white/60"
+                  onClick={() => handleToggleTag(tagOpt.label)}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-all ${
+                    isSelected
+                      ? `${getBadgeClasses(tagOpt.color)} ring-1 ring-white/40`
+                      : "border-white/10 bg-white/5 text-white/45 hover:text-white/80"
+                  }`}
                 >
-                  ×
+                  {tagOpt.label}
+                  {isSelected && <Check className="w-3 h-3" />}
                 </button>
-              </span>
-            ))}
+              );
+            })}
             <form onSubmit={handleAddTag} className="inline-flex">
               <input
                 type="text"
                 value={newTag}
                 onChange={(e) => setNewTag(e.target.value)}
-                placeholder="+ Add tag..."
-                className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs text-white placeholder-white/40 focus:border-primary focus:outline-none w-24"
+                placeholder="+ Custom tag..."
+                className="rounded-full border border-white/15 bg-white/5 px-2.5 py-0.5 text-xs text-white placeholder-white/40 focus:border-primary focus:outline-none w-28"
               />
             </form>
           </div>
@@ -498,21 +526,19 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
     </div>
   );
 
-  // Render inline expansion directly if viewMode === "inline"
   if (viewMode === "inline") {
     return (
-      <div className="my-2 rounded-2xl border border-primary/40 bg-black/75 backdrop-blur-2xl shadow-neon overflow-hidden">
+      <div className="my-2 rounded-2xl border border-primary/40 theme-panel backdrop-blur-2xl shadow-neon overflow-hidden">
         {innerContent}
       </div>
     );
   }
 
-  // Render Center Modal if viewMode === "center_modal"
   if (viewMode === "center_modal") {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
         <div
-          className="relative w-full max-w-3xl max-h-[88vh] rounded-2xl border border-white/20 bg-[#071318]/95 backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200"
+          className="relative w-full max-w-3xl max-h-[88vh] rounded-2xl border theme-panel backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
           {innerContent}
@@ -521,14 +547,13 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
     );
   }
 
-  // Default: Slide-Out Right Drawer (slide_drawer)
   return (
     <div
       className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-[2px]"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-xl lg:max-w-2xl h-full border-l border-white/15 bg-[#061217]/95 backdrop-blur-2xl shadow-2xl flex flex-col animate-in slide-in-from-right duration-200"
+        className="relative w-full max-w-xl lg:max-w-2xl h-full border-l theme-panel backdrop-blur-2xl shadow-2xl flex flex-col animate-in slide-in-from-right duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {innerContent}
@@ -536,4 +561,3 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
     </div>
   );
 };
-

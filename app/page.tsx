@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   ActionProposalPayload,
+  getWorkspaceConfig,
   SectionGroup,
   TaskItem,
   UserProfile,
+  WorkspaceConfig,
 } from "@/types/taskit";
 import { DEFAULT_PROFILE, INITIAL_SEED_TASKS } from "@/utils/seedData";
 import { createClient, isSupabaseConfigured } from "@/utils/supabase/client";
@@ -14,12 +16,14 @@ import { TopNavBar } from "@/components/dashboard/TopNavBar";
 import { CircularProgress } from "@/components/dashboard/CircularProgress";
 import { TaskTable } from "@/components/tasks/TaskTable";
 import { CopilotSidebar } from "@/components/ai/CopilotSidebar";
-import { SettingsModal } from "@/components/settings/SettingsModal";
+import {
+  SettingsModal,
+  SettingsTabId,
+} from "@/components/settings/SettingsModal";
 import { QuickCreateTaskModal } from "@/components/tasks/QuickCreateTaskModal";
-import { CheckCircle2, LogIn, ShieldAlert, Sparkles } from "lucide-react";
+import { CheckCircle2, LogIn } from "lucide-react";
 
-const LOCAL_STORAGE_TASKS_KEY = "taskit_tasks_v1";
-const LOCAL_STORAGE_PROFILE_KEY = "taskit_profile_v1";
+const LOCAL_STORAGE_CONFIG_KEY = "taskit_workspace_config_v1";
 
 export default function TaskItWorkspacePage() {
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
@@ -27,6 +31,7 @@ export default function TaskItWorkspacePage() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isCopilotOpen, setIsCopilotOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTabId>("customize");
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState<boolean>(false);
   const [newTaskDefaultSection, setNewTaskDefaultSection] =
     useState<SectionGroup>("TODAY");
@@ -35,6 +40,8 @@ export default function TaskItWorkspacePage() {
   const [authChecked, setAuthChecked] = useState<boolean>(false);
   const [isSyncingCanvas, setIsSyncingCanvas] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const workspaceConfig = useMemo(() => getWorkspaceConfig(profile), [profile]);
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -46,14 +53,32 @@ export default function TaskItWorkspacePage() {
 
   // 1. Check Supabase session & fetch user data
   useEffect(() => {
-    // Check if redirected with an auth error
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
       const authError = urlParams.get("auth_error");
       if (authError) {
         showToast(`Sign in error: ${authError}`);
-        window.history.replaceState({}, document.title, window.location.pathname);
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname
+        );
       }
+
+      // Load cached customization from localStorage as immediate fallback
+      try {
+        const cached = localStorage.getItem(LOCAL_STORAGE_CONFIG_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          setProfile((prev) => ({
+            ...prev,
+            custom_theme_json: {
+              ...(prev.custom_theme_json || {}),
+              ...parsed,
+            },
+          }));
+        }
+      } catch {}
     }
 
     if (!isSupabaseConfigured()) {
@@ -79,7 +104,12 @@ export default function TaskItWorkspacePage() {
             .maybeSingle();
 
           if (dbProfile) {
-            setProfile((prev) => ({ ...prev, ...dbProfile }));
+            setProfile((prev) => ({
+              ...prev,
+              ...dbProfile,
+              custom_theme_json:
+                dbProfile.custom_theme_json || prev.custom_theme_json,
+            }));
           } else {
             setProfile((prev) => ({
               ...prev,
@@ -114,7 +144,6 @@ export default function TaskItWorkspacePage() {
 
     initSession();
 
-    // Listen to Auth State Changes
     const {
       data: { subscription: authListener },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -132,7 +161,6 @@ export default function TaskItWorkspacePage() {
       }
     });
 
-    // Realtime channel for tasks
     const channel = supabase
       .channel("tasks-realtime")
       .on(
@@ -157,27 +185,30 @@ export default function TaskItWorkspacePage() {
       authListener.unsubscribe();
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [showToast]);
 
-  // 2. Set theme data-theme on html
+  // 2. Apply theme & custom colors to html element
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", profile.theme);
-  }, [profile.theme]);
+    const root = document.documentElement;
+    root.setAttribute("data-theme", profile.theme);
 
-  // 3. Keyboard shortcuts: Cmd+K (new task)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        if (!isAuthenticated) return;
-        e.preventDefault();
-        setIsNewTaskModalOpen((prev) => !prev);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isAuthenticated]);
+    const customColors = workspaceConfig.customThemeColors;
+    if (customColors) {
+      root.style.setProperty("--bg-base", customColors.bgBase);
+      root.style.setProperty("--surface", customColors.surface);
+      root.style.setProperty("--accent", customColors.accent);
+      root.style.setProperty("--primary", customColors.primary);
+      root.style.setProperty("--highlight", customColors.highlight);
+    } else {
+      root.style.removeProperty("--bg-base");
+      root.style.removeProperty("--surface");
+      root.style.removeProperty("--accent");
+      root.style.removeProperty("--primary");
+      root.style.removeProperty("--highlight");
+    }
+  }, [profile.theme, workspaceConfig.customThemeColors]);
 
-  // Update Profile
+  // 3. Update Profile
   const handleUpdateProfile = useCallback(
     async (updates: Partial<UserProfile>) => {
       setProfile((prev) => ({ ...prev, ...updates }));
@@ -195,7 +226,50 @@ export default function TaskItWorkspacePage() {
     [isAuthenticated, profile.id]
   );
 
-  // Create Task
+  // 4. Update Workspace Customization Config (persisted in custom_theme_json & localStorage)
+  const handleUpdateWorkspaceConfig = useCallback(
+    async (updates: Partial<WorkspaceConfig>) => {
+      setProfile((prev) => {
+        const currentConfig = getWorkspaceConfig(prev);
+        const mergedConfig: WorkspaceConfig = {
+          ...currentConfig,
+          ...updates,
+          columnHeaders: {
+            ...currentConfig.columnHeaders,
+            ...(updates.columnHeaders || {}),
+          },
+        };
+
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem(
+              LOCAL_STORAGE_CONFIG_KEY,
+              JSON.stringify(mergedConfig)
+            );
+          } catch {}
+        }
+
+        const nextJson = mergedConfig as unknown as Record<string, unknown>;
+
+        if (isSupabaseConfigured() && isAuthenticated) {
+          const supabase = createClient();
+          supabase
+            .from("profiles")
+            .update({ custom_theme_json: nextJson })
+            .eq("id", prev.id)
+            .then();
+        }
+
+        return {
+          ...prev,
+          custom_theme_json: nextJson,
+        };
+      });
+    },
+    [isAuthenticated]
+  );
+
+  // 5. Create Task (from Modal or Copilot)
   const handleCreateTask = useCallback(
     async (newTaskInput: Omit<TaskItem, "id" | "created_at" | "updated_at">) => {
       const nowISO = new Date().toISOString();
@@ -247,7 +321,82 @@ export default function TaskItWorkspacePage() {
     [showToast, isAuthenticated, profile.id]
   );
 
-  // Update Task
+  // 6. Inline Create Task Row directly in Table
+  const handleInlineCreateTask = useCallback(
+    (sectionId?: SectionGroup): string => {
+      const nowISO = new Date().toISOString();
+      const tempId = `task-${Date.now()}`;
+      const targetSection =
+        sectionId || workspaceConfig.sections[0]?.id || "TODAY";
+      const defaultStatus = workspaceConfig.statuses[0]?.label || "To Do";
+      const defaultType = workspaceConfig.types[0]?.label || "General";
+      const defaultPriority = workspaceConfig.priorities[2]?.label || "Medium";
+
+      const created: TaskItem = {
+        id: tempId,
+        user_id: profile.id,
+        title: "New Task",
+        content: "",
+        status: defaultStatus,
+        type: defaultType,
+        priority: defaultPriority,
+        due_date: nowISO,
+        estimated_minutes: 30,
+        tags: [],
+        notes: "",
+        is_canvas_assignment: false,
+        canvas_course_code: null,
+        custom_properties: {},
+        section_group: targetSection,
+        order_index: tasks.length,
+        completed_at: null,
+        created_at: nowISO,
+        updated_at: nowISO,
+      };
+
+      setTasks((prev) => [...prev, created]);
+
+      if (isSupabaseConfigured() && isAuthenticated) {
+        const supabase = createClient();
+        supabase
+          .from("tasks")
+          .insert({
+            user_id: profile.id,
+            title: created.title,
+            content: created.content,
+            status: created.status,
+            type: created.type,
+            priority: created.priority,
+            due_date: created.due_date,
+            estimated_minutes: created.estimated_minutes,
+            tags: created.tags,
+            notes: created.notes,
+            is_canvas_assignment: created.is_canvas_assignment,
+            canvas_course_code: created.canvas_course_code,
+            section_group: created.section_group,
+            order_index: created.order_index,
+          })
+          .select()
+          .single()
+          .then(({ data }) => {
+            if (data?.id) {
+              setTasks((prev) =>
+                prev.map((t) =>
+                  t.id === tempId
+                    ? { ...(data as TaskItem), title: t.title }
+                    : t
+                )
+              );
+            }
+          });
+      }
+
+      return tempId;
+    },
+    [workspaceConfig, profile.id, tasks.length, isAuthenticated]
+  );
+
+  // 7. Update Task
   const handleUpdateTask = useCallback(
     async (taskId: string, updates: Partial<TaskItem>) => {
       const nowISO = new Date().toISOString();
@@ -270,7 +419,7 @@ export default function TaskItWorkspacePage() {
     [isAuthenticated]
   );
 
-  // Delete Task
+  // 8. Delete Task
   const handleDeleteTask = useCallback(
     async (taskId: string) => {
       const target = tasks.find((t) => t.id === taskId);
@@ -294,15 +443,12 @@ export default function TaskItWorkspacePage() {
     [tasks, selectedTaskId, showToast, isAuthenticated]
   );
 
-  // Reorder Tasks
-  const handleReorderTasks = useCallback(
-    (newTasks: TaskItem[]) => {
-      setTasks(newTasks);
-    },
-    []
-  );
+  // 9. Reorder Tasks
+  const handleReorderTasks = useCallback((newTasks: TaskItem[]) => {
+    setTasks(newTasks);
+  }, []);
 
-  // Sync Canvas
+  // 10. Sync Canvas
   const handleSyncCanvasTasks = useCallback(
     async (feedUrl: string) => {
       setIsSyncingCanvas(true);
@@ -354,7 +500,9 @@ export default function TaskItWorkspacePage() {
         }
 
         setTasks(updatedList);
-        showToast(`Synced ${addedCount} Canvas assignments into your workspace.`);
+        showToast(
+          `Synced ${addedCount} Canvas assignments into your workspace.`
+        );
         return { count: addedCount, usedDemoFeed: Boolean(data.usedDemoFeed) };
       } finally {
         setIsSyncingCanvas(false);
@@ -363,7 +511,7 @@ export default function TaskItWorkspacePage() {
     [tasks, profile.id, showToast]
   );
 
-  // Confirm Copilot Proposals
+  // 11. Confirm Copilot Proposals
   const handleConfirmActionProposal = useCallback(
     async (proposal: ActionProposalPayload) => {
       const nowISO = new Date().toISOString();
@@ -400,7 +548,11 @@ export default function TaskItWorkspacePage() {
             return t;
           })
         );
-        showToast(`Rescheduled tasks to ${proposal.newDueDate ? "selected date" : "Saturday"}`);
+        showToast(
+          `Rescheduled tasks to ${
+            proposal.newDueDate ? "selected date" : "Saturday"
+          }`
+        );
       } else if (proposal.actionType === "BATCH_CREATE") {
         const newItems: TaskItem[] = proposal.changes.map((c, idx) => ({
           id: `ai-${Date.now()}-${idx}`,
@@ -462,8 +614,8 @@ export default function TaskItWorkspacePage() {
   };
 
   return (
-    <div className="relative min-h-screen flex flex-col bg-zinc-950 text-zinc-100">
-      {/* Background (Controlled dimming) */}
+    <div className="relative min-h-screen flex flex-col text-zinc-100">
+      {/* Ambient Theme & Video Background */}
       <VideoBackground
         preset={profile.video_bg_preset}
         dim={profile.video_bg_dim}
@@ -471,83 +623,106 @@ export default function TaskItWorkspacePage() {
         customVideoVersion={customVideoVersion}
       />
 
-      {/* Top Navbar */}
-      <TopNavBar
-        profile={profile}
-        isAuthenticated={isAuthenticated}
-        isCopilotOpen={isCopilotOpen}
-        isSyncingCanvas={isSyncingCanvas}
-        onUpdateProfile={handleUpdateProfile}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onToggleCopilot={() => setIsCopilotOpen((prev) => !prev)}
-        onQuickSyncCanvas={() =>
-          handleSyncCanvasTasks(profile.canvas_feed_url || "")
-        }
-        onGoogleSignIn={handleGoogleSignIn}
-        onSignOut={handleSignOut}
-      />
+      {/* Foreground Content Layer */}
+      <div className="relative z-10 flex flex-col min-h-screen">
+        {/* Top Navbar */}
+        <TopNavBar
+          profile={profile}
+          workspaceConfig={workspaceConfig}
+          isAuthenticated={isAuthenticated}
+          isCopilotOpen={isCopilotOpen}
+          isSyncingCanvas={isSyncingCanvas}
+          onUpdateProfile={handleUpdateProfile}
+          onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
+          onOpenSettings={() => {
+            setSettingsTab("customize");
+            setIsSettingsOpen(true);
+          }}
+          onToggleCopilot={() => setIsCopilotOpen((prev) => !prev)}
+          onQuickSyncCanvas={() =>
+            handleSyncCanvasTasks(profile.canvas_feed_url || "")
+          }
+          onGoogleSignIn={handleGoogleSignIn}
+          onSignOut={handleSignOut}
+        />
 
-      {/* Main Content Area */}
-      <main
-        className={`flex-1 mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8 py-6 space-y-5 transition-all duration-300 ${
-          isCopilotOpen ? " lg:pr-[440px]" : ""
-        }`}
-      >
-        {!isAuthenticated && authChecked ? (
-          /* Sign-In Gate: Clean Minimal Wall */
-          <div className="my-12 mx-auto max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/90 p-8 text-center shadow-2xl backdrop-blur-xl space-y-6">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-black font-extrabold text-2xl shadow-sm">
-              T
-            </div>
-            
-            <div className="space-y-2">
-              <h2 className="text-2xl font-bold tracking-tight text-white">
-                Welcome to TaskIt
-              </h2>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Your private AI productivity workspace and Notion-style task database.
-                Sign in with Google to create and sync your personal tasks.
-              </p>
-            </div>
-
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-white py-3 px-4 text-sm font-semibold text-black hover:bg-zinc-200 transition-colors shadow-sm"
+        {/* Main Content Area */}
+        <main
+          className={`flex-1 mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8 py-6 space-y-5 transition-all duration-300 ${
+            isCopilotOpen ? " lg:pr-[440px]" : ""
+          }`}
+        >
+          {!isAuthenticated && authChecked ? (
+            /* Sign-In Gate */
+            <div className="my-12 mx-auto max-w-md rounded-2xl border theme-panel p-8 text-center shadow-2xl backdrop-blur-2xl space-y-6">
+              <div
+                className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl font-extrabold text-2xl shadow-neon"
+                style={{
+                  backgroundColor: "var(--primary)",
+                  color: "#09090b",
+                }}
               >
-                <LogIn className="w-4 h-4" />
-                <span>Continue with Google</span>
-              </button>
-            </div>
+                {(workspaceConfig.brandName || "T").charAt(0).toUpperCase()}
+              </div>
 
-            <div className="pt-2 border-t border-zinc-800/80 text-[11px] text-zinc-500">
-              Personal Supabase PostgreSQL database with Row Level Security.
-            </div>
-          </div>
-        ) : (
-          /* Authenticated Workspace */
-          <>
-            {/* Header Telemetry */}
-            <CircularProgress tasks={tasks} streakDays={1} />
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold tracking-tight text-white">
+                  Welcome to {workspaceConfig.brandName}
+                </h2>
+                <p className="text-xs text-white/65 leading-relaxed">
+                  Your ultra-customizable AI productivity workspace and
+                  Notion-style task database. Sign in with Google to sync your
+                  tasks and custom themes.
+                </p>
+              </div>
 
-            {/* Task Table */}
-            <TaskTable
-              tasks={tasks}
-              selectedTaskId={selectedTaskId}
-              viewMode={profile.view_mode}
-              onSelectTask={setSelectedTaskId}
-              onUpdateTask={handleUpdateTask}
-              onDeleteTask={handleDeleteTask}
-              onReorderTasks={handleReorderTasks}
-              onOpenNewTaskModal={(sec) => {
-                setNewTaskDefaultSection(sec || "TODAY");
-                setIsNewTaskModalOpen(true);
-              }}
-            />
-          </>
-        )}
-      </main>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-primary py-3 px-4 text-sm font-bold text-black hover:brightness-110 transition-all shadow-neon"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Continue with Google</span>
+                </button>
+              </div>
+
+              <div className="pt-2 border-t border-white/10 text-[11px] text-white/45">
+                Personal Supabase PostgreSQL database with Row Level Security.
+              </div>
+            </div>
+          ) : (
+            /* Authenticated Workspace */
+            <>
+              {/* Header Telemetry (Editable Title & Motto) */}
+              <CircularProgress
+                tasks={tasks}
+                workspaceConfig={workspaceConfig}
+                onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
+                streakDays={1}
+              />
+
+              {/* Customizable Inline Task Table */}
+              <TaskTable
+                tasks={tasks}
+                selectedTaskId={selectedTaskId}
+                viewMode={profile.view_mode}
+                workspaceConfig={workspaceConfig}
+                onSelectTask={setSelectedTaskId}
+                onUpdateTask={handleUpdateTask}
+                onDeleteTask={handleDeleteTask}
+                onReorderTasks={handleReorderTasks}
+                onInlineCreateTask={handleInlineCreateTask}
+                onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
+                onOpenSettingsTab={(tab) => {
+                  setSettingsTab(tab);
+                  setIsSettingsOpen(true);
+                }}
+              />
+            </>
+          )}
+        </main>
+      </div>
 
       {/* AI Copilot Side Drawer */}
       {isAuthenticated && (
@@ -562,20 +737,23 @@ export default function TaskItWorkspacePage() {
         />
       )}
 
-      {/* Settings Modal */}
+      {/* Settings & Customization Modal */}
       {isAuthenticated && (
         <SettingsModal
           isOpen={isSettingsOpen}
+          initialTab={settingsTab}
           onClose={() => setIsSettingsOpen(false)}
           profile={profile}
+          workspaceConfig={workspaceConfig}
           tasks={tasks}
           onUpdateProfile={handleUpdateProfile}
+          onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
           onCustomVideoUploaded={() => setCustomVideoVersion((v) => v + 1)}
           onSyncCanvasTasks={handleSyncCanvasTasks}
         />
       )}
 
-      {/* Quick Create Task Modal (Cmd+K) */}
+      {/* Quick Create Task Modal */}
       {isAuthenticated && (
         <QuickCreateTaskModal
           isOpen={isNewTaskModalOpen}
@@ -588,8 +766,8 @@ export default function TaskItWorkspacePage() {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-xs font-medium text-white shadow-xl">
-          <CheckCircle2 className="w-4 h-4 text-white" />
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-primary/40 theme-panel px-4 py-2 text-xs font-medium text-white shadow-2xl backdrop-blur-xl">
+          <CheckCircle2 className="w-4 h-4 text-primary" />
           <span>{toastMessage}</span>
         </div>
       )}

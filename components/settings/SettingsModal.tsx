@@ -1,14 +1,22 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   AITone,
+  BADGE_COLOR_KEYS,
+  BADGE_COLOR_MAP,
+  BadgeColorKey,
+  ColumnHeadersConfig,
+  CustomOptionItem,
+  DEFAULT_WORKSPACE_CONFIG,
+  getBadgeClasses,
   THEME_OPTIONS,
   ThemeName,
   UserProfile,
   VideoPresetName,
   ViewMode,
   TaskItem,
+  WorkspaceConfig,
 } from "@/types/taskit";
 import {
   saveCustomVideoToIDB,
@@ -19,25 +27,38 @@ import {
   Calendar,
   Check,
   Copy,
-  Eye,
   KeyRound,
   LayoutPanelLeft,
   Loader2,
   Palette,
+  Plus,
   RefreshCw,
   Sliders,
+  Tags,
+  Trash2,
   Upload,
   Video,
   X,
   ExternalLink,
+  RotateCcw,
 } from "lucide-react";
+
+export type SettingsTabId =
+  | "customize"
+  | "appearance"
+  | "view"
+  | "ai"
+  | "integrations";
 
 interface SettingsModalProps {
   isOpen: boolean;
+  initialTab?: SettingsTabId;
   onClose: () => void;
   profile: UserProfile;
+  workspaceConfig: WorkspaceConfig;
   tasks: TaskItem[];
   onUpdateProfile: (updates: Partial<UserProfile>) => void;
+  onUpdateWorkspaceConfig: (updates: Partial<WorkspaceConfig>) => void;
   onCustomVideoUploaded: () => void;
   onSyncCanvasTasks: (feedUrl: string) => Promise<{
     count: number;
@@ -45,24 +66,186 @@ interface SettingsModalProps {
   }>;
 }
 
+// Reusable Option List Editor for Tags, Categories, Statuses, Priorities
+const OptionGroupEditor: React.FC<{
+  title: string;
+  subtitle: string;
+  items: CustomOptionItem[];
+  prefixHash?: boolean;
+  onChange: (nextItems: CustomOptionItem[]) => void;
+}> = ({ title, subtitle, items, prefixHash = false, onChange }) => {
+  const [newLabel, setNewLabel] = useState("");
+  const [newColor, setNewColor] = useState<BadgeColorKey>("cyan");
+
+  const handleAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    const raw = newLabel.trim();
+    if (!raw) return;
+    const formatted =
+      prefixHash && !raw.startsWith("#") ? `#${raw}` : raw;
+    if (
+      items.some(
+        (i) => i.label.toLowerCase() === formatted.toLowerCase()
+      )
+    ) {
+      setNewLabel("");
+      return;
+    }
+    onChange([
+      ...items,
+      { id: formatted, label: formatted, color: newColor },
+    ]);
+    setNewLabel("");
+  };
+
+  const handleUpdateItem = (
+    idx: number,
+    updates: Partial<CustomOptionItem>
+  ) => {
+    const next = items.map((item, i) =>
+      i === idx
+        ? {
+            ...item,
+            ...updates,
+            id: updates.label ? updates.label : item.id,
+          }
+        : item
+    );
+    onChange(next);
+  };
+
+  const handleDeleteItem = (idx: number) => {
+    if (items.length <= 1) return;
+    onChange(items.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div className="rounded-xl border border-white/15 bg-black/30 p-4 space-y-3">
+      <div>
+        <h4 className="text-xs font-bold text-white">{title}</h4>
+        <p className="text-[11px] text-white/55">{subtitle}</p>
+      </div>
+
+      {/* Existing items */}
+      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+        {items.map((item, idx) => (
+          <div
+            key={`${item.id}-${idx}`}
+            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1.5"
+          >
+            {/* Preview Badge */}
+            <span
+              className={`rounded border px-2 py-0.5 text-[11px] font-medium shrink-0 min-w-[70px] text-center ${getBadgeClasses(
+                item.color
+              )}`}
+            >
+              {item.label}
+            </span>
+
+            {/* Editable Label Input */}
+            <input
+              type="text"
+              value={item.label}
+              onChange={(e) =>
+                handleUpdateItem(idx, { label: e.target.value })
+              }
+              className="flex-1 rounded border border-white/10 bg-black/50 px-2 py-1 text-xs text-white focus:border-primary focus:outline-none"
+            />
+
+            {/* Color Selector */}
+            <select
+              value={item.color}
+              onChange={(e) =>
+                handleUpdateItem(idx, {
+                  color: e.target.value as BadgeColorKey,
+                })
+              }
+              className="rounded border border-white/15 bg-black/70 px-2 py-1 text-xs text-white focus:border-primary focus:outline-none"
+            >
+              {BADGE_COLOR_KEYS.map((ck) => (
+                <option key={ck} value={ck} className="bg-zinc-900 text-white">
+                  {BADGE_COLOR_MAP[ck].label}
+                </option>
+              ))}
+            </select>
+
+            {/* Delete */}
+            <button
+              type="button"
+              disabled={items.length <= 1}
+              onClick={() => handleDeleteItem(idx)}
+              className="p-1 rounded text-white/40 hover:text-red-400 disabled:opacity-20 transition-colors"
+              title="Delete option"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Add new item form */}
+      <form
+        onSubmit={handleAdd}
+        className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/10"
+      >
+        <input
+          type="text"
+          value={newLabel}
+          onChange={(e) => setNewLabel(e.target.value)}
+          placeholder={
+            prefixHash ? "Add new #tag..." : "Add new option..."
+          }
+          className="flex-1 min-w-[140px] rounded-lg border border-white/15 bg-black/60 px-2.5 py-1.5 text-xs text-white placeholder-white/35 focus:border-primary focus:outline-none"
+        />
+        <select
+          value={newColor}
+          onChange={(e) => setNewColor(e.target.value as BadgeColorKey)}
+          className="rounded-lg border border-white/15 bg-black/70 px-2.5 py-1.5 text-xs text-white focus:border-primary focus:outline-none"
+        >
+          {BADGE_COLOR_KEYS.map((ck) => (
+            <option key={ck} value={ck} className="bg-zinc-900 text-white">
+              {BADGE_COLOR_MAP[ck].label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-black hover:brightness-110 transition-all"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Add</span>
+        </button>
+      </form>
+    </div>
+  );
+};
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
+  initialTab = "customize",
   onClose,
   profile,
+  workspaceConfig,
   tasks,
   onUpdateProfile,
+  onUpdateWorkspaceConfig,
   onCustomVideoUploaded,
   onSyncCanvasTasks,
 }) => {
-  const [activeTab, setActiveTab] = useState<
-    "appearance" | "view" | "ai" | "integrations"
-  >("appearance");
+  const [activeTab, setActiveTab] = useState<SettingsTabId>(initialTab);
   const [uploadStatus, setUploadStatus] = useState<string>("");
   const [canvasSyncLoading, setCanvasSyncLoading] = useState(false);
   const [canvasSyncMessage, setCanvasSyncMessage] = useState<string>("");
   const [gcalSyncLoading, setGcalSyncLoading] = useState(false);
   const [gcalMessage, setGcalMessage] = useState<string>("");
   const [copiedIcs, setCopiedIcs] = useState(false);
+  const [newSectionTitle, setNewSectionTitle] = useState("");
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   if (!isOpen) return null;
 
@@ -134,26 +317,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setTimeout(() => setCopiedIcs(false), 2500);
   };
 
+  const activeThemeColors =
+    workspaceConfig.customThemeColors ||
+    THEME_OPTIONS.find((t) => t.id === profile.theme)?.colors ||
+    THEME_OPTIONS[0].colors;
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-3xl max-h-[88vh] rounded-2xl border border-white/20 bg-[#051014]/95 backdrop-blur-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-full max-w-4xl max-h-[90vh] rounded-2xl border theme-panel backdrop-blur-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-black/40">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 theme-header-bg">
           <div className="flex items-center gap-2.5">
             <Sliders className="w-5 h-5 text-primary" />
             <div>
               <h2 className="text-base font-bold text-white">
-                TaskIt Workspace Settings
+                Workspace Customization &amp; Settings
               </h2>
-              <p className="text-xs text-white/50">
-                Customize themes, zero-bandwidth video backgrounds, AI Copilot &
-                HCPSS Canvas sync
+              <p className="text-xs text-white/60">
+                Customize tags, statuses, categories, table headers, themes &amp;
+                integrations
               </p>
             </div>
           </div>
@@ -167,12 +355,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-white/10 bg-white/[0.02] px-6 gap-2 overflow-x-auto">
+        <div className="flex border-b border-white/10 bg-black/30 px-6 gap-2 overflow-x-auto">
           {[
-            { id: "appearance", label: "1. Appearance & Video", icon: Palette },
-            { id: "view", label: "2. Task View Mode", icon: LayoutPanelLeft },
-            { id: "ai", label: "3. AI Copilot & BYOK", icon: Bot },
-            { id: "integrations", label: "4. Canvas & Calendars", icon: Calendar },
+            {
+              id: "customize",
+              label: "1. Tags, Types & Headers",
+              icon: Tags,
+            },
+            {
+              id: "appearance",
+              label: "2. Themes & Background",
+              icon: Palette,
+            },
+            { id: "view", label: "3. Task View Mode", icon: LayoutPanelLeft },
+            { id: "ai", label: "4. AI Copilot & BYOK", icon: Bot },
+            {
+              id: "integrations",
+              label: "5. Canvas & Calendars",
+              icon: Calendar,
+            },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -180,12 +381,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <button
                 key={tab.id}
                 type="button"
-                onClick={() =>
-                  setActiveTab(
-                    tab.id as "appearance" | "view" | "ai" | "integrations"
-                  )
-                }
-                className={`flex items-center gap-2 border-b-2 py-3 px-2 text-xs font-semibold whitespace-nowrap transition-colors ${
+                onClick={() => setActiveTab(tab.id as SettingsTabId)}
+                className={`flex items-center gap-2 border-b-2 py-3 px-2.5 text-xs font-semibold whitespace-nowrap transition-colors ${
                   isActive
                     ? "border-primary text-highlight"
                     : "border-transparent text-white/55 hover:text-white"
@@ -200,27 +397,270 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Tab Content Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 text-white">
-          {/* TAB 1: APPEARANCE & VIDEO ENGINE */}
+          {/* TAB 1: TAGS, TYPES, STATUSES, PRIORITIES & HEADERS */}
+          {activeTab === "customize" && (
+            <div className="space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Customize Tags, Categories, Statuses &amp; Table Headers
+                  </h3>
+                  <p className="text-xs text-white/55">
+                    Add, rename, recolor, or remove any option. Changes apply
+                    instantly across your table dropdowns.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateWorkspaceConfig(DEFAULT_WORKSPACE_CONFIG)
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/70 hover:text-white hover:border-white/30 transition-colors"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset to Defaults</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Tags Editor */}
+                <OptionGroupEditor
+                  title="Tags (#Tags Dropdown)"
+                  subtitle="Manage tags and their badge colors for the Tags dropdown."
+                  items={workspaceConfig.tags}
+                  prefixHash={true}
+                  onChange={(tags) => onUpdateWorkspaceConfig({ tags })}
+                />
+
+                {/* Categories / Types Editor */}
+                <OptionGroupEditor
+                  title={`${workspaceConfig.columnHeaders.type} Options`}
+                  subtitle="Manage task categories/types (e.g. College, School, Work, Club)."
+                  items={workspaceConfig.types}
+                  onChange={(types) => onUpdateWorkspaceConfig({ types })}
+                />
+
+                {/* Statuses Editor */}
+                <OptionGroupEditor
+                  title={`${workspaceConfig.columnHeaders.status} Options`}
+                  subtitle="Manage workflow statuses (keep 'Done' for completion tracking)."
+                  items={workspaceConfig.statuses}
+                  onChange={(statuses) =>
+                    onUpdateWorkspaceConfig({ statuses })
+                  }
+                />
+
+                {/* Priorities Editor */}
+                <OptionGroupEditor
+                  title={`${workspaceConfig.columnHeaders.priority} Levels`}
+                  subtitle="Manage priority levels and their badge colors."
+                  items={workspaceConfig.priorities}
+                  onChange={(priorities) =>
+                    onUpdateWorkspaceConfig({ priorities })
+                  }
+                />
+              </div>
+
+              {/* Section Dividers Editor */}
+              <div className="rounded-xl border border-white/15 bg-black/30 p-4 space-y-3">
+                <div>
+                  <h4 className="text-xs font-bold text-white">
+                    Section Divider Headers
+                  </h4>
+                  <p className="text-[11px] text-white/55">
+                    Rename, reorder, add, or remove table section groups (you
+                    can also click any section header directly in the table).
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {workspaceConfig.sections.map((sec, idx) => (
+                    <div
+                      key={sec.id}
+                      className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1.5"
+                    >
+                      <span className="text-[10px] font-mono text-white/40 w-5">
+                        #{idx + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={sec.label}
+                        onChange={(e) => {
+                          const next = workspaceConfig.sections.map((s, i) =>
+                            i === idx ? { ...s, label: e.target.value } : s
+                          );
+                          onUpdateWorkspaceConfig({ sections: next });
+                        }}
+                        className="flex-1 rounded border border-white/10 bg-black/50 px-2 py-1 text-xs text-white focus:border-primary focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        disabled={workspaceConfig.sections.length <= 1}
+                        onClick={() =>
+                          onUpdateWorkspaceConfig({
+                            sections: workspaceConfig.sections.filter(
+                              (_, i) => i !== idx
+                            ),
+                          })
+                        }
+                        className="p-1 text-white/40 hover:text-red-400 disabled:opacity-20"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const cleaned = newSectionTitle.trim();
+                    if (!cleaned) return;
+                    const id = cleaned.toUpperCase().replace(/\s+/g, "_");
+                    if (
+                      !workspaceConfig.sections.some((s) => s.id === id)
+                    ) {
+                      onUpdateWorkspaceConfig({
+                        sections: [
+                          ...workspaceConfig.sections,
+                          { id, label: cleaned, badge: "Custom" },
+                        ],
+                      });
+                    }
+                    setNewSectionTitle("");
+                  }}
+                  className="flex items-center gap-2 pt-2 border-t border-white/10"
+                >
+                  <input
+                    type="text"
+                    value={newSectionTitle}
+                    onChange={(e) => setNewSectionTitle(e.target.value)}
+                    placeholder="New section header title (e.g. 🚀 PROJECTS)..."
+                    className="flex-1 rounded-lg border border-white/15 bg-black/60 px-2.5 py-1.5 text-xs text-white placeholder-white/35 focus:border-primary focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-black hover:brightness-110"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Section</span>
+                  </button>
+                </form>
+              </div>
+
+              {/* Column Headers & Workspace Titles Editor */}
+              <div className="rounded-xl border border-white/15 bg-black/30 p-4 space-y-4">
+                <div>
+                  <h4 className="text-xs font-bold text-white">
+                    Table Column Headers &amp; Workspace Titles
+                  </h4>
+                  <p className="text-[11px] text-white/55">
+                    Edit any header label below, or simply click directly on any
+                    header in the app to rename it inline.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-white/50 mb-1">
+                      Workspace Main Title
+                    </label>
+                    <input
+                      type="text"
+                      value={workspaceConfig.workspaceTitle}
+                      onChange={(e) =>
+                        onUpdateWorkspaceConfig({
+                          workspaceTitle: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-lg border border-white/15 bg-black/60 px-2.5 py-1.5 text-xs text-white focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-white/50 mb-1">
+                      Top Navbar Brand Name
+                    </label>
+                    <input
+                      type="text"
+                      value={workspaceConfig.brandName}
+                      onChange={(e) =>
+                        onUpdateWorkspaceConfig({ brandName: e.target.value })
+                      }
+                      className="w-full rounded-lg border border-white/15 bg-black/60 px-2.5 py-1.5 text-xs text-white focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] text-white/50 mb-1">
+                      Workspace Subtitle / Motto
+                    </label>
+                    <input
+                      type="text"
+                      value={workspaceConfig.workspaceSubtitle}
+                      onChange={(e) =>
+                        onUpdateWorkspaceConfig({
+                          workspaceSubtitle: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-lg border border-white/15 bg-black/60 px-2.5 py-1.5 text-xs text-white focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 border-t border-white/10">
+                  {(
+                    Object.keys(
+                      workspaceConfig.columnHeaders
+                    ) as Array<keyof ColumnHeadersConfig>
+                  ).map((colKey) => (
+                    <div key={colKey}>
+                      <label className="block text-[10px] uppercase tracking-wider text-white/45 mb-1">
+                        {colKey.replace("_", " ")} Column
+                      </label>
+                      <input
+                        type="text"
+                        value={workspaceConfig.columnHeaders[colKey]}
+                        onChange={(e) =>
+                          onUpdateWorkspaceConfig({
+                            columnHeaders: {
+                              ...workspaceConfig.columnHeaders,
+                              [colKey]: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full rounded-lg border border-white/15 bg-black/60 px-2.5 py-1.5 text-xs text-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: APPEARANCE & VIDEO ENGINE */}
           {activeTab === "appearance" && (
             <div className="space-y-6">
               <div>
                 <h3 className="text-sm font-bold text-white mb-1">
-                  Color Theme Palette (Instant Variable Switching)
+                  Full-Atmosphere Theme Palettes
                 </h3>
                 <p className="text-xs text-white/55 mb-3">
-                  Select one of the 5 curated high-contrast productivity themes.
+                  Themes transform the entire background aurora, glass panels,
+                  table headers, section dividers, and accents.
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {THEME_OPTIONS.map((t) => {
-                    const selected = profile.theme === t.id;
+                    const selected =
+                      profile.theme === t.id &&
+                      !workspaceConfig.customThemeColors;
                     return (
                       <button
                         key={t.id}
                         type="button"
-                        onClick={() =>
-                          onUpdateProfile({ theme: t.id as ThemeName })
-                        }
+                        onClick={() => {
+                          onUpdateWorkspaceConfig({ customThemeColors: null });
+                          onUpdateProfile({ theme: t.id as ThemeName });
+                        }}
                         className={`flex items-center justify-between rounded-xl border p-3.5 text-left transition-all ${
                           selected
                             ? "border-primary bg-primary/15 shadow-neon"
@@ -255,17 +695,82 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
+              {/* Custom Color Palette Picker */}
+              <div className="rounded-xl border border-white/15 bg-black/30 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-white">
+                      Custom Color Palette Studio
+                    </h4>
+                    <p className="text-[11px] text-white/55">
+                      Fine-tune individual colors for Background, Surface,
+                      Accent, Primary &amp; Highlight.
+                    </p>
+                  </div>
+                  {workspaceConfig.customThemeColors && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onUpdateWorkspaceConfig({ customThemeColors: null })
+                      }
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Reset to Preset Theme
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  {(
+                    [
+                      { key: "bgBase", label: "Background" },
+                      { key: "surface", label: "Surface / Panel" },
+                      { key: "accent", label: "Aurora Accent" },
+                      { key: "primary", label: "Primary Glow" },
+                      { key: "highlight", label: "Text Highlight" },
+                    ] as const
+                  ).map((item) => (
+                    <label
+                      key={item.key}
+                      className="flex flex-col gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] p-2.5 cursor-pointer hover:border-primary/50"
+                    >
+                      <span className="text-[10px] font-semibold text-white/70">
+                        {item.label}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={activeThemeColors[item.key]}
+                          onChange={(e) => {
+                            onUpdateWorkspaceConfig({
+                              customThemeColors: {
+                                ...activeThemeColors,
+                                [item.key]: e.target.value,
+                              },
+                            });
+                          }}
+                          className="h-7 w-9 cursor-pointer rounded border-0 bg-transparent"
+                        />
+                        <span className="text-[11px] font-mono text-white/80">
+                          {activeThemeColors[item.key]}
+                        </span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               {/* Video Background Preset & IndexedDB Custom Upload */}
               <div className="border-t border-white/10 pt-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-bold text-white flex items-center gap-2">
                       <Video className="w-4 h-4 text-primary" />
-                      Ambient Video Background Engine
+                      Ambient Video &amp; Particle Background Engine
                     </h3>
                     <p className="text-xs text-white/55">
-                      Custom MP4/WebM uploads are stored in browser IndexedDB (
-                      <code>idb-keyval</code>) with zero cloud bandwidth cost.
+                      Lower the Overlay Dimming slider below to make the
+                      background colors and animations even more vivid!
                     </p>
                   </div>
                 </div>
@@ -305,8 +810,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       Upload Custom Loop Video (MP4 / WebM)
                     </div>
                     <div className="text-[11px] text-white/50">
-                      Stored via <code>set(&apos;custom_video_bg&apos;, fileBlob)</code>{" "}
-                      — never uploaded to Supabase or Vercel.
+                      Stored in local browser IndexedDB — zero cloud bandwidth.
                     </div>
                     {uploadStatus && (
                       <div className="text-[11px] text-emerald-400 font-medium pt-1">
@@ -332,7 +836,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         onClick={async () => {
                           await clearCustomVideoFromIDB();
                           onUpdateProfile({ video_bg_preset: "rain" });
-                          setUploadStatus("Cleared custom video from IndexedDB.");
+                          setUploadStatus(
+                            "Cleared custom video from IndexedDB."
+                          );
                         }}
                         className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/70 hover:text-white"
                       >
@@ -347,7 +853,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-2">
                     <div className="flex justify-between text-xs">
                       <span className="font-medium text-white/80">
-                        Overlay Dimming (20% – 85%)
+                        Overlay Dimming (10% – 85%)
                       </span>
                       <span className="font-mono text-highlight">
                         {Math.round(profile.video_bg_dim * 100)}%
@@ -355,7 +861,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                     <input
                       type="range"
-                      min={0.2}
+                      min={0.1}
                       max={0.85}
                       step={0.05}
                       value={profile.video_bg_dim}
@@ -396,7 +902,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: TASK DOCUMENT VIEW PREFERENCE */}
+          {/* TAB 3: TASK DOCUMENT VIEW PREFERENCE */}
           {activeTab === "view" && (
             <div className="space-y-4">
               <div>
@@ -405,7 +911,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </h3>
                 <p className="text-xs text-white/55">
                   Choose how the TipTap rich-text document editor opens when you
-                  click a task title.
+                  click the &ldquo;Doc&rdquo; button on a task row.
                 </p>
               </div>
 
@@ -461,15 +967,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 3: AI PREFERENCES & BYOK */}
+          {/* TAB 4: AI PREFERENCES & BYOK */}
           {activeTab === "ai" && (
             <div className="space-y-6">
               <div>
                 <h3 className="text-sm font-bold text-white mb-1">
-                  TaskIt Copilot Personality & Coaching Tone
+                  TaskIt Copilot Personality &amp; Coaching Tone
                 </h3>
                 <p className="text-xs text-white/55 mb-3">
-                  Configures the system prompt for Gemini 1.5 Flash tool calls &
+                  Configures the system prompt for Gemini tool calls &amp;
                   briefings.
                 </p>
 
@@ -526,7 +1032,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="border-t border-white/10 pt-5 space-y-2">
                 <label className="text-xs font-bold text-white flex items-center gap-1.5">
                   <KeyRound className="w-4 h-4 text-primary" />
-                  Bring Your Own Key (BYOK — Google Gemini or OpenRouter Free Tier)
+                  Bring Your Own Key (BYOK — Google Gemini or OpenRouter)
                 </label>
                 <p className="text-[11px] text-white/50">
                   Optional. Stored in your private profile preferences and sent
@@ -547,7 +1053,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 4: INTEGRATIONS (CANVAS iCAL, GOOGLE CALENDAR, APPLE ICS) */}
+          {/* TAB 5: INTEGRATIONS */}
           {activeTab === "integrations" && (
             <div className="space-y-6">
               {/* 1. HCPSS Canvas iCal Feed */}
@@ -559,8 +1065,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </h4>
                     <p className="text-[11px] text-white/55">
                       Paste your private Canvas Calendar Feed URL (or leave
-                      blank to test with the built-in HCPSS AP Bio / Linear
-                      Algebra demo feed).
+                      blank to test with the built-in sample feed).
                     </p>
                   </div>
                   <span className="rounded-full bg-orange-500/20 border border-orange-400/40 px-2.5 py-0.5 text-[10px] font-semibold text-orange-300">
@@ -687,12 +1192,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-between border-t border-white/10 bg-black/40 px-6 py-3.5 text-xs text-white/50">
-          <span>All preferences auto-save locally &amp; sync to Supabase</span>
+        <div className="flex items-center justify-between border-t border-white/10 theme-header-bg px-6 py-3.5 text-xs text-white/60">
+          <span>All customizations auto-save &amp; sync to Supabase</span>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-primary px-4 py-1.5 font-bold text-black hover:brightness-110 transition-all"
+            className="rounded-xl bg-primary px-4 py-1.5 font-bold text-black hover:brightness-110 transition-all shadow-neon"
           >
             Done
           </button>
@@ -701,4 +1206,3 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     </div>
   );
 };
-

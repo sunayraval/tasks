@@ -1,15 +1,15 @@
-import { TaskItem, UserProfile } from "@/types/taskit";
+import { DEFAULT_WORKSPACE_CONFIG, TaskItem, UserProfile } from "@/types/taskit";
 
 export const DEFAULT_PROFILE: UserProfile = {
   id: "user-default",
   email: "",
   full_name: null,
   avatar_url: null,
-  theme: "monochrome",
-  custom_theme_json: null,
+  theme: "cyber_ocean",
+  custom_theme_json: DEFAULT_WORKSPACE_CONFIG as unknown as Record<string, unknown>,
   video_bg_preset: "rain",
-  video_bg_dim: 0.75,
-  video_bg_blur: 10,
+  video_bg_dim: 0.45,
+  video_bg_blur: 6,
   ai_tone: "locked_in",
   custom_ai_api_key: null,
   view_mode: "slide_drawer",

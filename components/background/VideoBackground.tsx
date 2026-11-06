@@ -3,18 +3,15 @@
 import React, { useEffect, useRef, useState } from "react";
 import { get, set, del } from "idb-keyval";
 import { VideoPresetName } from "@/types/taskit";
-import { BatteryCharging, PauseCircle, PlayCircle, Sparkles } from "lucide-react";
+import { BatteryCharging, PauseCircle } from "lucide-react";
 
 export const IDB_VIDEO_KEY = "custom_video_bg";
 
 interface VideoBackgroundProps {
   preset: VideoPresetName;
-  dim: number; // 0.2 to 0.85
+  dim: number; // 0.1 to 0.85
   blur: number; // 0 to 24 (px)
-  customVideoVersion?: number; // bumped when user uploads a new custom blob
-  showQuickControls?: boolean;
-  onUpdateDim?: (dim: number) => void;
-  onUpdateBlur?: (blur: number) => void;
+  customVideoVersion?: number;
 }
 
 export async function saveCustomVideoToIDB(file: File): Promise<void> {
@@ -81,9 +78,7 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
         if (shouldPause || batterySaverActive) {
           videoRef.current.pause();
         } else {
-          videoRef.current.play().catch(() => {
-            // Autoplay blocked or fallback active
-          });
+          videoRef.current.play().catch(() => {});
         }
       }
     };
@@ -104,7 +99,6 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
     window.addEventListener("blur", handleWindowBlur);
     window.addEventListener("focus", handleWindowFocus);
 
-    // Check Web Battery API for low battery auto-pause
     let batteryObj: {
       level: number;
       charging: boolean;
@@ -149,7 +143,7 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
     };
   }, [batterySaverActive]);
 
-  // Zero-bandwidth procedural ambient canvas engine (renders seamlessly behind/when WebM is not loaded)
+  // Zero-bandwidth procedural ambient canvas engine
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -167,12 +161,11 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
     };
     window.addEventListener("resize", handleResize);
 
-    // Create particles tailored to preset
-    const count = preset === "rain" ? 110 : preset === "cyber" ? 65 : 55;
+    const count = preset === "rain" ? 120 : preset === "cyber" ? 70 : 60;
     const items = Array.from({ length: count }, (_, idx) => ({
       x: Math.random() * width,
       y: Math.random() * height,
-      len: 14 + Math.random() * 26,
+      len: 16 + Math.random() * 28,
       speedX:
         preset === "rain"
           ? -0.6
@@ -185,8 +178,8 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
           : preset === "cyber"
           ? (Math.random() - 0.5) * 0.9
           : -0.3 - Math.random() * 0.5,
-      radius: 1.5 + Math.random() * 3.5,
-      alpha: 0.15 + Math.random() * 0.45,
+      radius: 1.8 + Math.random() * 4,
+      alpha: 0.22 + Math.random() * 0.5,
       phase: idx * 0.4,
     }));
 
@@ -199,31 +192,49 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
 
         const computedStyle = getComputedStyle(document.documentElement);
         const primary =
-          computedStyle.getPropertyValue("--primary").trim() || "#0FA4AF";
+          computedStyle.getPropertyValue("--primary").trim() || "#00e5ff";
         const highlight =
-          computedStyle.getPropertyValue("--highlight").trim() || "#AFDDE5";
+          computedStyle.getPropertyValue("--highlight").trim() || "#a8f9ff";
         const surface =
-          computedStyle.getPropertyValue("--surface").trim() || "#024950";
+          computedStyle.getPropertyValue("--surface").trim() || "#0a3c44";
+        const accent =
+          computedStyle.getPropertyValue("--accent").trim() || "#136f7a";
 
-        // Ambient radial aurora gradient
-        const grad = ctx.createRadialGradient(
-          width * (0.5 + Math.sin(tick * 0.5) * 0.18),
-          height * (0.35 + Math.cos(tick * 0.4) * 0.12),
-          40,
-          width * 0.5,
-          height * 0.5,
-          Math.max(width, height) * 0.85
+        // Primary moving aurora glow
+        const grad1 = ctx.createRadialGradient(
+          width * (0.35 + Math.sin(tick * 0.5) * 0.2),
+          height * (0.28 + Math.cos(tick * 0.4) * 0.15),
+          20,
+          width * 0.4,
+          height * 0.4,
+          Math.max(width, height) * 0.75
         );
-        grad.addColorStop(0, `${surface}aa`);
-        grad.addColorStop(1, "transparent");
-        ctx.fillStyle = grad;
+        grad1.addColorStop(0, `${accent}99`);
+        grad1.addColorStop(0.5, `${surface}66`);
+        grad1.addColorStop(1, "transparent");
+        ctx.fillStyle = grad1;
+        ctx.fillRect(0, 0, width, height);
+
+        // Secondary accent glow
+        const grad2 = ctx.createRadialGradient(
+          width * (0.72 + Math.cos(tick * 0.35) * 0.15),
+          height * (0.68 + Math.sin(tick * 0.45) * 0.15),
+          30,
+          width * 0.7,
+          height * 0.7,
+          Math.max(width, height) * 0.65
+        );
+        grad2.addColorStop(0, `${primary}44`);
+        grad2.addColorStop(0.6, `${surface}44`);
+        grad2.addColorStop(1, "transparent");
+        ctx.fillStyle = grad2;
         ctx.fillRect(0, 0, width, height);
 
         if (preset === "rain") {
           ctx.strokeStyle = highlight;
-          ctx.lineWidth = 1.2;
+          ctx.lineWidth = 1.3;
           for (const drop of items) {
-            ctx.globalAlpha = drop.alpha * 0.65;
+            ctx.globalAlpha = drop.alpha * 0.75;
             ctx.beginPath();
             ctx.moveTo(drop.x, drop.y);
             ctx.lineTo(drop.x + drop.speedX * 3, drop.y + drop.len);
@@ -238,7 +249,6 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
             if (drop.x < 0) drop.x = width;
           }
         } else if (preset === "cyber") {
-          // Futuristic cyber grid & nodes
           ctx.strokeStyle = primary;
           for (let i = 0; i < items.length; i++) {
             const a = items[i];
@@ -250,7 +260,7 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
             ctx.globalAlpha = a.alpha;
             ctx.fillStyle = highlight;
             ctx.beginPath();
-            ctx.arc(a.x, a.y, a.radius * 0.75, 0, Math.PI * 2);
+            ctx.arc(a.x, a.y, a.radius * 0.85, 0, Math.PI * 2);
             ctx.fill();
 
             for (let j = i + 1; j < items.length; j++) {
@@ -258,9 +268,9 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
               const dx = a.x - b.x;
               const dy = a.y - b.y;
               const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist < 130) {
-                ctx.globalAlpha = (1 - dist / 130) * 0.22;
-                ctx.lineWidth = 0.8;
+              if (dist < 140) {
+                ctx.globalAlpha = (1 - dist / 140) * 0.3;
+                ctx.lineWidth = 0.9;
                 ctx.beginPath();
                 ctx.moveTo(a.x, a.y);
                 ctx.lineTo(b.x, b.y);
@@ -269,7 +279,6 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
             }
           }
         } else if (preset === "lofi") {
-          // Warm floating bokeh orbs
           for (const orb of items) {
             orb.x += Math.sin(tick + orb.phase) * 0.35;
             orb.y += orb.speedY * 0.45;
@@ -278,25 +287,24 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
               orb.x = Math.random() * width;
             }
             ctx.globalAlpha =
-              orb.alpha * (0.45 + 0.25 * Math.sin(tick * 2 + orb.phase));
+              orb.alpha * (0.55 + 0.3 * Math.sin(tick * 2 + orb.phase));
             const orbGrad = ctx.createRadialGradient(
               orb.x,
               orb.y,
               1,
               orb.x,
               orb.y,
-              orb.radius * 9
+              orb.radius * 10
             );
             orbGrad.addColorStop(0, highlight);
             orbGrad.addColorStop(0.5, primary);
             orbGrad.addColorStop(1, "transparent");
             ctx.fillStyle = orbGrad;
             ctx.beginPath();
-            ctx.arc(orb.x, orb.y, orb.radius * 9, 0, Math.PI * 2);
+            ctx.arc(orb.x, orb.y, orb.radius * 10, 0, Math.PI * 2);
             ctx.fill();
           }
         } else {
-          // Particles / Custom fallback
           for (const p of items) {
             p.x += p.speedX;
             p.y += p.speedY;
@@ -305,7 +313,7 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
             if (p.x > width + 10) p.x = -10;
 
             ctx.globalAlpha =
-              p.alpha * (0.6 + 0.4 * Math.sin(tick * 3 + p.phase));
+              p.alpha * (0.65 + 0.35 * Math.sin(tick * 3 + p.phase));
             ctx.fillStyle = highlight;
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
@@ -324,29 +332,31 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
     };
   }, [preset, isPausedBySaver, videoLoaded]);
 
-  // Clamp dim between 0.20 and 0.85 as specified
-  const safeDim = Math.min(0.85, Math.max(0.2, dim));
-  // Clamp blur between 0 and 24px
+  const safeDim = Math.min(0.85, Math.max(0.1, dim));
   const safeBlur = Math.min(24, Math.max(0, blur));
 
   return (
     <div
-      className="fixed inset-0 -z-10 pointer-events-none overflow-hidden select-none"
+      className="fixed inset-0 z-0 pointer-events-none overflow-hidden select-none"
       aria-hidden="true"
     >
-      {/* Base theme gradient backdrop */}
+      {/* Rich multi-stop theme gradient backdrop */}
       <div
-        className="absolute inset-0 transition-colors duration-700"
+        className="absolute inset-0 transition-all duration-700"
         style={{
-          background:
-            "radial-gradient(circle at 20% 15%, var(--surface) 0%, var(--bg-base) 70%)",
+          background: `
+            radial-gradient(circle at 15% 15%, var(--accent) 0%, transparent 45%),
+            radial-gradient(circle at 85% 20%, color-mix(in srgb, var(--primary) 35%, transparent) 0%, transparent 45%),
+            radial-gradient(circle at 50% 85%, var(--surface) 0%, var(--bg-base) 75%),
+            var(--bg-base)
+          `,
         }}
       />
 
       {/* Zero-bandwidth procedural canvas layer */}
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full object-cover opacity-90"
+        className="absolute inset-0 w-full h-full object-cover opacity-95"
       />
 
       {/* Fullscreen fixed HTML5 Video element for WebM presets & IndexedDB custom uploads */}
@@ -365,17 +375,18 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
         }`}
       />
 
-      {/* Frosted glass & dim overlay */}
+      {/* Theme-tinted Frosted Glass & Dim Overlay */}
       <div
         className="absolute inset-0 transition-all duration-300"
         style={{
-          backgroundColor: `rgba(0, 0, 0, ${safeDim})`,
+          backgroundColor: `color-mix(in srgb, var(--bg-base) ${Math.round(
+            safeDim * 100
+          )}%, transparent)`,
           backdropFilter: `blur(${safeBlur}px)`,
           WebkitBackdropFilter: `blur(${safeBlur}px)`,
         }}
       />
 
-      {/* Subtle status badge in bottom-left when battery-saver / auto-pause is active */}
       {isPausedBySaver && (
         <div className="fixed bottom-3 left-3 z-20 flex items-center gap-1.5 rounded-full bg-black/60 border border-white/10 px-3 py-1 text-[11px] text-white/70 backdrop-blur-md">
           {batterySaverActive ? (
@@ -394,4 +405,3 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
     </div>
   );
 };
-
