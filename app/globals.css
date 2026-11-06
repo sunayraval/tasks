@@ -1,0 +1,192 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 1. Cyber Ocean (Default) */
+:root,
+[data-theme="cyber_ocean"] {
+  --bg-base: #003135;
+  --surface: #024950;
+  --accent: #964734;
+  --primary: #0FA4AF;
+  --highlight: #AFDDE5;
+}
+
+/* 2. Warm Slate / Terracotta */
+[data-theme="warm_slate"] {
+  --bg-base: #2C3531;
+  --surface: #116466;
+  --accent: #D9B08C;
+  --primary: #FFCB9A;
+  --highlight: #D1E8E2;
+}
+
+/* 3. Electric Sky / Lavender */
+[data-theme="electric_lavender"] {
+  --bg-base: #1E2342;
+  --surface: #5680E9;
+  --accent: #8860D0;
+  --primary: #5AB9EA;
+  --highlight: #C1C8E4;
+}
+
+/* 4. Alpine Forest / Slate */
+[data-theme="alpine_forest"] {
+  --bg-base: #1C2522;
+  --surface: #31708E;
+  --accent: #687864;
+  --primary: #5085A5;
+  --highlight: #8FC1E3;
+}
+
+/* 5. Mint Sunray */
+[data-theme="mint_sunray"] {
+  --bg-base: #023035;
+  --surface: #026670;
+  --accent: #FCE181;
+  --primary: #9FEDD7;
+  --highlight: #FEF9C7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background-color: var(--bg-base);
+  color: #f8fafc;
+  min-height: 100vh;
+  overflow-x: hidden;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Custom Sleek Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 9999px;
+  opacity: 0.5;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--highlight);
+}
+
+/* TipTap Rich Text Editor Styling */
+.tiptap-editor .ProseMirror {
+  outline: none;
+  min-height: 300px;
+  color: #f1f5f9;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
+  color: rgba(255, 255, 255, 0.35);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap-editor .ProseMirror h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  color: var(--highlight);
+}
+
+.tiptap-editor .ProseMirror h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.4rem;
+  color: var(--primary);
+}
+
+.tiptap-editor .ProseMirror h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.3rem;
+}
+
+.tiptap-editor .ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.4rem;
+  margin: 0.5rem 0;
+}
+
+.tiptap-editor .ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.4rem;
+  margin: 0.5rem 0;
+}
+
+.tiptap-editor .ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding: 0;
+}
+
+.tiptap-editor .ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: 0.35rem 0;
+}
+
+.tiptap-editor .ProseMirror ul[data-type="taskList"] li > label {
+  flex: 0 0 auto;
+  margin-top: 0.25rem;
+  user-select: none;
+}
+
+.tiptap-editor .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+  accent-color: var(--primary);
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+  border-radius: 0.25rem;
+}
+
+.tiptap-editor .ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1 1 auto;
+}
+
+.tiptap-editor .ProseMirror pre {
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.5rem;
+  color: var(--highlight);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  padding: 0.85rem 1rem;
+  margin: 0.75rem 0;
+  overflow-x: auto;
+}
+
+.tiptap-editor .ProseMirror code {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 0.25rem;
+  padding: 0.15rem 0.35rem;
+  font-size: 0.85em;
+  color: var(--highlight);
+}
+
+.tiptap-editor .ProseMirror blockquote {
+  border-left: 3px solid var(--primary);
+  padding-left: 1rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-style: italic;
+  margin: 0.75rem 0;
+}
+
