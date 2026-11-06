@@ -41,7 +41,7 @@ function buildDefaultHeaderRowsForTasks(
     const headerItem: TaskItem = {
       id: `header-seed-${Date.now()}-${idx}`,
       user_id: userId,
-      title: sec.title,
+      title: `——— ${sec.label} ———`,
       content: "",
       status: "To Do",
       type: "General",
