@@ -46,6 +46,16 @@ export default function TaskItWorkspacePage() {
 
   // 1. Check Supabase session & fetch user data
   useEffect(() => {
+    // Check if redirected with an auth error
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const authError = urlParams.get("auth_error");
+      if (authError) {
+        showToast(`Sign in error: ${authError}`);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+
     if (!isSupabaseConfigured()) {
       setAuthChecked(true);
       return;
