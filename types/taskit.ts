@@ -458,7 +458,7 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
   workspaceTitle: "Daily Workspace",
   workspaceSubtitle:
     "Lock in. You can’t change others, but you can change yourself. Work hard, play hard, and enjoy life.",
-  brandName: "TaskIt",
+  brandName: "kite",
   brandBadge: "Workspace",
   columnHeaders: {
     title: "Task",
@@ -508,6 +508,11 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
 
 export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
   const raw = (profile.custom_theme_json || {}) as Partial<WorkspaceConfig>;
+  const rawBrand =
+    typeof raw.brandName === "string" ? raw.brandName.trim() : "";
+  const normalizedBrand =
+    !rawBrand || rawBrand.toLowerCase() === "taskit" ? "kite" : rawBrand;
+
   return {
     workspaceTitle:
       typeof raw.workspaceTitle === "string"
@@ -517,10 +522,7 @@ export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
       typeof raw.workspaceSubtitle === "string"
         ? raw.workspaceSubtitle
         : DEFAULT_WORKSPACE_CONFIG.workspaceSubtitle,
-    brandName:
-      typeof raw.brandName === "string"
-        ? raw.brandName
-        : DEFAULT_WORKSPACE_CONFIG.brandName,
+    brandName: normalizedBrand,
     brandBadge:
       typeof raw.brandBadge === "string"
         ? raw.brandBadge

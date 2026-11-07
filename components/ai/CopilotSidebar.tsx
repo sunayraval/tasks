@@ -63,7 +63,7 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
       id: "welcome-msg",
       role: "assistant",
       content:
-        "Yo Sunay — **TaskIt Copilot** online. I have live visibility into your College apps, HCPSS Canvas assignments, and daily focus queue. All modifications use the **Strict Action Confirmation Card Protocol** so nothing mutates your board until you approve.",
+        "Yo Sunay — **kite Copilot** online. I have live visibility into your College apps, HCPSS Canvas assignments, and daily focus queue. All modifications use the **Strict Action Confirmation Card Protocol** so nothing mutates your board until you approve.",
       timestamp: "Just now",
       actionProposal: {
         actionType: "BATCH_RESCHEDULE",
@@ -168,7 +168,7 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
         className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 rounded-2xl border border-primary/50 bg-black/80 px-4 py-3 text-xs sm:text-sm font-bold text-white shadow-neon backdrop-blur-xl hover:scale-105 transition-all"
       >
         <Bot className="w-5 h-5 text-primary" />
-        <span>TaskIt Copilot</span>
+        <span>kite Copilot</span>
         <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] text-highlight">
           {TONE_LABELS[aiTone].label}
         </span>
@@ -186,7 +186,7 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-white">TaskIt Copilot</h2>
+              <h2 className="text-sm font-bold text-white">kite Copilot</h2>
               <span className="rounded-full bg-emerald-500/20 border border-emerald-400/30 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
                 Gemini 1.5 Flash
               </span>
@@ -302,7 +302,7 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
         {isLoading && (
           <div className="flex items-center gap-2 text-xs text-highlight/80 px-2">
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            <span>TaskIt Copilot is computing action proposal...</span>
+            <span>kite Copilot is computing action proposal...</span>
           </div>
         )}
         <div ref={scrollEndRef} />

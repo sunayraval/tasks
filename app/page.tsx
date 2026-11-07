@@ -23,12 +23,14 @@ import { GeminiHeroChat } from "@/components/ai/GeminiHeroChat";
 import { GeminiSetupModal } from "@/components/ai/GeminiSetupModal";
 import { MyDayView } from "@/components/myday/MyDayView";
 import { EnrichedMyDayBlock } from "@/utils/myDayUtils";
+import { KiteMarketingPage } from "@/components/marketing/KiteMarketingPage";
+import { KiteFlyingLoader } from "@/components/ui/KiteBrand";
 import {
   SettingsModal,
   SettingsTabId,
 } from "@/components/settings/SettingsModal";
 import { QuickCreateTaskModal } from "@/components/tasks/QuickCreateTaskModal";
-import { CheckCircle2, Loader2, LogIn } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 
 const LOCAL_STORAGE_CONFIG_KEY = "taskit_workspace_config_v1";
 const HEADERS_SEEDED_STORAGE_KEY = "taskit_doc_headers_seeded_v1";
@@ -115,11 +117,12 @@ function buildDefaultHeaderRowsForTasks(
   return { combined: indexed, createdHeaders: indexedHeaders };
 }
 
-export default function TaskItWorkspacePage() {
+export default function KiteWorkspacePage() {
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   const [tasks, setTasks] = useState<TaskItem[]>(INITIAL_SEED_TASKS);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("chat");
+  const [heroResetNonce, setHeroResetNonce] = useState<number>(0);
   const [localApiKey, setLocalApiKey] = useState<string>("");
   const [aiTemporarilyDisabled, setAiTemporarilyDisabled] =
     useState<boolean>(false);
@@ -1353,147 +1356,121 @@ export default function TaskItWorkspacePage() {
 
       {/* Foreground Content Layer */}
       <div className="relative z-10 flex flex-col min-h-screen">
-        {/* Top Navbar */}
-        <TopNavBar
-          profile={profile}
-          workspaceConfig={workspaceConfig}
-          isAuthenticated={isAuthenticated}
-          canAccessWorkspace={canAccessWorkspace}
-          activeTab={effectiveTab}
-          aiTemporarilyDisabled={aiTemporarilyDisabled}
-          hasGeminiApiKey={hasGeminiApiKey}
-          activeTaskCount={activeTaskCount}
-          isSyncingCanvas={isSyncingCanvas}
-          onSelectTab={setActiveTab}
-          onUpdateProfile={handleUpdateProfile}
-          onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
-          onOpenSettings={() => {
-            setSettingsTab("customize");
-            setIsSettingsOpen(true);
-          }}
-          onQuickSyncCanvas={() =>
-            handleSyncCanvasTasks(profile.canvas_feed_url || "")
-          }
-          onGoogleSignIn={handleGoogleSignIn}
-          onSignOut={handleSignOut}
-        />
-
-        {/* Main Content Area */}
-        <main className="flex-1 flex flex-col mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8 py-6 transition-all duration-300">
-          {supabaseEnabled && !authChecked ? (
-            <div className="flex-1 flex items-center justify-center py-24">
-              <Loader2 className="w-6 h-6 animate-spin text-primary/80" />
-            </div>
-          ) : supabaseEnabled && !isAuthenticated ? (
-            /* Sign-In Gate */
-            <div className="my-12 mx-auto w-full max-w-md rounded-2xl border theme-panel p-8 text-center shadow-2xl backdrop-blur-2xl space-y-6">
-              <div
-                className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl font-extrabold text-2xl shadow-neon"
-                style={{
-                  backgroundColor: "var(--primary)",
-                  color: "#09090b",
-                }}
-              >
-                {(workspaceConfig.brandName || "T").charAt(0).toUpperCase()}
-              </div>
-
-              <div className="space-y-2">
-                <h2 className="text-2xl font-bold tracking-tight text-white">
-                  Welcome to {workspaceConfig.brandName}
-                </h2>
-                <p className="text-xs text-white/65 leading-relaxed">
-                  Your ultra-customizable AI productivity workspace and
-                  Notion-style task database. Sign in with Google to sync your
-                  tasks and custom themes.
-                </p>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={handleGoogleSignIn}
-                  className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-primary py-3 px-4 text-sm font-bold text-black hover:brightness-110 transition-all shadow-neon"
-                >
-                  <LogIn className="w-4 h-4" />
-                  <span>Continue with Google</span>
-                </button>
-              </div>
-
-              <div className="pt-2 border-t border-white/10 text-[11px] text-white/45">
-                Personal Supabase PostgreSQL database with Row Level Security.
-              </div>
-            </div>
-          ) : effectiveTab === "chat" ? (
-            /* Hero Homepage: Gemini-Styled Autonomous Workspace Agent */
-            <GeminiHeroChat
-              tasks={tasks}
+        {supabaseEnabled && !authChecked ? (
+          <div className="flex-1 flex items-center justify-center py-24">
+            <KiteFlyingLoader label="launching kite" compact />
+          </div>
+        ) : supabaseEnabled && !isAuthenticated ? (
+          /* Immersive Animated Marketing Landing Page for Unauthenticated Visitors */
+          <KiteMarketingPage
+            profile={profile}
+            onUpdateProfile={handleUpdateProfile}
+            onGoogleSignIn={handleGoogleSignIn}
+          />
+        ) : (
+          <>
+            {/* Top Navbar */}
+            <TopNavBar
               profile={profile}
               workspaceConfig={workspaceConfig}
-              messages={heroMessages}
-              setMessages={setHeroMessages}
-              hasApiKey={hasGeminiApiKey}
-              effectiveApiKey={effectiveApiKey}
+              isAuthenticated={isAuthenticated}
+              canAccessWorkspace={canAccessWorkspace}
               activeTab={effectiveTab}
+              aiTemporarilyDisabled={aiTemporarilyDisabled}
+              hasGeminiApiKey={hasGeminiApiKey}
+              activeTaskCount={activeTaskCount}
+              isSyncingCanvas={isSyncingCanvas}
               onSelectTab={setActiveTab}
-              onSaveApiKey={(key) => handleSaveApiKey(key)}
-              onOpenApiKeySetup={() => setIsGeminiSetupOpen(true)}
-              onOptOutTemporary={() => handleSetAiTemporarilyDisabled(true)}
-              onChangeTone={(tone) => handleUpdateProfile({ ai_tone: tone })}
+              onResetChatToHero={() => setHeroResetNonce((n) => n + 1)}
+              onUpdateProfile={handleUpdateProfile}
+              onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
               onOpenSettings={() => {
-                setSettingsTab("ai");
+                setSettingsTab("customize");
                 setIsSettingsOpen(true);
               }}
               onQuickSyncCanvas={() =>
                 handleSyncCanvasTasks(profile.canvas_feed_url || "")
               }
-              onApplyAgentMutation={handleApplyAgentMutation}
-              onUndoAgentMessage={handleUndoAgentMessage}
-              onToggleMyDayBlockComplete={handleToggleMyDayBlockComplete}
+              onGoogleSignIn={handleGoogleSignIn}
+              onSignOut={handleSignOut}
             />
-          ) : effectiveTab === "my_day" ? (
-            /* MY DAY Tab: Live Centered Clock + Dual Status Bars + Manual & AI Auto-Arrange Builder */
-            <MyDayView
-              tasks={tasks}
-              profile={profile}
-              workspaceConfig={workspaceConfig}
-              hasApiKey={hasGeminiApiKey}
-              effectiveApiKey={effectiveApiKey}
-              aiTemporarilyDisabled={aiTemporarilyDisabled}
-              onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
-              onUpdateTask={handleUpdateTask}
-              onOpenApiKeySetup={() => setIsGeminiSetupOpen(true)}
-              onShowToast={showToast}
-            />
-          ) : (
-            /* Tasks Tab: Telemetry Header + Document-Style Resizable Task Table */
-            <div className="space-y-5">
-              <CircularProgress
-                tasks={tasks}
-                workspaceConfig={workspaceConfig}
-                onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
-                streakDays={1}
-              />
 
-              <TaskTable
-                tasks={tasks}
-                selectedTaskId={selectedTaskId}
-                viewMode={profile.view_mode}
-                workspaceConfig={workspaceConfig}
-                onSelectTask={setSelectedTaskId}
-                onUpdateTask={handleUpdateTask}
-                onDeleteTask={handleDeleteTask}
-                onReorderTasks={handleReorderTasks}
-                onInlineCreateTask={handleInlineCreateTask}
-                onInlineCreateHeader={handleInlineCreateHeader}
-                onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
-                onOpenSettingsTab={(tab) => {
-                  setSettingsTab(tab);
-                  setIsSettingsOpen(true);
-                }}
-              />
-            </div>
-          )}
-        </main>
+            {/* Main Content Area */}
+            <main className="flex-1 flex flex-col mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8 py-6 transition-all duration-300">
+              {effectiveTab === "chat" ? (
+                /* Hero Homepage: "What's on your mind?" + Autonomous Workspace Agent */
+                <GeminiHeroChat
+                  tasks={tasks}
+                  profile={profile}
+                  workspaceConfig={workspaceConfig}
+                  messages={heroMessages}
+                  setMessages={setHeroMessages}
+                  hasApiKey={hasGeminiApiKey}
+                  effectiveApiKey={effectiveApiKey}
+                  activeTab={effectiveTab}
+                  heroResetNonce={heroResetNonce}
+                  onSelectTab={setActiveTab}
+                  onSaveApiKey={(key) => handleSaveApiKey(key)}
+                  onOpenApiKeySetup={() => setIsGeminiSetupOpen(true)}
+                  onOptOutTemporary={() => handleSetAiTemporarilyDisabled(true)}
+                  onChangeTone={(tone) => handleUpdateProfile({ ai_tone: tone })}
+                  onOpenSettings={() => {
+                    setSettingsTab("ai");
+                    setIsSettingsOpen(true);
+                  }}
+                  onQuickSyncCanvas={() =>
+                    handleSyncCanvasTasks(profile.canvas_feed_url || "")
+                  }
+                  onApplyAgentMutation={handleApplyAgentMutation}
+                  onUndoAgentMessage={handleUndoAgentMessage}
+                  onToggleMyDayBlockComplete={handleToggleMyDayBlockComplete}
+                />
+              ) : effectiveTab === "my_day" ? (
+                /* MY DAY Tab: Live Centered Clock + Dual Status Bars + Manual & AI Auto-Arrange Builder */
+                <MyDayView
+                  tasks={tasks}
+                  profile={profile}
+                  workspaceConfig={workspaceConfig}
+                  hasApiKey={hasGeminiApiKey}
+                  effectiveApiKey={effectiveApiKey}
+                  aiTemporarilyDisabled={aiTemporarilyDisabled}
+                  onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
+                  onUpdateTask={handleUpdateTask}
+                  onOpenApiKeySetup={() => setIsGeminiSetupOpen(true)}
+                  onShowToast={showToast}
+                />
+              ) : (
+                /* Tasks Tab: Telemetry Header + Document-Style Resizable Task Table */
+                <div className="space-y-5">
+                  <CircularProgress
+                    tasks={tasks}
+                    workspaceConfig={workspaceConfig}
+                    onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
+                    streakDays={1}
+                  />
+
+                  <TaskTable
+                    tasks={tasks}
+                    selectedTaskId={selectedTaskId}
+                    viewMode={profile.view_mode}
+                    workspaceConfig={workspaceConfig}
+                    onSelectTask={setSelectedTaskId}
+                    onUpdateTask={handleUpdateTask}
+                    onDeleteTask={handleDeleteTask}
+                    onReorderTasks={handleReorderTasks}
+                    onInlineCreateTask={handleInlineCreateTask}
+                    onInlineCreateHeader={handleInlineCreateHeader}
+                    onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
+                    onOpenSettingsTab={(tab) => {
+                      setSettingsTab(tab);
+                      setIsSettingsOpen(true);
+                    }}
+                  />
+                </div>
+              )}
+            </main>
+          </>
+        )}
       </div>
 
       {/* Google AI API Key Onboarding & Setup Modal */}

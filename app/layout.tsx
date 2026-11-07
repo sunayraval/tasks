@@ -13,9 +13,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TaskIt — Next-Gen AI Productivity Workspace",
+  title: "kite — Autonomous AI Workspace & Day Architect",
   description:
-    "Futuristic Notion-style time management workspace with Gemini AI Copilot, HCPSS Canvas iCal Sync, and zero-bandwidth IndexedDB video backgrounds.",
+    "Let your day take flight. Conversational Gemini AI workspace, live MY DAY schedule engine, Notion-style resizable task database, Canvas LMS sync, and cinema-grade ambient themes.",
 };
 
 export default function RootLayout({

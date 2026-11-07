@@ -45,7 +45,7 @@ export async function POST(request: Request) {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              summary: `[TaskIt • ${task.priority}] ${task.title}`,
+              summary: `[kite • ${task.priority}] ${task.title}`,
               description: `${task.notes || ""}\nTags: ${(
                 task.tags || []
               ).join(", ")}`,

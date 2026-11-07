@@ -21,6 +21,7 @@ import {
   Sparkles,
   Table2,
 } from "lucide-react";
+import { KiteLogoMark } from "@/components/ui/KiteBrand";
 
 interface TopNavBarProps {
   profile: UserProfile;
@@ -33,6 +34,7 @@ interface TopNavBarProps {
   activeTaskCount: number;
   isSyncingCanvas: boolean;
   onSelectTab: (tab: WorkspaceTab) => void;
+  onResetChatToHero?: () => void;
   onUpdateProfile: (updates: Partial<UserProfile>) => void;
   onUpdateWorkspaceConfig: (updates: Partial<WorkspaceConfig>) => void;
   onOpenSettings: () => void;
@@ -52,6 +54,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   activeTaskCount,
   isSyncingCanvas,
   onSelectTab,
+  onResetChatToHero,
   onUpdateProfile,
   onUpdateWorkspaceConfig,
   onOpenSettings,
@@ -70,7 +73,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
   const commitBrand = () => {
     setEditingBrand(false);
-    const cleaned = brandDraft.trim() || "TaskIt";
+    const cleaned = brandDraft.trim() || "kite";
     setBrandDraft(cleaned);
     if (cleaned !== workspaceConfig.brandName) {
       onUpdateWorkspaceConfig({ brandName: cleaned });
@@ -86,6 +89,10 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
     }
   };
 
+  const isDefaultKiteBrand =
+    !workspaceConfig.brandName ||
+    workspaceConfig.brandName.trim().toLowerCase() === "kite";
+
   return (
     <header className="sticky top-0 z-30 border-b theme-header-bg backdrop-blur-xl transition-colors duration-300">
       <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
@@ -98,7 +105,11 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               color: "#09090b",
             }}
           >
-            {(workspaceConfig.brandName || "T").charAt(0).toUpperCase()}
+            {isDefaultKiteBrand ? (
+              <KiteLogoMark className="w-4 h-4" strokeWidth={2.2} />
+            ) : (
+              (workspaceConfig.brandName || "k").charAt(0).toUpperCase()
+            )}
           </div>
           <div className="flex items-center gap-2 min-w-0">
             {editingBrand ? (
@@ -176,7 +187,10 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                 type="button"
                 role="tab"
                 aria-selected={activeTab === "chat"}
-                onClick={() => onSelectTab("chat")}
+                onClick={() => {
+                  onSelectTab("chat");
+                  onResetChatToHero?.();
+                }}
                 className={`relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
                   activeTab === "chat"
                     ? "bg-white/15 text-white shadow-sm border border-white/15"

@@ -44,10 +44,10 @@ export async function GET(request: Request) {
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//TaskIt AI Workspace//tasks.sunayraval.com//EN",
+    "PRODID:-//kite AI Workspace//tasks.sunayraval.com//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    "X-WR-CALNAME:TaskIt — AI Productivity Workspace",
+    "X-WR-CALNAME:kite — AI Productivity Workspace",
     "X-WR-TIMEZONE:UTC",
   ];
 
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
 
     lines.push(
       "BEGIN:VEVENT",
-      `UID:taskit-${t.id}@tasks.sunayraval.com`,
+      `UID:kite-${t.id}@tasks.sunayraval.com`,
       `DTSTAMP:${formatICSDate(t.updated_at || new Date().toISOString())}`,
       `DTSTART:${dtStart}`,
       `DTEND:${dtEnd}`,

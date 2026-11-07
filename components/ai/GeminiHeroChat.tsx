@@ -14,6 +14,8 @@ import {
   WorkspaceTab,
 } from "@/types/taskit";
 import {
+  ArrowLeft,
+  ArrowRight,
   ArrowUp,
   ArrowUpDown,
   CalendarClock,
@@ -25,6 +27,7 @@ import {
   Heading,
   KeyRound,
   Loader2,
+  MessageSquare,
   Mic,
   MicOff,
   Palette,
@@ -40,6 +43,7 @@ import {
 } from "lucide-react";
 import { MyDayStatusBanner } from "@/components/myday/MyDayStatusBanner";
 import { EnrichedMyDayBlock } from "@/utils/myDayUtils";
+import { KiteFlyingLoader, KiteLogoMark } from "@/components/ui/KiteBrand";
 
 interface GeminiHeroChatProps {
   tasks: TaskItem[];
@@ -50,6 +54,7 @@ interface GeminiHeroChatProps {
   hasApiKey: boolean;
   effectiveApiKey: string;
   activeTab: WorkspaceTab;
+  heroResetNonce?: number;
   onSelectTab: (tab: WorkspaceTab) => void;
   onSaveApiKey: (key: string) => void;
   onOpenApiKeySetup: () => void;
@@ -277,6 +282,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   hasApiKey,
   effectiveApiKey,
   activeTab,
+  heroResetNonce,
   onSelectTab,
   onSaveApiKey,
   onOpenApiKeySetup,
@@ -295,6 +301,14 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  // Always begin on the "What's on your mind?" hero screen first
+  const [showConversation, setShowConversation] = useState(false);
+
+  useEffect(() => {
+    if (heroResetNonce) {
+      setShowConversation(false);
+    }
+  }, [heroResetNonce]);
 
   // Live timer while agent is processing
   useEffect(() => {
@@ -355,12 +369,12 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
     [nonHeaderTasks]
   );
 
-  // Auto-scroll chat on new messages
+  // Auto-scroll chat on new messages or when opening conversation view
   useEffect(() => {
-    if (messages.length > 0 || isThinking) {
+    if (showConversation && (messages.length > 0 || isThinking)) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, isThinking]);
+  }, [messages, isThinking, showConversation]);
 
   // Auto-resize textarea height cleanly
   useEffect(() => {
@@ -547,6 +561,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
 
     setMentionQuery(null);
     setPlusMenuOpen(false);
+    setShowConversation(true);
     if (overridePrompt === undefined) {
       setInput("");
     }
@@ -722,7 +737,10 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
         type="button"
         role="tab"
         aria-selected={activeTab === "chat"}
-        onClick={() => onSelectTab("chat")}
+        onClick={() => {
+          onSelectTab("chat");
+          setShowConversation(false);
+        }}
         className={`rounded-full px-5 py-2 text-[13px] font-medium transition-all ${
           activeTab === "chat"
             ? "bg-[#282a2f]/95 border border-white/[0.14] text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
@@ -859,7 +877,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   // ---------------------------------------------------------------------------
   // Shared Gemini Stadium Input Bar
   // ---------------------------------------------------------------------------
-  const isHeroEmpty = messages.length === 0;
+  const isHeroEmpty = !showConversation;
 
   const GeminiInputBar = (
     <div className="relative w-full max-w-[740px] mx-auto">
@@ -1027,12 +1045,26 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                 <Settings2 className="w-3.5 h-3.5 text-white/60" />
                 <span>Workspace &amp; Theme Settings</span>
               </button>
+              {messages.length > 0 && !showConversation && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPlusMenuOpen(false);
+                    setShowConversation(true);
+                  }}
+                  className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-highlight hover:bg-white/10 transition-colors"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-primary" />
+                  <span>View Current Chat ({messages.length})</span>
+                </button>
+              )}
               {messages.length > 0 && (
                 <button
                   type="button"
                   onClick={() => {
                     setPlusMenuOpen(false);
                     setMessages([]);
+                    setShowConversation(false);
                   }}
                   className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-rose-300 hover:bg-rose-500/15 transition-colors border-t border-white/10 mt-1 pt-2"
                 >
@@ -1249,7 +1281,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   );
 
   // ---------------------------------------------------------------------------
-  // STATE B: Clean Centered Gemini Hero Screen (No messages yet)
+  // STATE B: Clean Centered "What's on your mind?" Hero Screen (Always First)
   // ---------------------------------------------------------------------------
   if (isHeroEmpty) {
     return (
@@ -1261,19 +1293,61 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
         />
 
         <div className="relative z-10 w-full max-w-[760px] flex flex-col items-center">
-          {/* Hero Greeting */}
-          <h1 className="text-[32px] sm:text-[42px] font-normal tracking-[-0.02em] text-white/95 text-center mb-8 sm:mb-9 select-none">
-            Where should we start?
+          {/* Minimalist Kite Crest */}
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/[0.09] bg-white/[0.03] px-3 py-1 text-[11px] font-medium text-white/60 backdrop-blur-md select-none">
+            <KiteLogoMark className="w-3.5 h-3.5 text-primary" />
+            <span>kite workspace</span>
+          </div>
+
+          {/* Hero Prompt Headline */}
+          <h1 className="text-[32px] sm:text-[44px] font-normal tracking-[-0.025em] text-white/95 text-center mb-8 sm:mb-9 select-none">
+            What&apos;s on your mind?
           </h1>
 
-          {/* Gemini Stadium Input Pill */}
+          {/* Live Voice Dictation Indicator */}
+          {isListening && (
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-red-400/35 bg-red-500/15 px-3.5 py-1 text-xs font-medium text-red-200 animate-pulse">
+              <Mic className="w-3.5 h-3.5 text-red-400" />
+              <span>Listening — speak your mind, then press Enter...</span>
+            </div>
+          )}
+
+          {/* Stadium Input Pill */}
           {GeminiInputBar}
 
-          {/* Centered [ Chat | Tasks ] Switcher Pill right underneath (matches screenshot) */}
+          {/* One-Click "View Chat" Pill when previous messages exist */}
+          {messages.length > 0 && (
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowConversation(true)}
+                className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/15 hover:bg-primary/25 px-4 py-1.5 text-xs font-semibold text-highlight shadow-sm transition-all"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-primary" />
+                <span>
+                  View Chat ({messages.length}{" "}
+                  {messages.length === 1 ? "message" : "messages"})
+                </span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMessages([])}
+                className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] px-3 py-1.5 text-xs text-white/50 hover:text-white/85 transition-colors"
+                title="Start a fresh conversation"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Clear</span>
+              </button>
+            </div>
+          )}
+
+          {/* Centered [ Chat | Tasks | MY DAY ] Switcher Pill */}
           <div className="mt-6">{ModeSwitcherPill}</div>
 
           {/* Subtle Optional Quick Prompts */}
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-2 max-w-2xl">
+          <div className="mt-9 flex flex-wrap items-center justify-center gap-2 max-w-2xl">
             {[
               {
                 label: "Show my day schedule",
@@ -1317,13 +1391,24 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   return (
     <div className="flex-1 flex flex-col max-w-[840px] w-full mx-auto px-4 sm:px-6 pt-3 pb-6 min-h-[calc(100vh-5rem)]">
       {/* Top Minimal Session Bar */}
-      <div className="flex items-center justify-between gap-2 pb-3 mb-2 border-b border-white/[0.08]">
-        <div className="flex items-center gap-2 text-xs text-white/55">
-          <Sparkles className="w-3.5 h-3.5 text-primary" />
-          <span>
-            Gemini {modelChoice === "pro" ? "3.8 Pro" : "3.8 Flash"} •{" "}
-            {activeTaskCount} active task{activeTaskCount === 1 ? "" : "s"} in
-            context
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-2 border-b border-white/[0.08]">
+        <div className="flex items-center gap-2.5 text-xs text-white/55">
+          <button
+            type="button"
+            onClick={() => setShowConversation(false)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.04] hover:bg-white/10 px-3 py-1 text-xs font-medium text-white/80 hover:text-white transition-colors"
+            title="Return to What's on your mind? screen"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-primary" />
+            <span>What&apos;s on your mind?</span>
+          </button>
+
+          <span className="hidden sm:inline-flex items-center gap-1.5">
+            <KiteLogoMark className="w-3.5 h-3.5 text-primary" />
+            <span>
+              Gemini {modelChoice === "pro" ? "3.8 Pro" : "3.8 Flash"} •{" "}
+              {activeTaskCount} active task{activeTaskCount === 1 ? "" : "s"}
+            </span>
           </span>
         </div>
 
@@ -1346,7 +1431,10 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => setMessages([])}
+            onClick={() => {
+              setMessages([]);
+              setShowConversation(false);
+            }}
             className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 px-3 py-1 text-xs text-white/65 hover:text-white transition-colors"
             title="Start a fresh chat"
           >
@@ -1371,9 +1459,9 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
 
           return (
             <div key={m.id} className="flex items-start gap-3.5">
-              {/* Gemini Sparkle Avatar */}
+              {/* Minimalist Kite Avatar */}
               <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/35 bg-primary/15 text-primary shadow-neon">
-                <Sparkles className="w-4 h-4" />
+                <KiteLogoMark className="w-4 h-4" />
               </div>
 
               <div className="flex-1 min-w-0 space-y-3">
@@ -1495,18 +1583,13 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           );
         })}
 
+        {/* Minimalistic Kite Flying Loading Animation */}
         {isThinking && (
-          <div className="flex items-center gap-3.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/20 text-primary animate-pulse">
-              <Sparkles className="w-4 h-4" />
+          <div className="flex items-start gap-3.5 py-1">
+            <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/15 text-primary shadow-neon">
+              <KiteLogoMark className="w-4 h-4" />
             </div>
-            <div className="flex items-center gap-2 text-xs sm:text-sm text-white/60">
-              <Loader2 className="w-4 h-4 animate-spin text-primary" />
-              <span>
-                Thinking &amp; updating workspace...
-                {thinkingSeconds > 0 && ` (${thinkingSeconds}s)`}
-              </span>
-            </div>
+            <KiteFlyingLoader elapsedSeconds={thinkingSeconds} />
           </div>
         )}
 
