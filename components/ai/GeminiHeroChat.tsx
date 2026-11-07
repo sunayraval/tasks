@@ -1073,12 +1073,12 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                     [
                       {
                         id: "flash",
-                        name: "2.5 Flash",
+                        name: "3.8 Flash",
                         desc: "Fast, agile task & board actions",
                       },
                       {
                         id: "pro",
-                        name: "2.5 Pro",
+                        name: "3.8 Pro",
                         desc: "Deep planning & complex schedules",
                       },
                     ] as const
@@ -1250,7 +1250,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
         <div className="flex items-center gap-2 text-xs text-white/55">
           <Sparkles className="w-3.5 h-3.5 text-primary" />
           <span>
-            Gemini {modelChoice === "pro" ? "2.5 Pro" : "2.5 Flash"} •{" "}
+            Gemini {modelChoice === "pro" ? "3.8 Pro" : "3.8 Flash"} •{" "}
             {activeTaskCount} active task{activeTaskCount === 1 ? "" : "s"} in
             context
           </span>

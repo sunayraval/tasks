@@ -185,7 +185,7 @@ export async function POST(request: Request) {
       }
 
       const google = createGoogleGenerativeAI({ apiKey: customApiKey });
-      const verifyCandidates = ["gemini-2.5-flash", "gemini-2.0-flash"];
+      const verifyCandidates = ["gemini-3.8-flash", "gemini-2.5-flash"];
       let lastErr: unknown = null;
 
       for (const candidateModel of verifyCandidates) {
@@ -1380,8 +1380,8 @@ ${JSON.stringify(serializedBoard, null, 2)}`;
     const google = createGoogleGenerativeAI({ apiKey: customApiKey });
     const modelChain =
       modelChoice === "pro"
-        ? ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"]
-        : ["gemini-2.5-flash", "gemini-2.0-flash"];
+        ? ["gemini-3.8-pro", "gemini-3.8-flash", "gemini-2.5-pro", "gemini-2.5-flash"]
+        : ["gemini-3.8-flash", "gemini-2.5-flash"];
 
     let replyText = "";
     let usedModel = modelChain[0];

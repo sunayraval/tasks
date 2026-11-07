@@ -192,7 +192,7 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
                 </span>
                 <span>
                   Click <strong className="text-white">&ldquo;Create API key&rdquo;</strong>{" "}
-                  (free tier includes Gemini 2.5 Flash with no billing required).
+                  (free tier includes Gemini 3.8 Flash with no billing required).
                 </span>
               </li>
               <li className="flex items-start gap-2.5">

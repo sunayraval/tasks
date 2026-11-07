@@ -1186,7 +1186,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </li>
                     <li>
                       Click <strong className="text-white/90">&ldquo;Create API key&rdquo;</strong>{" "}
-                      (free tier includes generous Gemini 2.5 Flash &amp; Pro usage).
+                      (free tier includes generous Gemini 3.8 Flash &amp; Pro usage).
                     </li>
                     <li>
                       Copy the key (starts with <code className="text-highlight">AIzaSy...</code>),
