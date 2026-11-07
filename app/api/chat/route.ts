@@ -20,6 +20,9 @@ import {
   WorkspaceTab,
 } from "@/types/taskit";
 
+export const maxDuration = 30;
+export const dynamic = "force-dynamic";
+
 const TONE_PROMPTS: Record<AITone, string> = {
   locked_in:
     "Tone: LOCKED IN — crisp, focused, tactical, high-agency partner. Zero fluff, clear priorities, sharp execution.",
@@ -185,23 +188,31 @@ export async function POST(request: Request) {
       }
 
       const google = createGoogleGenerativeAI({ apiKey: customApiKey });
-      const verifyCandidates = ["gemini-3.8-flash", "gemini-2.5-flash"];
+      const verifyCandidates = [
+        "gemini-3.8-flash",
+        "gemini-1.5-flash",
+        "gemini-2.5-flash",
+      ];
       let lastErr: unknown = null;
 
       for (const candidateModel of verifyCandidates) {
         try {
-          await generateText({
-            model: google(candidateModel),
-            prompt: "Reply with OK",
-            maxTokens: 5,
-            providerOptions: {
-              google: {
-                thinkingConfig: {
-                  thinkingBudget: 0,
-                },
-              },
-            },
-          });
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error(`Timeout verifying on ${candidateModel}`)),
+              3500
+            )
+          );
+
+          await Promise.race([
+            generateText({
+              model: google(candidateModel),
+              prompt: "Reply with OK",
+              maxTokens: 5,
+            }),
+            timeoutPromise,
+          ]);
+
           return NextResponse.json({
             valid: true,
             model: candidateModel,
@@ -1384,8 +1395,8 @@ ${serializedBoard || "(No tasks currently on the board)"}`;
     const google = createGoogleGenerativeAI({ apiKey: customApiKey });
     const modelChain =
       modelChoice === "pro"
-        ? ["gemini-3.8-flash", "gemini-2.5-pro", "gemini-2.5-flash"]
-        : ["gemini-3.8-flash", "gemini-2.5-flash"];
+        ? ["gemini-3.8-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
+        : ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-2.5-flash"];
 
     let replyText = "";
     let usedModel = modelChain[0];
@@ -1393,48 +1404,27 @@ ${serializedBoard || "(No tasks currently on the board)"}`;
     let succeeded = false;
     const tStart = Date.now();
 
-    const invokeModel = async (candidate: string, zeroThinking: boolean) => {
-      const providerOptions = zeroThinking
-        ? {
-            google: {
-              thinkingConfig: {
-                thinkingBudget: 0,
-              },
-            },
-          }
-        : undefined;
-
-      return await generateText({
-        model: google(candidate),
-        system: systemPrompt,
-        messages: conversationMessages,
-        tools,
-        maxSteps: 6,
-        maxTokens: 1500,
-        providerOptions,
-      });
-    };
-
     for (const candidate of modelChain) {
       const candStart = Date.now();
       try {
-        let result;
-        try {
-          // Disable thinking budget on Flash for sub-second conversational latency
-          result = await invokeModel(candidate, modelChoice === "flash");
-        } catch (subErr) {
-          const subStr = String(subErr || "").toLowerCase();
-          if (
-            modelChoice === "flash" &&
-            (subStr.includes("thinking") ||
-              subStr.includes("unknown field") ||
-              subStr.includes("invalid argument"))
-          ) {
-            result = await invokeModel(candidate, false);
-          } else {
-            throw subErr;
-          }
-        }
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`Timeout on model ${candidate}`)),
+            5500
+          )
+        );
+
+        const result = await Promise.race([
+          generateText({
+            model: google(candidate),
+            system: systemPrompt,
+            messages: conversationMessages,
+            tools,
+            maxSteps: 4,
+            maxTokens: 1200,
+          }),
+          timeoutPromise,
+        ]);
 
         usedModel = candidate;
         replyText = (result.text || "").trim();

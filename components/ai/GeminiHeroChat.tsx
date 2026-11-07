@@ -284,9 +284,22 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   const [input, setInput] = useState("");
   const [modelChoice, setModelChoice] = useState<AIModelChoice>("flash");
   const [isThinking, setIsThinking] = useState(false);
+  const [thinkingSeconds, setThinkingSeconds] = useState(0);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
+
+  // Live timer while agent is processing
+  useEffect(() => {
+    if (!isThinking) {
+      setThinkingSeconds(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setThinkingSeconds((s) => s + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isThinking]);
 
   // Inline API Key quick-add when on Chat without key
   const [inlineKeyDraft, setInlineKeyDraft] = useState("");
@@ -545,11 +558,17 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
     setMessages((prev) => [...prev, userMsg]);
     setIsThinking(true);
 
+    const controller = new AbortController();
+    const abortTimeout = setTimeout(() => {
+      controller.abort();
+    }, 22000);
+
     try {
       const now = new Date();
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           mode: "chat",
           message: promptText,
@@ -621,19 +640,24 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
-    } catch {
+    } catch (err: unknown) {
+      const isTimeout =
+        err instanceof Error &&
+        (err.name === "AbortError" || err.message?.includes("aborted"));
       setMessages((prev) => [
         ...prev,
         {
           id: `err-${Date.now()}`,
           role: "assistant",
-          content:
-            "Network hiccup while reaching the Gemini agent endpoint. Please try again.",
+          content: isTimeout
+            ? "The Gemini model took longer than 20s to respond. Please try again or switch to Flash mode."
+            : "Network hiccup while reaching the Gemini agent endpoint. Please try again.",
           timestamp: nowLabel,
           isError: true,
         },
       ]);
     } finally {
+      clearTimeout(abortTimeout);
       setIsThinking(false);
     }
   };
@@ -1398,7 +1422,10 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
             </div>
             <div className="flex items-center gap-2 text-xs sm:text-sm text-white/60">
               <Loader2 className="w-4 h-4 animate-spin text-primary" />
-              <span>Thinking &amp; updating workspace...</span>
+              <span>
+                Thinking &amp; updating workspace...
+                {thinkingSeconds > 0 && ` (${thinkingSeconds}s)`}
+              </span>
             </div>
           </div>
         )}
