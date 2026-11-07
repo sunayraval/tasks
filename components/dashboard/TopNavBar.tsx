@@ -15,7 +15,6 @@ import {
   LogIn,
   LogOut,
   Palette,
-  Pencil,
   RefreshCw,
   Settings,
   Sparkles,
@@ -63,119 +62,33 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   onSignOut,
 }) => {
   const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
-  const [editingBrand, setEditingBrand] = useState(false);
-  const [editingBadge, setEditingBadge] = useState(false);
-  const [brandDraft, setBrandDraft] = useState(workspaceConfig.brandName);
-  const [badgeDraft, setBadgeDraft] = useState(workspaceConfig.brandBadge);
 
   const activeThemeMeta =
     THEME_OPTIONS.find((t) => t.id === profile.theme) || THEME_OPTIONS[0];
 
-  const commitBrand = () => {
-    setEditingBrand(false);
-    const cleaned = brandDraft.trim() || "kite";
-    setBrandDraft(cleaned);
-    if (cleaned !== workspaceConfig.brandName) {
-      onUpdateWorkspaceConfig({ brandName: cleaned });
-    }
-  };
-
-  const commitBadge = () => {
-    setEditingBadge(false);
-    const cleaned = badgeDraft.trim();
-    setBadgeDraft(cleaned);
-    if (cleaned !== workspaceConfig.brandBadge) {
-      onUpdateWorkspaceConfig({ brandBadge: cleaned });
-    }
-  };
-
-  const isDefaultKiteBrand =
-    !workspaceConfig.brandName ||
-    workspaceConfig.brandName.trim().toLowerCase() === "kite";
-
   return (
     <header className="sticky top-0 z-30 border-b theme-header-bg backdrop-blur-xl transition-colors duration-300">
       <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
-        {/* Left: Editable Brand Identity */}
-        <div className="flex items-center gap-2.5 min-w-0">
+        {/* Left: Brand Identity matching user screenshot, strictly non-editable */}
+        <div className="flex items-center gap-2.5 shrink-0 select-none">
           <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-extrabold text-sm shadow-neon transition-colors"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-[0_0_24px_rgba(250,204,21,0.55)] transition-transform"
             style={{
-              backgroundColor: "var(--primary)",
+              backgroundColor: "#facc15",
               color: "#09090b",
             }}
           >
-            {isDefaultKiteBrand ? (
-              <KiteLogoMark className="w-4 h-4" strokeWidth={2.2} />
-            ) : (
-              (workspaceConfig.brandName || "k").charAt(0).toUpperCase()
-            )}
+            <KiteLogoMark className="w-5 h-5 text-black" strokeWidth={2.4} />
           </div>
-          <div className="flex items-center gap-2 min-w-0">
-            {editingBrand ? (
-              <input
-                type="text"
-                autoFocus
-                value={brandDraft}
-                onChange={(e) => setBrandDraft(e.target.value)}
-                onBlur={commitBrand}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitBrand();
-                  if (e.key === "Escape") {
-                    setBrandDraft(workspaceConfig.brandName);
-                    setEditingBrand(false);
-                  }
-                }}
-                className="rounded border border-primary bg-black/60 px-2 py-0.5 text-sm font-bold text-white focus:outline-none w-28 sm:w-32"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setBrandDraft(workspaceConfig.brandName);
-                  setEditingBrand(true);
-                }}
-                className="group flex items-center gap-1 text-base font-bold tracking-tight text-white hover:text-highlight transition-colors truncate"
-                title="Click to edit workspace brand title"
-              >
-                <span className="truncate">{workspaceConfig.brandName}</span>
-                <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity shrink-0" />
-              </button>
-            )}
-
-            {editingBadge ? (
-              <input
-                type="text"
-                autoFocus
-                value={badgeDraft}
-                onChange={(e) => setBadgeDraft(e.target.value)}
-                onBlur={commitBadge}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitBadge();
-                  if (e.key === "Escape") {
-                    setBadgeDraft(workspaceConfig.brandBadge);
-                    setEditingBadge(false);
-                  }
-                }}
-                className="rounded border border-primary bg-black/60 px-2 py-0.5 text-[10px] font-mono text-white focus:outline-none w-36"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setBadgeDraft(workspaceConfig.brandBadge);
-                  setEditingBadge(true);
-                }}
-                className="hidden md:inline-flex items-center gap-1 rounded border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-mono text-highlight/80 hover:border-primary/50 hover:text-highlight transition-colors shrink-0"
-                title="Click to edit subtitle badge"
-              >
-                <span>{workspaceConfig.brandBadge || "Edit badge"}</span>
-              </button>
-            )}
-          </div>
+          <span className="text-xl font-extrabold tracking-tight text-white leading-none">
+            kite
+          </span>
+          <span className="inline-flex items-center rounded-full border border-white px-2.5 py-0.5 text-xs font-mono font-medium text-yellow-300 leading-none">
+            2.0
+          </span>
         </div>
 
-        {/* Center: Workspace Mode Switcher (Chat hidden when user opts out of AI; Tasks & MY DAY always available) */}
+        {/* Center: Workspace Mode Switcher (Chat hidden when user opts out of AI; Tasks & my day always available) */}
         {canAccessWorkspace && (
           <div
             role="tablist"
@@ -258,7 +171,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                   activeTab === "my_day" ? "text-primary" : "text-white/50"
                 }`}
               />
-              <span>MY DAY</span>
+              <span>my day</span>
               {(workspaceConfig.myDaySchedule?.blocks.length || 0) > 0 && (
                 <span
                   className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${

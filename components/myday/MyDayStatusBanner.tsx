@@ -151,7 +151,7 @@ export const MyDayStatusBanner: React.FC<MyDayStatusBannerProps> = ({
               onClick={onOpenMyDay}
               className="inline-flex items-center gap-1 rounded-xl border border-primary/35 bg-primary/15 hover:bg-primary/25 px-3 py-1 text-xs font-semibold text-highlight transition-colors"
             >
-              <span>Open MY DAY</span>
+              <span>Open my day</span>
               <ArrowRight className="w-3 h-3" />
             </button>
           )}
@@ -159,8 +159,8 @@ export const MyDayStatusBanner: React.FC<MyDayStatusBannerProps> = ({
 
         {!telemetry.hasSchedule ? (
           <div className="py-3 text-center text-xs text-white/60">
-            Your MY DAY schedule is currently empty. Ask me to auto-arrange your
-            tasks for today or open the MY DAY tab to build it manually!
+            Your my day schedule is currently empty. Ask me to auto-arrange your
+            tasks for today or open the my day tab to build it manually!
           </div>
         ) : (
           <>

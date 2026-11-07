@@ -1583,7 +1583,7 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
               </div>
               <div className="space-y-1 max-w-md mx-auto">
                 <h4 className="text-base font-bold text-white">
-                  Your MY DAY schedule is open
+                  Your my day schedule is open
                 </h4>
                 <p className="text-xs text-white/55 leading-relaxed">
                   Use <strong>Manual Build</strong> on the left to pick tasks

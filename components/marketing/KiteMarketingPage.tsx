@@ -309,18 +309,18 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
             className="flex items-center gap-2.5 group focus:outline-none"
           >
             <div
-              className="flex h-9 w-9 items-center justify-center rounded-xl shadow-neon transition-transform duration-300 group-hover:scale-105 group-hover:-rotate-3"
+              className="flex h-9 w-9 items-center justify-center rounded-xl shadow-[0_0_24px_rgba(250,204,21,0.55)] transition-transform duration-300 group-hover:scale-105"
               style={{
-                backgroundColor: "var(--primary)",
+                backgroundColor: "#facc15",
                 color: "#09090b",
               }}
             >
-              <KiteLogoMark className="w-5 h-5" strokeWidth={2.2} />
+              <KiteLogoMark className="w-5 h-5 text-black" strokeWidth={2.4} />
             </div>
-            <span className="text-xl font-extrabold tracking-tight text-white">
+            <span className="text-xl font-extrabold tracking-tight text-white leading-none">
               kite
             </span>
-            <span className="hidden sm:inline-flex items-center rounded-full border border-primary/35 bg-primary/15 px-2 py-0.5 text-[10px] font-mono font-semibold text-highlight">
+            <span className="inline-flex items-center rounded-full border border-white px-2.5 py-0.5 text-xs font-mono font-medium text-yellow-300 leading-none">
               2.0
             </span>
           </a>
@@ -343,7 +343,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
               href="#my-day-showcase"
               className="hover:text-white transition-colors"
             >
-              MY DAY Engine
+              my day Engine
             </a>
             <a
               href="#atmospheres"
@@ -445,7 +445,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
           <p className="mx-auto max-w-2xl text-sm sm:text-lg text-white/70 leading-relaxed">
             <strong className="text-white font-semibold">kite</strong> unites an
             autonomous AI workspace agent, a live down-to-the-second{" "}
-            <strong className="text-highlight font-semibold">MY DAY</strong>{" "}
+            <strong className="text-highlight font-semibold">my day</strong>{" "}
             time-blocker, a resizable Notion-style task database, and 1-click
             Canvas LMS sync—wrapped in cinema-grade ambient themes.
           </p>
@@ -561,7 +561,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
                   }`}
                 >
                   <CalendarClock className="w-3.5 h-3.5" />
-                  <span>MY DAY Live</span>
+                  <span>my day Live</span>
                 </button>
                 <button
                   type="button"
@@ -1111,7 +1111,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
               <CalendarClock className="w-5 h-5" />
             </div>
             <h3 className="text-xl font-bold text-white">
-              MY DAY: Live Centered Clock, Dual Status Bars &amp; AI
+              my day: Live Centered Clock, Dual Status Bars &amp; AI
               Auto-Arrange
             </h3>
             <p className="text-sm text-white/65 leading-relaxed">
@@ -1330,7 +1330,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
             },
             {
               step: "03",
-              title: "Auto-Arrange MY DAY & Fly",
+              title: "Auto-Arrange my day & Fly",
               desc: "Let Gemini slot every task into your ideal window and follow the live centered clock & progress bars to 100%.",
               icon: CalendarClock,
             },

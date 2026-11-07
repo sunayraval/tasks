@@ -15,7 +15,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "kite — Autonomous AI Workspace & Day Architect",
   description:
-    "Let your day take flight. Conversational Gemini AI workspace, live MY DAY schedule engine, Notion-style resizable task database, Canvas LMS sync, and cinema-grade ambient themes.",
+    "Let your day take flight. Conversational Gemini AI workspace, live my day schedule engine, Notion-style resizable task database, Canvas LMS sync, and cinema-grade ambient themes.",
 };
 
 export default function RootLayout({

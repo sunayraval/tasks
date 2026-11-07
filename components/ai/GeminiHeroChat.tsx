@@ -413,10 +413,10 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
       {
         id: "skill-myday",
         kind: "skill",
-        label: "@My Day Schedule",
-        sublabel: "Show live My Day status bar, current schedule & logistics",
+        label: "@my day Schedule",
+        sublabel: "Show live my day status bar, current schedule & logistics",
         insertText:
-          "Show my current MY DAY schedule, live status bar, and full logistics ",
+          "Show my current my day schedule, live status bar, and full logistics ",
       },
       {
         id: "skill-briefing",
@@ -778,7 +778,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
             : "border border-transparent text-white/60 hover:text-white hover:bg-white/[0.06]"
         }`}
       >
-        <span>MY DAY</span>
+        <span>my day</span>
         {(workspaceConfig.myDaySchedule?.blocks.length || 0) > 0 && (
           <span className="rounded-full bg-white/10 px-1.5 py-0.2 text-[10px] font-semibold text-white/75">
             {workspaceConfig.myDaySchedule?.blocks.length}
@@ -1000,7 +1000,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                 onClick={() => {
                   setPlusMenuOpen(false);
                   sendPrompt(
-                    "Show my current MY DAY schedule, display the live status bar UI, and summarize my schedule logistics."
+                    "Show my current my day schedule, display the live status bar UI, and summarize my schedule logistics."
                   );
                 }}
                 className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-white/85 hover:bg-white/10 transition-colors"
@@ -1343,7 +1343,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
             </div>
           )}
 
-          {/* Centered [ Chat | Tasks | MY DAY ] Switcher Pill */}
+          {/* Centered [ Chat | Tasks | my day ] Switcher Pill */}
           <div className="mt-6">{ModeSwitcherPill}</div>
 
           {/* Subtle Optional Quick Prompts */}
@@ -1352,12 +1352,12 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
               {
                 label: "Show my day schedule",
                 prompt:
-                  "Show my current MY DAY schedule, display the live status bar UI, and pull my schedule logistics.",
+                  "Show my current my day schedule, display the live status bar UI, and pull my schedule logistics.",
               },
               {
                 label: "Auto-arrange my day",
                 prompt:
-                  "Auto-arrange all my active tasks into my MY DAY schedule for the next 4 hours starting right now.",
+                  "Auto-arrange all my active tasks into my my day schedule for the next 4 hours starting right now.",
               },
               {
                 label: "Organize & clean up board",
@@ -1419,7 +1419,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
             className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 px-3 py-1 text-xs text-white/75 hover:text-white transition-colors"
           >
             <CalendarClock className="w-3.5 h-3.5 text-primary" />
-            <span>MY DAY</span>
+            <span>my day</span>
           </button>
           <button
             type="button"
@@ -1488,7 +1488,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                             className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/80 hover:text-white transition-colors"
                           >
                             <CalendarClock className="w-3 h-3 text-primary" />
-                            <span>View in MY DAY</span>
+                            <span>View in my day</span>
                           </button>
                         ) : (
                           <button
