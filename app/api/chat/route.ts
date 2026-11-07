@@ -193,7 +193,14 @@ export async function POST(request: Request) {
           await generateText({
             model: google(candidateModel),
             prompt: "Reply with OK",
-            maxTokens: 10,
+            maxTokens: 5,
+            providerOptions: {
+              google: {
+                thinkingConfig: {
+                  thinkingBudget: 0,
+                },
+              },
+            },
           });
           return NextResponse.json({
             valid: true,
@@ -422,38 +429,35 @@ export async function POST(request: Request) {
       }
     };
 
-    // Build compact, crystal-clear workspace snapshot for the system prompt
-    const serializedBoard = workingTasks.map((t, index) => {
-      if (isHeaderRow(t)) {
-        return {
-          row: index + 1,
-          id: t.id,
-          kind: "SECTION_HEADER",
-          title: t.title,
-        };
-      }
-      return {
-        row: index + 1,
-        id: t.id,
-        kind: "TASK",
-        title: t.title,
-        status: t.status,
-        priority: t.priority,
-        category: t.type,
-        due_date: t.due_date,
-        estimated_minutes: t.estimated_minutes,
-        tags: t.tags,
-        notes: t.notes || "",
-        has_rich_doc: Boolean(t.content && t.content.trim().length > 0),
-        is_canvas: t.is_canvas_assignment || false,
-        course: t.canvas_course_code || undefined,
-      };
-    });
+    // Build compact, single-line board snapshot for system prompt (drastically reduces input tokens and latency)
+    const serializedBoard = workingTasks
+      .map((t, index) => {
+        if (isHeaderRow(t)) {
+          return `[ROW ${index + 1} | HEADER] ID="${t.id}" "${t.title}" (Section: ${t.section_group || "CUSTOM"})`;
+        }
+        const fields = [
+          `[ROW ${index + 1} | TASK] ID="${t.id}" "${t.title}"`,
+          `Status: "${t.status}"`,
+          `Priority: "${t.priority}"`,
+          `Category: "${t.type}"`,
+          `Section: "${t.section_group}"`,
+        ];
+        if (t.due_date) fields.push(`Due: ${t.due_date.slice(0, 10)}`);
+        if (t.estimated_minutes) fields.push(`Est: ${t.estimated_minutes}m`);
+        if (t.tags && t.tags.length > 0) fields.push(`Tags: ${t.tags.join(",")}`);
+        if (t.notes) fields.push(`Note: "${t.notes.slice(0, 80)}"`);
+        if (t.is_canvas_assignment) fields.push(`Canvas: true`);
+        return fields.join(" • ");
+      })
+      .join("\n");
 
     const systemPrompt = `You are the Gemini Workspace Agent for "${workingConfig.brandName}" (${workingConfig.workspaceTitle}).
 ${TONE_PROMPTS[tone]}
 
 CURRENT USER LOCAL DATE: ${clientLocalDateReadable} (ISO: ${clientISO})
+
+CONVERSATIONAL FAST PATH:
+- For simple greetings, small talk, acknowledgments, or questions that don't ask to change the workspace (e.g. "yo", "hi", "hey", "hello", "how are you?", "what can you do?"), respond directly and naturally in text. DO NOT invoke any tools for simple conversational messages.
 
 YOUR CAPABILITIES:
 You have direct, live read/write control over the user's entire workspace via your tools:
@@ -479,12 +483,12 @@ CURRENT WORKSPACE CONFIGURATION:
 - Tags: ${workingConfig.tags.map((t) => t.label).join(", ")}
 
 CURRENT BOARD (${workingTasks.length} rows in exact top-to-bottom table order):
-${JSON.stringify(serializedBoard, null, 2)}`;
+${serializedBoard || "(No tasks currently on the board)"}`;
 
-    // Assemble multi-turn conversation messages
+    // Assemble multi-turn conversation messages (last 6 turns for instant context ingestion)
     const conversationMessages: CoreMessage[] = [
       ...history
-        .slice(-14)
+        .slice(-6)
         .filter((m) => m.content && m.content.trim().length > 0)
         .map((m) => ({
           role: m.role as "user" | "assistant",
@@ -1376,34 +1380,79 @@ ${JSON.stringify(serializedBoard, null, 2)}`;
       }),
     };
 
-    // Execute Gemini with smart model fallback
+    // Execute Gemini with smart model fallback and latency optimization
     const google = createGoogleGenerativeAI({ apiKey: customApiKey });
     const modelChain =
       modelChoice === "pro"
-        ? ["gemini-3.8-pro", "gemini-3.8-flash", "gemini-2.5-pro", "gemini-2.5-flash"]
+        ? ["gemini-3.8-flash", "gemini-2.5-pro", "gemini-2.5-flash"]
         : ["gemini-3.8-flash", "gemini-2.5-flash"];
 
     let replyText = "";
     let usedModel = modelChain[0];
     let lastError: unknown = null;
     let succeeded = false;
+    const tStart = Date.now();
+
+    const invokeModel = async (candidate: string, zeroThinking: boolean) => {
+      const providerOptions = zeroThinking
+        ? {
+            google: {
+              thinkingConfig: {
+                thinkingBudget: 0,
+              },
+            },
+          }
+        : undefined;
+
+      return await generateText({
+        model: google(candidate),
+        system: systemPrompt,
+        messages: conversationMessages,
+        tools,
+        maxSteps: 6,
+        maxTokens: 1500,
+        providerOptions,
+      });
+    };
 
     for (const candidate of modelChain) {
+      const candStart = Date.now();
       try {
-        const result = await generateText({
-          model: google(candidate),
-          system: systemPrompt,
-          messages: conversationMessages,
-          tools,
-          maxSteps: 6,
-        });
+        let result;
+        try {
+          // Disable thinking budget on Flash for sub-second conversational latency
+          result = await invokeModel(candidate, modelChoice === "flash");
+        } catch (subErr) {
+          const subStr = String(subErr || "").toLowerCase();
+          if (
+            modelChoice === "flash" &&
+            (subStr.includes("thinking") ||
+              subStr.includes("unknown field") ||
+              subStr.includes("invalid argument"))
+          ) {
+            result = await invokeModel(candidate, false);
+          } else {
+            throw subErr;
+          }
+        }
 
         usedModel = candidate;
         replyText = (result.text || "").trim();
         succeeded = true;
+        console.log(
+          `[Gemini Chat] Model "${candidate}" generated response in ${
+            Date.now() - candStart
+          }ms`
+        );
         break;
       } catch (err) {
         lastError = err;
+        console.warn(
+          `[Gemini Chat] Candidate "${candidate}" attempt failed in ${
+            Date.now() - candStart
+          }ms:`,
+          err
+        );
         const info = extractCleanErrorMessage(err);
         // Do not retry other models if the API key itself is invalid OR if tools already mutated state
         if (info.isKeyError || executedActions.length > 0) {
@@ -1466,6 +1515,7 @@ ${JSON.stringify(serializedBoard, null, 2)}`;
     return NextResponse.json({
       reply: replyText,
       modelUsed: usedModel,
+      latencyMs: Date.now() - tStart,
       mutation: mutationPayload,
     });
   } catch (error: unknown) {
