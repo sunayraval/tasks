@@ -13,9 +13,17 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "kite — Autonomous AI Workspace & Day Architect",
+  title: "kite -- let your day take flight",
   description:
     "Let your day take flight. Conversational Gemini AI workspace, live my day schedule engine, Notion-style resizable task database, Canvas LMS sync, and cinema-grade ambient themes.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
@@ -29,6 +37,11 @@ export default function RootLayout({
       data-theme="cyber_ocean"
       className={`${inter.variable} ${jetbrainsMono.variable} dark`}
     >
+      <head>
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <link rel="alternate icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+      </head>
       <body className="font-sans antialiased selection:bg-primary selection:text-black">
         {children}
       </body>
