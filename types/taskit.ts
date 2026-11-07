@@ -77,6 +77,7 @@ export interface WorkspaceConfig {
   brandName: string;
   brandBadge: string;
   showCompletedTasks?: boolean;
+  geminiApiKey?: string | null;
   columnHeaders: ColumnHeadersConfig;
   sections: CustomSectionItem[];
   statuses: CustomOptionItem[];
@@ -85,6 +86,10 @@ export interface WorkspaceConfig {
   tags: CustomOptionItem[];
   customThemeColors?: ThemeColors | null;
 }
+
+export type WorkspaceTab = "chat" | "tasks";
+
+export type AIModelChoice = "flash" | "pro";
 
 export interface UserProfile {
   id: string;
@@ -141,6 +146,59 @@ export interface ActionProposalPayload {
   description: string;
   changes: ActionChangeItem[];
   newDueDate?: string;
+}
+
+export interface AgentExecutedAction {
+  id: string;
+  category:
+    | "create"
+    | "update"
+    | "delete"
+    | "move"
+    | "header"
+    | "theme"
+    | "settings"
+    | "sync";
+  summary: string;
+  detail?: string;
+}
+
+export interface AgentTasksMutation {
+  updatedTasks: TaskItem[];
+  addedTasks: TaskItem[];
+  modifiedTasks: TaskItem[];
+  deletedTaskIds: string[];
+  reordered: boolean;
+}
+
+export interface AgentWorkspaceMutationPayload {
+  executedActions: AgentExecutedAction[];
+  tasksMutation?: AgentTasksMutation | null;
+  profileUpdates?: Partial<UserProfile> | null;
+  workspaceConfigUpdates?: Partial<WorkspaceConfig> | null;
+  triggerCanvasSync?: boolean;
+  switchTab?: WorkspaceTab | null;
+}
+
+export interface AgentUndoSnapshot {
+  tasks: TaskItem[];
+  profile: UserProfile;
+  workspaceConfig: WorkspaceConfig;
+  addedTaskIds: string[];
+  deletedTasks: TaskItem[];
+  modifiedBefore: TaskItem[];
+}
+
+export interface HeroChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+  modelUsed?: string;
+  executedActions?: AgentExecutedAction[];
+  undoSnapshot?: AgentUndoSnapshot | null;
+  undone?: boolean;
+  isError?: boolean;
 }
 
 export const BADGE_COLOR_MAP: Record<
@@ -415,6 +473,7 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
     { id: "#Lab", label: "#Lab", color: "emerald" },
   ],
   showCompletedTasks: false,
+  geminiApiKey: null,
   customThemeColors: null,
 };
 
@@ -441,6 +500,8 @@ export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
       typeof raw.showCompletedTasks === "boolean"
         ? raw.showCompletedTasks
         : false,
+    geminiApiKey:
+      typeof raw.geminiApiKey === "string" ? raw.geminiApiKey : null,
     columnHeaders: {
       ...DEFAULT_WORKSPACE_CONFIG.columnHeaders,
       ...(raw.columnHeaders || {}),

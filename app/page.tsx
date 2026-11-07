@@ -2,13 +2,16 @@
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
-  ActionProposalPayload,
+  AgentUndoSnapshot,
+  AgentWorkspaceMutationPayload,
   DEFAULT_WORKSPACE_CONFIG,
   getWorkspaceConfig,
+  HeroChatMessage,
   SectionGroup,
   TaskItem,
   UserProfile,
   WorkspaceConfig,
+  WorkspaceTab,
 } from "@/types/taskit";
 import { DEFAULT_PROFILE, INITIAL_SEED_TASKS } from "@/utils/seedData";
 import { createClient, isSupabaseConfigured } from "@/utils/supabase/client";
@@ -16,16 +19,23 @@ import { VideoBackground } from "@/components/background/VideoBackground";
 import { TopNavBar } from "@/components/dashboard/TopNavBar";
 import { CircularProgress } from "@/components/dashboard/CircularProgress";
 import { TaskTable } from "@/components/tasks/TaskTable";
-import { CopilotSidebar } from "@/components/ai/CopilotSidebar";
+import { GeminiHeroChat } from "@/components/ai/GeminiHeroChat";
+import { GeminiSetupModal } from "@/components/ai/GeminiSetupModal";
 import {
   SettingsModal,
   SettingsTabId,
 } from "@/components/settings/SettingsModal";
 import { QuickCreateTaskModal } from "@/components/tasks/QuickCreateTaskModal";
-import { CheckCircle2, LogIn } from "lucide-react";
+import { CheckCircle2, Loader2, LogIn } from "lucide-react";
 
 const LOCAL_STORAGE_CONFIG_KEY = "taskit_workspace_config_v1";
 const HEADERS_SEEDED_STORAGE_KEY = "taskit_doc_headers_seeded_v1";
+const GEMINI_API_KEY_STORAGE_KEY = "taskit_gemini_api_key_v1";
+const AI_TEMP_DISABLED_SESSION_KEY = "taskit_ai_temp_disabled_v1";
+const HERO_CHAT_MESSAGES_SESSION_KEY = "taskit_hero_chat_msgs_v1";
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function generateUUID(): string {
   if (
@@ -107,12 +117,16 @@ export default function TaskItWorkspacePage() {
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   const [tasks, setTasks] = useState<TaskItem[]>(INITIAL_SEED_TASKS);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [isCopilotOpen, setIsCopilotOpen] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("chat");
+  const [localApiKey, setLocalApiKey] = useState<string>("");
+  const [aiTemporarilyDisabled, setAiTemporarilyDisabled] =
+    useState<boolean>(false);
+  const [isGeminiSetupOpen, setIsGeminiSetupOpen] = useState<boolean>(false);
+  const [heroMessages, setHeroMessages] = useState<HeroChatMessage[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTabId>("customize");
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState<boolean>(false);
-  const [newTaskDefaultSection, setNewTaskDefaultSection] =
-    useState<SectionGroup>("TODAY");
+  const [newTaskDefaultSection] = useState<SectionGroup>("TODAY");
   const [customVideoVersion, setCustomVideoVersion] = useState<number>(0);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [authChecked, setAuthChecked] = useState<boolean>(false);
@@ -121,6 +135,8 @@ export default function TaskItWorkspacePage() {
 
   // Persistent tracking of deleted task IDs to eliminate any re-query flicker
   const deletedTaskIdsRef = useRef<Set<string>>(new Set());
+  const hasAutoPromptedSetupRef = useRef<boolean>(false);
+  const chatHydratedRef = useRef<boolean>(false);
 
   // Ref to trigger canvas sync in parallel from auth initialization without circular dependency
   const syncCanvasParallelRef = useRef<
@@ -129,6 +145,32 @@ export default function TaskItWorkspacePage() {
 
   const workspaceConfig = useMemo(() => getWorkspaceConfig(profile), [profile]);
 
+  const supabaseEnabled = isSupabaseConfigured();
+  const canAccessWorkspace = isAuthenticated || !supabaseEnabled;
+
+  const effectiveApiKey = useMemo(
+    () =>
+      (
+        profile.custom_ai_api_key ||
+        workspaceConfig.geminiApiKey ||
+        localApiKey ||
+        ""
+      ).trim(),
+    [profile.custom_ai_api_key, workspaceConfig.geminiApiKey, localApiKey]
+  );
+
+  const hasGeminiApiKey = effectiveApiKey.length >= 20;
+
+  const activeTaskCount = useMemo(
+    () =>
+      tasks.filter((t) => {
+        if (t.custom_properties?.is_header) return false;
+        const s = (t.status || "").toLowerCase();
+        return s !== "done" && s !== "completed";
+      }).length,
+    [tasks]
+  );
+
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
     const timer = setTimeout(() => {
@@ -136,6 +178,32 @@ export default function TaskItWorkspacePage() {
     }, 3500);
     return () => clearTimeout(timer);
   }, []);
+
+  // Persist chat conversation in sessionStorage across tab switches & reloads
+  useEffect(() => {
+    if (!chatHydratedRef.current || typeof window === "undefined") return;
+    try {
+      const compact = heroMessages.slice(-40).map((m) => ({
+        ...m,
+        undoSnapshot: undefined,
+      }));
+      sessionStorage.setItem(
+        HERO_CHAT_MESSAGES_SESSION_KEY,
+        JSON.stringify(compact)
+      );
+    } catch {}
+  }, [heroMessages]);
+
+  // Auto-open Google AI API key setup prompt if user doesn't have a key set up and hasn't opted out
+  useEffect(() => {
+    if (!authChecked || !canAccessWorkspace) return;
+    if (hasAutoPromptedSetupRef.current) return;
+    hasAutoPromptedSetupRef.current = true;
+
+    if (!hasGeminiApiKey && !aiTemporarilyDisabled) {
+      setIsGeminiSetupOpen(true);
+    }
+  }, [authChecked, canAccessWorkspace, hasGeminiApiKey, aiTemporarilyDisabled]);
 
   // 1. Check Supabase session & fetch user data
   useEffect(() => {
@@ -150,6 +218,34 @@ export default function TaskItWorkspacePage() {
           window.location.pathname
         );
       }
+
+      // Hydrate API key, temporary AI opt-out, and session chat history
+      try {
+        const savedKey = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY);
+        if (savedKey) {
+          setLocalApiKey(savedKey);
+        }
+      } catch {}
+
+      try {
+        const tempDisabled =
+          sessionStorage.getItem(AI_TEMP_DISABLED_SESSION_KEY) === "true";
+        if (tempDisabled) {
+          setAiTemporarilyDisabled(true);
+          setActiveTab("tasks");
+        }
+      } catch {}
+
+      try {
+        const savedMsgs = sessionStorage.getItem(HERO_CHAT_MESSAGES_SESSION_KEY);
+        if (savedMsgs) {
+          const parsedMsgs = JSON.parse(savedMsgs);
+          if (Array.isArray(parsedMsgs)) {
+            setHeroMessages(parsedMsgs);
+          }
+        }
+      } catch {}
+      chatHydratedRef.current = true;
 
       // Load cached customization from localStorage as immediate fallback
       try {
@@ -831,79 +927,353 @@ export default function TaskItWorkspacePage() {
     syncCanvasParallelRef.current = handleSyncCanvasTasks;
   }, [handleSyncCanvasTasks]);
 
-  // 11. Confirm Copilot Proposals
-  const handleConfirmActionProposal = useCallback(
-    async (proposal: ActionProposalPayload) => {
-      const nowISO = new Date().toISOString();
+  // 11a. Toggle temporary session-scoped AI opt-out (always switchable in Settings -> AI)
+  const handleSetAiTemporarilyDisabled = useCallback(
+    (disabled: boolean) => {
+      setAiTemporarilyDisabled(disabled);
+      if (typeof window !== "undefined") {
+        try {
+          if (disabled) {
+            sessionStorage.setItem(AI_TEMP_DISABLED_SESSION_KEY, "true");
+          } else {
+            sessionStorage.removeItem(AI_TEMP_DISABLED_SESSION_KEY);
+          }
+        } catch {}
+      }
 
-      if (proposal.actionType === "BATCH_RESCHEDULE") {
-        const targetIds = new Set(
-          proposal.changes.map((c) => c.id).filter(Boolean)
-        );
-        const targetTitles = new Set(
-          proposal.changes.map((c) => c.title.toLowerCase())
-        );
-        const nextDue =
-          proposal.newDueDate ||
-          new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
-
-        setTasks((prev) =>
-          prev.map((t) => {
-            if (
-              targetIds.has(t.id) ||
-              targetTitles.has(t.title.toLowerCase())
-            ) {
-              const updated = {
-                ...t,
-                due_date: nextDue,
-                section_group: "SOON" as SectionGroup,
-                updated_at: nowISO,
-              };
-              if (isAuthenticated) {
-                createClient()
-                  .from("tasks")
-                  .update({ due_date: nextDue, section_group: "SOON" })
-                  .eq("id", t.id)
-                  .then();
-              }
-              return updated;
-            }
-            return t;
-          })
-        );
+      if (disabled) {
+        setIsGeminiSetupOpen(false);
+        setActiveTab("tasks");
         showToast(
-          `Rescheduled tasks to ${
-            proposal.newDueDate ? "selected date" : "Saturday"
-          }`
+          "AI features hidden for this session. Switch back anytime in Customize → AI."
         );
-      } else if (proposal.actionType === "BATCH_CREATE") {
-        const newItems: TaskItem[] = proposal.changes.map((c, idx) => ({
-          id: generateUUID(),
-          user_id: profile.id,
-          title: c.title,
-          content: "<p>Created via Copilot.</p>",
-          status: "To Do",
-          type: c.type || "School",
-          priority: c.priority || "High",
-          due_date: proposal.newDueDate || nowISO,
-          estimated_minutes: c.estimated_minutes || 30,
-          tags: ["#Copilot"],
-          notes: "",
-          is_canvas_assignment: false,
-          canvas_course_code: null,
-          custom_properties: {},
-          section_group: c.section_group || "TODAY",
-          order_index: tasks.length + idx,
-          completed_at: null,
-          created_at: nowISO,
-          updated_at: nowISO,
-        }));
-
-        setTasks((prev) => [...prev, ...newItems]);
-        showToast(`Added ${newItems.length} tasks!`);
+      } else {
+        setActiveTab("chat");
+        showToast("Gemini AI Workspace Agent enabled!");
       }
     },
-    [profile.id, isAuthenticated, showToast, tasks.length]
+    [showToast]
+  );
+
+  // 11b. Save or clear Google AI (Gemini) API key across localStorage, profile, and workspaceConfig
+  const handleSaveApiKey = useCallback(
+    (key: string | null) => {
+      const cleaned = key ? key.trim() : null;
+      setLocalApiKey(cleaned || "");
+
+      if (typeof window !== "undefined") {
+        try {
+          if (cleaned) {
+            localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, cleaned);
+          } else {
+            localStorage.removeItem(GEMINI_API_KEY_STORAGE_KEY);
+          }
+        } catch {}
+      }
+
+      handleUpdateProfile({ custom_ai_api_key: cleaned });
+      handleUpdateWorkspaceConfig({ geminiApiKey: cleaned });
+
+      if (cleaned) {
+        setAiTemporarilyDisabled(false);
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.removeItem(AI_TEMP_DISABLED_SESSION_KEY);
+          } catch {}
+        }
+        setIsGeminiSetupOpen(false);
+        setActiveTab("chat");
+        showToast("Google Gemini AI connected!");
+      } else {
+        showToast("Removed Google AI API key.");
+      }
+    },
+    [handleUpdateProfile, handleUpdateWorkspaceConfig, showToast]
+  );
+
+  // 11c. Apply live mutations executed by the Gemini Workspace Agent & persist to Supabase
+  const handleApplyAgentMutation = useCallback(
+    (mutation: AgentWorkspaceMutationPayload): AgentUndoSnapshot => {
+      const tm = mutation.tasksMutation;
+
+      const snapshotTasks = tasks.map((t) => ({
+        ...t,
+        tags: [...(t.tags || [])],
+        custom_properties: { ...(t.custom_properties || {}) },
+      }));
+      const snapshotConfig: WorkspaceConfig = JSON.parse(
+        JSON.stringify(workspaceConfig)
+      );
+      const snapshotProfile: UserProfile = {
+        ...profile,
+        custom_theme_json: snapshotConfig as unknown as Record<string, unknown>,
+      };
+
+      const deletedSet = new Set(tm?.deletedTaskIds || []);
+      const modifiedSet = new Set((tm?.modifiedTasks || []).map((m) => m.id));
+
+      const undoSnapshot: AgentUndoSnapshot = {
+        tasks: snapshotTasks,
+        profile: snapshotProfile,
+        workspaceConfig: snapshotConfig,
+        addedTaskIds: (tm?.addedTasks || []).map((a) => a.id),
+        deletedTasks: snapshotTasks.filter((t) => deletedSet.has(t.id)),
+        modifiedBefore: snapshotTasks.filter((t) => modifiedSet.has(t.id)),
+      };
+
+      if (tm) {
+        for (const delId of tm.deletedTaskIds) {
+          deletedTaskIdsRef.current.add(delId);
+          if (selectedTaskId === delId) {
+            setSelectedTaskId(null);
+          }
+        }
+
+        setTasks(tm.updatedTasks);
+
+        if (isSupabaseConfigured() && isAuthenticated) {
+          const supabase = createClient();
+
+          // 1) Persist deletions
+          if (tm.deletedTaskIds.length > 0) {
+            const uuidDeletes = tm.deletedTaskIds.filter((id) =>
+              UUID_REGEX.test(id)
+            );
+            if (uuidDeletes.length > 0) {
+              supabase.from("tasks").delete().in("id", uuidDeletes).then();
+            }
+            for (const delTask of undoSnapshot.deletedTasks) {
+              if (delTask.title) {
+                supabase
+                  .from("tasks")
+                  .delete()
+                  .eq("user_id", profile.id)
+                  .eq("title", delTask.title)
+                  .then();
+              }
+            }
+          }
+
+          // 2) Persist newly added tasks & headers
+          if (tm.addedTasks.length > 0) {
+            const insertPayload = tm.addedTasks.map((created) => ({
+              id: created.id,
+              user_id: profile.id,
+              title: created.title,
+              content: created.content,
+              status: created.status,
+              type: created.type,
+              priority: created.priority,
+              due_date: created.due_date,
+              estimated_minutes: created.estimated_minutes,
+              tags: created.tags,
+              notes: created.notes,
+              is_canvas_assignment: created.is_canvas_assignment,
+              canvas_course_code: created.canvas_course_code,
+              custom_properties: created.custom_properties || {},
+              section_group: created.section_group,
+              order_index: created.order_index,
+            }));
+            supabase.from("tasks").insert(insertPayload).then();
+          }
+
+          // 3) Persist modified tasks & headers
+          const updatedOrderHandled = new Set<string>();
+          for (const mod of tm.modifiedTasks) {
+            if (UUID_REGEX.test(mod.id)) {
+              updatedOrderHandled.add(mod.id);
+              supabase
+                .from("tasks")
+                .update({
+                  title: mod.title,
+                  content: mod.content,
+                  status: mod.status,
+                  type: mod.type,
+                  priority: mod.priority,
+                  due_date: mod.due_date,
+                  estimated_minutes: mod.estimated_minutes,
+                  tags: mod.tags,
+                  notes: mod.notes,
+                  custom_properties: mod.custom_properties || {},
+                  section_group: mod.section_group,
+                  order_index: mod.order_index,
+                  completed_at: mod.completed_at,
+                  updated_at: mod.updated_at,
+                })
+                .eq("id", mod.id)
+                .then();
+            }
+          }
+
+          // 4) Persist order_index changes from move/reorder operations
+          if (tm.reordered) {
+            const addedSet = new Set(tm.addedTasks.map((a) => a.id));
+            for (const item of tm.updatedTasks) {
+              if (
+                UUID_REGEX.test(item.id) &&
+                !addedSet.has(item.id) &&
+                !updatedOrderHandled.has(item.id)
+              ) {
+                supabase
+                  .from("tasks")
+                  .update({ order_index: item.order_index })
+                  .eq("id", item.id)
+                  .then();
+              }
+            }
+          }
+        }
+      }
+
+      if (mutation.profileUpdates) {
+        handleUpdateProfile(mutation.profileUpdates);
+      }
+
+      if (mutation.workspaceConfigUpdates) {
+        handleUpdateWorkspaceConfig(mutation.workspaceConfigUpdates);
+      }
+
+      if (mutation.triggerCanvasSync) {
+        handleSyncCanvasTasks(profile.canvas_feed_url || "").catch(() => {});
+      }
+
+      if (mutation.switchTab && !aiTemporarilyDisabled) {
+        setActiveTab(mutation.switchTab);
+      }
+
+      if (mutation.executedActions.length > 0) {
+        showToast(
+          mutation.executedActions.length === 1
+            ? mutation.executedActions[0].summary
+            : `Agent completed ${mutation.executedActions.length} workspace actions`
+        );
+      }
+
+      return undoSnapshot;
+    },
+    [
+      tasks,
+      workspaceConfig,
+      profile,
+      selectedTaskId,
+      isAuthenticated,
+      aiTemporarilyDisabled,
+      handleUpdateProfile,
+      handleUpdateWorkspaceConfig,
+      handleSyncCanvasTasks,
+      showToast,
+    ]
+  );
+
+  // 11d. One-click Undo for any Gemini Agent turn
+  const handleUndoAgentMessage = useCallback(
+    (messageId: string) => {
+      const targetMsg = heroMessages.find((m) => m.id === messageId);
+      if (!targetMsg?.undoSnapshot || targetMsg.undone) return;
+
+      const snap = targetMsg.undoSnapshot;
+
+      for (const restored of snap.deletedTasks) {
+        deletedTaskIdsRef.current.delete(restored.id);
+      }
+      for (const addedId of snap.addedTaskIds) {
+        deletedTaskIdsRef.current.add(addedId);
+      }
+
+      setTasks(snap.tasks);
+      setProfile(snap.profile);
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(
+            LOCAL_STORAGE_CONFIG_KEY,
+            JSON.stringify(snap.workspaceConfig)
+          );
+        } catch {}
+      }
+
+      if (isSupabaseConfigured() && isAuthenticated) {
+        const supabase = createClient();
+
+        const uuidAdded = snap.addedTaskIds.filter((id) =>
+          UUID_REGEX.test(id)
+        );
+        if (uuidAdded.length > 0) {
+          supabase.from("tasks").delete().in("id", uuidAdded).then();
+        }
+
+        if (snap.deletedTasks.length > 0) {
+          const restorePayload = snap.deletedTasks
+            .filter((t) => UUID_REGEX.test(t.id))
+            .map((t) => ({
+              id: t.id,
+              user_id: profile.id,
+              title: t.title,
+              content: t.content,
+              status: t.status,
+              type: t.type,
+              priority: t.priority,
+              due_date: t.due_date,
+              estimated_minutes: t.estimated_minutes,
+              tags: t.tags,
+              notes: t.notes,
+              is_canvas_assignment: t.is_canvas_assignment,
+              canvas_course_code: t.canvas_course_code,
+              custom_properties: t.custom_properties || {},
+              section_group: t.section_group,
+              order_index: t.order_index,
+            }));
+          if (restorePayload.length > 0) {
+            supabase.from("tasks").insert(restorePayload).then();
+          }
+        }
+
+        for (const prevItem of snap.tasks) {
+          if (UUID_REGEX.test(prevItem.id)) {
+            supabase
+              .from("tasks")
+              .update({
+                title: prevItem.title,
+                content: prevItem.content,
+                status: prevItem.status,
+                type: prevItem.type,
+                priority: prevItem.priority,
+                due_date: prevItem.due_date,
+                estimated_minutes: prevItem.estimated_minutes,
+                tags: prevItem.tags,
+                notes: prevItem.notes,
+                custom_properties: prevItem.custom_properties || {},
+                section_group: prevItem.section_group,
+                order_index: prevItem.order_index,
+                completed_at: prevItem.completed_at,
+              })
+              .eq("id", prevItem.id)
+              .then();
+          }
+        }
+
+        supabase
+          .from("profiles")
+          .update({
+            theme: snap.profile.theme,
+            video_bg_preset: snap.profile.video_bg_preset,
+            video_bg_dim: snap.profile.video_bg_dim,
+            video_bg_blur: snap.profile.video_bg_blur,
+            ai_tone: snap.profile.ai_tone,
+            view_mode: snap.profile.view_mode,
+            custom_theme_json:
+              snap.workspaceConfig as unknown as Record<string, unknown>,
+          })
+          .eq("id", profile.id)
+          .then();
+      }
+
+      setHeroMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, undone: true } : m))
+      );
+      showToast("Reverted agent changes.");
+    },
+    [heroMessages, isAuthenticated, profile.id, showToast]
   );
 
   // Google OAuth Sign In
@@ -936,6 +1306,10 @@ export default function TaskItWorkspacePage() {
     showToast("Signed out.");
   };
 
+  const effectiveTab: WorkspaceTab = aiTemporarilyDisabled
+    ? "tasks"
+    : activeTab;
+
   return (
     <div className="relative min-h-screen flex flex-col text-zinc-100">
       {/* Ambient Theme & Video Background */}
@@ -953,15 +1327,19 @@ export default function TaskItWorkspacePage() {
           profile={profile}
           workspaceConfig={workspaceConfig}
           isAuthenticated={isAuthenticated}
-          isCopilotOpen={isCopilotOpen}
+          canAccessWorkspace={canAccessWorkspace}
+          activeTab={effectiveTab}
+          aiTemporarilyDisabled={aiTemporarilyDisabled}
+          hasGeminiApiKey={hasGeminiApiKey}
+          activeTaskCount={activeTaskCount}
           isSyncingCanvas={isSyncingCanvas}
+          onSelectTab={setActiveTab}
           onUpdateProfile={handleUpdateProfile}
           onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
           onOpenSettings={() => {
             setSettingsTab("customize");
             setIsSettingsOpen(true);
           }}
-          onToggleCopilot={() => setIsCopilotOpen((prev) => !prev)}
           onQuickSyncCanvas={() =>
             handleSyncCanvasTasks(profile.canvas_feed_url || "")
           }
@@ -970,14 +1348,14 @@ export default function TaskItWorkspacePage() {
         />
 
         {/* Main Content Area */}
-        <main
-          className={`flex-1 mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8 py-6 space-y-5 transition-all duration-300 ${
-            isCopilotOpen ? " lg:pr-[440px]" : ""
-          }`}
-        >
-          {!isAuthenticated && authChecked ? (
+        <main className="flex-1 flex flex-col mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8 py-6 transition-all duration-300">
+          {supabaseEnabled && !authChecked ? (
+            <div className="flex-1 flex items-center justify-center py-24">
+              <Loader2 className="w-6 h-6 animate-spin text-primary/80" />
+            </div>
+          ) : supabaseEnabled && !isAuthenticated ? (
             /* Sign-In Gate */
-            <div className="my-12 mx-auto max-w-md rounded-2xl border theme-panel p-8 text-center shadow-2xl backdrop-blur-2xl space-y-6">
+            <div className="my-12 mx-auto w-full max-w-md rounded-2xl border theme-panel p-8 text-center shadow-2xl backdrop-blur-2xl space-y-6">
               <div
                 className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl font-extrabold text-2xl shadow-neon"
                 style={{
@@ -1014,10 +1392,35 @@ export default function TaskItWorkspacePage() {
                 Personal Supabase PostgreSQL database with Row Level Security.
               </div>
             </div>
+          ) : effectiveTab === "chat" ? (
+            /* Hero Homepage: Gemini-Styled Autonomous Workspace Agent */
+            <GeminiHeroChat
+              tasks={tasks}
+              profile={profile}
+              workspaceConfig={workspaceConfig}
+              messages={heroMessages}
+              setMessages={setHeroMessages}
+              hasApiKey={hasGeminiApiKey}
+              effectiveApiKey={effectiveApiKey}
+              activeTab={effectiveTab}
+              onSelectTab={setActiveTab}
+              onSaveApiKey={(key) => handleSaveApiKey(key)}
+              onOpenApiKeySetup={() => setIsGeminiSetupOpen(true)}
+              onOptOutTemporary={() => handleSetAiTemporarilyDisabled(true)}
+              onChangeTone={(tone) => handleUpdateProfile({ ai_tone: tone })}
+              onOpenSettings={() => {
+                setSettingsTab("ai");
+                setIsSettingsOpen(true);
+              }}
+              onQuickSyncCanvas={() =>
+                handleSyncCanvasTasks(profile.canvas_feed_url || "")
+              }
+              onApplyAgentMutation={handleApplyAgentMutation}
+              onUndoAgentMessage={handleUndoAgentMessage}
+            />
           ) : (
-            /* Authenticated Workspace */
-            <>
-              {/* Header Telemetry (Editable Title & Motto) */}
+            /* Tasks Tab: Telemetry Header + Document-Style Resizable Task Table */
+            <div className="space-y-5">
               <CircularProgress
                 tasks={tasks}
                 workspaceConfig={workspaceConfig}
@@ -1025,7 +1428,6 @@ export default function TaskItWorkspacePage() {
                 streakDays={1}
               />
 
-              {/* Customizable Document-Style Task Table */}
               <TaskTable
                 tasks={tasks}
                 selectedTaskId={selectedTaskId}
@@ -1043,26 +1445,24 @@ export default function TaskItWorkspacePage() {
                   setIsSettingsOpen(true);
                 }}
               />
-            </>
+            </div>
           )}
         </main>
       </div>
 
-      {/* AI Copilot Side Drawer */}
-      {isAuthenticated && (
-        <CopilotSidebar
-          isOpen={isCopilotOpen}
-          onToggle={() => setIsCopilotOpen((prev) => !prev)}
-          tasks={tasks}
-          aiTone={profile.ai_tone}
-          customApiKey={profile.custom_ai_api_key}
-          onChangeTone={(tone) => handleUpdateProfile({ ai_tone: tone })}
-          onConfirmActionProposal={handleConfirmActionProposal}
+      {/* Google AI API Key Onboarding & Setup Modal */}
+      {canAccessWorkspace && (
+        <GeminiSetupModal
+          isOpen={isGeminiSetupOpen}
+          initialKey={effectiveApiKey}
+          onSaveApiKey={(key) => handleSaveApiKey(key)}
+          onOptOutTemporary={() => handleSetAiTemporarilyDisabled(true)}
+          onClose={() => setIsGeminiSetupOpen(false)}
         />
       )}
 
       {/* Settings & Customization Modal */}
-      {isAuthenticated && (
+      {canAccessWorkspace && (
         <SettingsModal
           isOpen={isSettingsOpen}
           initialTab={settingsTab}
@@ -1070,6 +1470,10 @@ export default function TaskItWorkspacePage() {
           profile={profile}
           workspaceConfig={workspaceConfig}
           tasks={tasks}
+          aiTemporarilyDisabled={aiTemporarilyDisabled}
+          effectiveApiKey={effectiveApiKey}
+          onSetAiTemporarilyDisabled={handleSetAiTemporarilyDisabled}
+          onSaveApiKey={handleSaveApiKey}
           onUpdateProfile={handleUpdateProfile}
           onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
           onCustomVideoUploaded={() => setCustomVideoVersion((v) => v + 1)}
@@ -1078,7 +1482,7 @@ export default function TaskItWorkspacePage() {
       )}
 
       {/* Quick Create Task Modal */}
-      {isAuthenticated && (
+      {canAccessWorkspace && (
         <QuickCreateTaskModal
           isOpen={isNewTaskModalOpen}
           defaultSection={newTaskDefaultSection}

@@ -23,10 +23,13 @@ import {
   clearCustomVideoFromIDB,
 } from "@/components/background/VideoBackground";
 import {
+  AlertCircle,
   Bot,
   Calendar,
   Check,
   Copy,
+  Eye,
+  EyeOff,
   KeyRound,
   LayoutPanelLeft,
   Loader2,
@@ -34,6 +37,7 @@ import {
   Plus,
   RefreshCw,
   Sliders,
+  Sparkles,
   Tags,
   Trash2,
   Upload,
@@ -58,6 +62,10 @@ interface SettingsModalProps {
   profile: UserProfile;
   workspaceConfig: WorkspaceConfig;
   tasks: TaskItem[];
+  aiTemporarilyDisabled: boolean;
+  effectiveApiKey: string;
+  onSetAiTemporarilyDisabled: (disabled: boolean) => void;
+  onSaveApiKey: (key: string | null) => void;
   onUpdateProfile: (updates: Partial<UserProfile>) => void;
   onUpdateWorkspaceConfig: (updates: Partial<WorkspaceConfig>) => void;
   onCustomVideoUploaded: () => void;
@@ -228,6 +236,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   profile,
   workspaceConfig,
   tasks,
+  aiTemporarilyDisabled,
+  effectiveApiKey,
+  onSetAiTemporarilyDisabled,
+  onSaveApiKey,
   onUpdateProfile,
   onUpdateWorkspaceConfig,
   onCustomVideoUploaded,
@@ -241,6 +253,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [gcalMessage, setGcalMessage] = useState<string>("");
   const [copiedIcs, setCopiedIcs] = useState(false);
   const [newSectionTitle, setNewSectionTitle] = useState("");
+  const [apiKeyDraft, setApiKeyDraft] = useState<string>(effectiveApiKey || "");
+  const [showApiKey, setShowApiKey] = useState<boolean>(false);
+  const [verifyingApiKey, setVerifyingApiKey] = useState<boolean>(false);
+  const [apiKeyStatus, setApiKeyStatus] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   useEffect(() => {
     if (isOpen && initialTab) {
@@ -248,7 +267,65 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   }, [isOpen, initialTab]);
 
+  useEffect(() => {
+    if (isOpen) {
+      setApiKeyDraft(effectiveApiKey || "");
+      setApiKeyStatus(null);
+    }
+  }, [isOpen, effectiveApiKey]);
+
   if (!isOpen) return null;
+
+  const hasSavedKey = effectiveApiKey.trim().length >= 20;
+
+  const handleVerifyAndSaveKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = apiKeyDraft.trim();
+    if (!trimmed) {
+      setApiKeyStatus({
+        type: "error",
+        text: "Please paste your Google AI API key first.",
+      });
+      return;
+    }
+
+    setVerifyingApiKey(true);
+    setApiKeyStatus(null);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "verify",
+          customApiKey: trimmed,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        setApiKeyStatus({
+          type: "error",
+          text:
+            data.error ||
+            "Google AI rejected this API key. Make sure you copied a valid Gemini key (AIza...).",
+        });
+        return;
+      }
+
+      onSaveApiKey(trimmed);
+      onSetAiTemporarilyDisabled(false);
+      setApiKeyStatus({
+        type: "success",
+        text: "Verified & connected! Your Gemini Workspace Agent is active.",
+      });
+    } catch {
+      setApiKeyStatus({
+        type: "error",
+        text: "Network error while verifying key. Please try again.",
+      });
+    } finally {
+      setVerifyingApiKey(false);
+    }
+  };
 
   const origin =
     typeof window !== "undefined"
@@ -369,7 +446,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               icon: Palette,
             },
             { id: "view", label: "3. Task View Mode", icon: LayoutPanelLeft },
-            { id: "ai", label: "4. AI Copilot & BYOK", icon: Bot },
+            { id: "ai", label: "4. AI Agent & API Key", icon: Bot },
             {
               id: "integrations",
               label: "5. Canvas & Calendars",
@@ -414,7 +491,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   type="button"
                   onClick={() =>
-                    onUpdateWorkspaceConfig(DEFAULT_WORKSPACE_CONFIG)
+                    onUpdateWorkspaceConfig({
+                      ...DEFAULT_WORKSPACE_CONFIG,
+                      geminiApiKey: workspaceConfig.geminiApiKey,
+                    })
                   }
                   className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/70 hover:text-white hover:border-white/30 transition-colors"
                 >
@@ -1006,16 +1086,216 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 4: AI PREFERENCES & BYOK */}
+          {/* TAB 4: AI AGENT & API KEY */}
           {activeTab === "ai" && (
             <div className="space-y-6">
+              {/* 1. Enable / Hide AI Workspace Agent Toggle */}
+              <div className="rounded-xl border border-white/15 bg-black/40 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-primary" />
+                      <h4 className="text-xs font-bold text-white">
+                        Enable Gemini AI Workspace Agent
+                      </h4>
+                      <span
+                        className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                          !aiTemporarilyDisabled
+                            ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-300"
+                            : "border-zinc-400/30 bg-zinc-500/15 text-zinc-300"
+                        }`}
+                      >
+                        {!aiTemporarilyDisabled ? "Enabled" : "Hidden for Session"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-white/55 leading-relaxed">
+                      When enabled, the hero homepage opens to your Gemini-styled AI Agent with a{" "}
+                      <span className="text-white/80 font-medium">Chat / Tasks</span> tab switcher.
+                      Turn off temporarily if you prefer a pure task-table workspace with all AI chats hidden.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onSetAiTemporarilyDisabled(!aiTemporarilyDisabled)
+                    }
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      !aiTemporarilyDisabled ? "bg-primary" : "bg-white/20"
+                    }`}
+                    role="switch"
+                    aria-checked={!aiTemporarilyDisabled}
+                    aria-label="Enable Gemini AI Workspace Agent"
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full shadow ring-0 transition duration-200 ease-in-out ${
+                        !aiTemporarilyDisabled
+                          ? "translate-x-5 bg-black"
+                          : "translate-x-0 bg-white"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Google AI API Key Setup & Instructions */}
+              <div className="rounded-xl border border-white/15 bg-black/35 p-4 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <KeyRound className="w-4 h-4 text-primary" />
+                      Google AI (Gemini) API Key Setup
+                    </h4>
+                    <p className="text-[11px] text-white/55 mt-0.5">
+                      Required for the Gemini Workspace Agent. Stored privately in your workspace preferences.
+                    </p>
+                  </div>
+
+                  {hasSavedKey ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1 text-[10px] font-semibold text-emerald-300">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Connected ({effectiveApiKey.slice(0, 6)}••••
+                      {effectiveApiKey.slice(-4)})
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/15 px-2.5 py-1 text-[10px] font-semibold text-amber-200">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      No API Key Set
+                    </span>
+                  )}
+                </div>
+
+                {/* Quick 3-Step Instructions */}
+                <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3.5 space-y-2 text-[11px] text-white/75">
+                  <div className="font-semibold text-white/90">
+                    How to get a free Google Gemini API key (~30 seconds):
+                  </div>
+                  <ol className="list-decimal pl-4 space-y-1 text-white/65">
+                    <li>
+                      Open{" "}
+                      <a
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-highlight underline underline-offset-2 hover:brightness-110 font-medium"
+                      >
+                        Google AI Studio (aistudio.google.com/app/apikey)
+                        <ExternalLink className="w-3 h-3" />
+                      </a>{" "}
+                      and sign in with your Google account.
+                    </li>
+                    <li>
+                      Click <strong className="text-white/90">&ldquo;Create API key&rdquo;</strong>{" "}
+                      (free tier includes generous Gemini 2.5 Flash &amp; Pro usage).
+                    </li>
+                    <li>
+                      Copy the key (starts with <code className="text-highlight">AIzaSy...</code>),
+                      paste it below, and click <strong className="text-white/90">Verify &amp; Save Key</strong>.
+                    </li>
+                  </ol>
+                </div>
+
+                {/* API Key Input & Verify Form */}
+                <form onSubmit={handleVerifyAndSaveKey} className="space-y-2.5">
+                  <label
+                    htmlFor="settings-gemini-api-key"
+                    className="sr-only"
+                  >
+                    Google AI API Key
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        id="settings-gemini-api-key"
+                        type={showApiKey ? "text" : "password"}
+                        value={apiKeyDraft}
+                        onChange={(e) => {
+                          setApiKeyDraft(e.target.value);
+                          if (apiKeyStatus) setApiKeyStatus(null);
+                        }}
+                        placeholder="Paste Google AI API key (AIzaSy...)"
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="w-full rounded-xl border border-white/15 bg-black/60 pl-3.5 pr-10 py-2.5 text-xs text-white placeholder-white/30 focus:border-primary focus:outline-none font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowApiKey((v) => !v)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-white/45 hover:text-white transition-colors"
+                        title={showApiKey ? "Hide key" : "Show key"}
+                      >
+                        {showApiKey ? (
+                          <EyeOff className="w-3.5 h-3.5" />
+                        ) : (
+                          <Eye className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={verifyingApiKey}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-black hover:brightness-110 disabled:opacity-50 transition-all shrink-0 shadow-neon"
+                    >
+                      {verifyingApiKey ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Verifying...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Verify &amp; Save Key</span>
+                        </>
+                      )}
+                    </button>
+
+                    {hasSavedKey && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setApiKeyDraft("");
+                          onSaveApiKey(null);
+                          setApiKeyStatus({
+                            type: "success",
+                            text: "Removed saved Google AI API key.",
+                          });
+                        }}
+                        className="inline-flex items-center justify-center gap-1 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2.5 text-xs font-semibold text-red-300 hover:bg-red-500/20 transition-colors shrink-0"
+                        title="Remove saved API key"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Remove</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {apiKeyStatus && (
+                    <div
+                      className={`flex items-center gap-1.5 text-xs font-medium ${
+                        apiKeyStatus.type === "success"
+                          ? "text-emerald-400"
+                          : "text-rose-400"
+                      }`}
+                    >
+                      {apiKeyStatus.type === "success" ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      )}
+                      <span>{apiKeyStatus.text}</span>
+                    </div>
+                  )}
+                </form>
+              </div>
+
+              {/* 3. Agent Coaching Personality */}
               <div>
                 <h3 className="text-sm font-bold text-white mb-1">
-                  TaskIt Copilot Personality &amp; Coaching Tone
+                  Gemini Agent Personality &amp; Coaching Tone
                 </h3>
                 <p className="text-xs text-white/55 mb-3">
-                  Configures the system prompt for Gemini tool calls &amp;
-                  briefings.
+                  Configures how your workspace agent communicates, prioritizes, and coaches you.
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1066,28 +1346,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     );
                   })}
                 </div>
-              </div>
-
-              <div className="border-t border-white/10 pt-5 space-y-2">
-                <label className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <KeyRound className="w-4 h-4 text-primary" />
-                  Bring Your Own Key (BYOK — Google Gemini or OpenRouter)
-                </label>
-                <p className="text-[11px] text-white/50">
-                  Optional. Stored in your private profile preferences and sent
-                  only to <code>/api/chat</code>.
-                </p>
-                <input
-                  type="password"
-                  value={profile.custom_ai_api_key || ""}
-                  onChange={(e) =>
-                    onUpdateProfile({
-                      custom_ai_api_key: e.target.value || null,
-                    })
-                  }
-                  placeholder="AIzaSy... or sk-or-v1-..."
-                  className="w-full rounded-xl border border-white/15 bg-black/60 px-3.5 py-2.5 text-xs text-white placeholder-white/30 focus:border-primary focus:outline-none font-mono"
-                />
               </div>
             </div>
           )}

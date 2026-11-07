@@ -6,9 +6,9 @@ import {
   ThemeName,
   UserProfile,
   WorkspaceConfig,
+  WorkspaceTab,
 } from "@/types/taskit";
 import {
-  Bot,
   Check,
   ChevronDown,
   LogIn,
@@ -17,18 +17,24 @@ import {
   Pencil,
   RefreshCw,
   Settings,
+  Sparkles,
+  Table2,
 } from "lucide-react";
 
 interface TopNavBarProps {
   profile: UserProfile;
   workspaceConfig: WorkspaceConfig;
   isAuthenticated: boolean;
-  isCopilotOpen: boolean;
+  canAccessWorkspace: boolean;
+  activeTab: WorkspaceTab;
+  aiTemporarilyDisabled: boolean;
+  hasGeminiApiKey: boolean;
+  activeTaskCount: number;
   isSyncingCanvas: boolean;
+  onSelectTab: (tab: WorkspaceTab) => void;
   onUpdateProfile: (updates: Partial<UserProfile>) => void;
   onUpdateWorkspaceConfig: (updates: Partial<WorkspaceConfig>) => void;
   onOpenSettings: () => void;
-  onToggleCopilot: () => void;
   onQuickSyncCanvas: () => void;
   onGoogleSignIn: () => void;
   onSignOut: () => void;
@@ -38,12 +44,16 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   profile,
   workspaceConfig,
   isAuthenticated,
-  isCopilotOpen,
+  canAccessWorkspace,
+  activeTab,
+  aiTemporarilyDisabled,
+  hasGeminiApiKey,
+  activeTaskCount,
   isSyncingCanvas,
+  onSelectTab,
   onUpdateProfile,
   onUpdateWorkspaceConfig,
   onOpenSettings,
-  onToggleCopilot,
   onQuickSyncCanvas,
   onGoogleSignIn,
   onSignOut,
@@ -77,11 +87,11 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
   return (
     <header className="sticky top-0 z-30 border-b theme-header-bg backdrop-blur-xl transition-colors duration-300">
-      <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-4">
+      <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
         {/* Left: Editable Brand Identity */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
           <div
-            className="flex h-8 w-8 items-center justify-center rounded-lg font-extrabold text-sm shadow-neon transition-colors"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-extrabold text-sm shadow-neon transition-colors"
             style={{
               backgroundColor: "var(--primary)",
               color: "#09090b",
@@ -89,7 +99,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           >
             {(workspaceConfig.brandName || "T").charAt(0).toUpperCase()}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             {editingBrand ? (
               <input
                 type="text"
@@ -104,7 +114,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                     setEditingBrand(false);
                   }
                 }}
-                className="rounded border border-primary bg-black/60 px-2 py-0.5 text-sm font-bold text-white focus:outline-none w-32"
+                className="rounded border border-primary bg-black/60 px-2 py-0.5 text-sm font-bold text-white focus:outline-none w-28 sm:w-32"
               />
             ) : (
               <button
@@ -113,11 +123,11 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                   setBrandDraft(workspaceConfig.brandName);
                   setEditingBrand(true);
                 }}
-                className="group flex items-center gap-1 text-base font-bold tracking-tight text-white hover:text-highlight transition-colors"
+                className="group flex items-center gap-1 text-base font-bold tracking-tight text-white hover:text-highlight transition-colors truncate"
                 title="Click to edit workspace brand title"
               >
-                <span>{workspaceConfig.brandName}</span>
-                <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />
+                <span className="truncate">{workspaceConfig.brandName}</span>
+                <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity shrink-0" />
               </button>
             )}
 
@@ -144,7 +154,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                   setBadgeDraft(workspaceConfig.brandBadge);
                   setEditingBadge(true);
                 }}
-                className="hidden sm:inline-flex items-center gap-1 rounded border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-mono text-highlight/80 hover:border-primary/50 hover:text-highlight transition-colors"
+                className="hidden md:inline-flex items-center gap-1 rounded border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-mono text-highlight/80 hover:border-primary/50 hover:text-highlight transition-colors shrink-0"
                 title="Click to edit subtitle badge"
               >
                 <span>{workspaceConfig.brandBadge || "Edit badge"}</span>
@@ -153,8 +163,72 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           </div>
         </div>
 
+        {/* Center: Workspace Mode Switcher (Hidden completely when user opts out of AI) */}
+        {canAccessWorkspace && !aiTemporarilyDisabled && (
+          <div
+            role="tablist"
+            aria-label="Workspace View Switcher"
+            className="inline-flex items-center rounded-full border border-white/15 bg-black/45 p-1 backdrop-blur-xl shadow-inner"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "chat"}
+              onClick={() => onSelectTab("chat")}
+              className={`relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
+                activeTab === "chat"
+                  ? "bg-white/15 text-white shadow-sm border border-white/15"
+                  : "text-white/60 hover:text-white border border-transparent"
+              }`}
+            >
+              <Sparkles
+                className={`w-3.5 h-3.5 ${
+                  activeTab === "chat" ? "text-primary" : "text-white/50"
+                }`}
+              />
+              <span>Chat</span>
+              {!hasGeminiApiKey && (
+                <span
+                  className="h-1.5 w-1.5 rounded-full bg-amber-400"
+                  title="Google AI API key required"
+                />
+              )}
+            </button>
+
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "tasks"}
+              onClick={() => onSelectTab("tasks")}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
+                activeTab === "tasks"
+                  ? "bg-white/15 text-white shadow-sm border border-white/15"
+                  : "text-white/60 hover:text-white border border-transparent"
+              }`}
+            >
+              <Table2
+                className={`w-3.5 h-3.5 ${
+                  activeTab === "tasks" ? "text-primary" : "text-white/50"
+                }`}
+              />
+              <span>Tasks</span>
+              {activeTaskCount > 0 && (
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
+                    activeTab === "tasks"
+                      ? "bg-primary/25 text-highlight"
+                      : "bg-white/10 text-white/65"
+                  }`}
+                >
+                  {activeTaskCount}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
+
         {/* Right: Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {/* Theme Switcher */}
           <div className="relative">
             <button
@@ -164,7 +238,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               title="Switch theme"
             >
               <Palette className="w-3.5 h-3.5 text-primary" />
-              <span className="hidden sm:inline font-medium">
+              <span className="hidden xl:inline font-medium">
                 {profile.theme === "custom" ? "Custom Theme" : activeThemeMeta.name}
               </span>
               <div className="flex items-center -space-x-1">
@@ -227,7 +301,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           </div>
 
           {/* Sync Canvas */}
-          {isAuthenticated && (
+          {canAccessWorkspace && (
             <button
               type="button"
               disabled={isSyncingCanvas}
@@ -240,33 +314,17 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                   isSyncingCanvas ? "animate-spin text-primary" : "text-primary/80"
                 }`}
               />
-              <span className="hidden md:inline">Sync Canvas</span>
-            </button>
-          )}
-
-          {/* Copilot Sidebar Toggle */}
-          {isAuthenticated && (
-            <button
-              type="button"
-              onClick={onToggleCopilot}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all ${
-                isCopilotOpen
-                  ? "border-primary bg-primary text-black font-bold shadow-neon"
-                  : "border-white/15 bg-white/5 text-white/85 hover:text-white hover:border-primary/50"
-              }`}
-            >
-              <Bot className="w-3.5 h-3.5" />
-              <span>Copilot</span>
+              <span className="hidden lg:inline">Sync Canvas</span>
             </button>
           )}
 
           {/* Settings */}
-          {isAuthenticated && (
+          {canAccessWorkspace && (
             <button
               type="button"
               onClick={onOpenSettings}
               className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-white/85 hover:text-white hover:border-primary/50 transition-colors"
-              title="Customize Tags, Categories, Themes & Settings"
+              title="Customize Tags, Categories, Themes, AI & Settings"
             >
               <Settings className="w-3.5 h-3.5 text-primary" />
               <span className="hidden lg:inline">Customize</span>
@@ -282,7 +340,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               title="Sign Out"
             >
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              <span className="hidden sm:inline max-w-[120px] truncate">
+              <span className="hidden sm:inline max-w-[110px] truncate">
                 {profile.full_name || profile.email}
               </span>
               <LogOut className="w-3.5 h-3.5 text-white/50" />
