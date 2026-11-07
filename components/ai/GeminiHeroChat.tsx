@@ -16,6 +16,7 @@ import {
 import {
   ArrowUp,
   ArrowUpDown,
+  CalendarClock,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -37,6 +38,8 @@ import {
   Wand2,
   Zap,
 } from "lucide-react";
+import { MyDayStatusBanner } from "@/components/myday/MyDayStatusBanner";
+import { EnrichedMyDayBlock } from "@/utils/myDayUtils";
 
 interface GeminiHeroChatProps {
   tasks: TaskItem[];
@@ -58,6 +61,7 @@ interface GeminiHeroChatProps {
     mutation: AgentWorkspaceMutationPayload
   ) => HeroChatMessage["undoSnapshot"];
   onUndoAgentMessage: (messageId: string) => void;
+  onToggleMyDayBlockComplete?: (block: EnrichedMyDayBlock) => void;
 }
 
 interface MentionCandidate {
@@ -257,6 +261,8 @@ function getActionCategoryIcon(category: AgentExecutedAction["category"]) {
       return <Palette className="w-3.5 h-3.5 text-pink-400 shrink-0" />;
     case "sync":
       return <RefreshCw className="w-3.5 h-3.5 text-cyan-400 shrink-0" />;
+    case "schedule":
+      return <CalendarClock className="w-3.5 h-3.5 text-primary shrink-0" />;
     default:
       return <Settings2 className="w-3.5 h-3.5 text-primary shrink-0" />;
   }
@@ -280,6 +286,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   onQuickSyncCanvas,
   onApplyAgentMutation,
   onUndoAgentMessage,
+  onToggleMyDayBlockComplete,
 }) => {
   const [input, setInput] = useState("");
   const [modelChoice, setModelChoice] = useState<AIModelChoice>("flash");
@@ -389,6 +396,14 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
     const q = mentionQuery.toLowerCase().trim();
 
     const skills: MentionCandidate[] = [
+      {
+        id: "skill-myday",
+        kind: "skill",
+        label: "@My Day Schedule",
+        sublabel: "Show live My Day status bar, current schedule & logistics",
+        insertText:
+          "Show my current MY DAY schedule, live status bar, and full logistics ",
+      },
       {
         id: "skill-briefing",
         kind: "skill",
@@ -637,6 +652,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
         modelUsed: data.modelUsed,
         executedActions: mutation?.executedActions || [],
         undoSnapshot: undoSnap,
+        showMyDayCard: Boolean(mutation?.showMyDayCard),
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -695,7 +711,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
     }
   };
 
-  // Shared Gemini-styled Chat | Tasks Switcher Pill (matches uploaded screenshot)
+  // Shared Gemini-styled Chat | Tasks | MY DAY Switcher Pill
   const ModeSwitcherPill = (
     <div
       role="tablist"
@@ -730,6 +746,24 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
         {activeTaskCount > 0 && (
           <span className="rounded-full bg-white/10 px-1.5 py-0.2 text-[10px] font-semibold text-white/75">
             {activeTaskCount}
+          </span>
+        )}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "my_day"}
+        onClick={() => onSelectTab("my_day")}
+        className={`inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-[13px] font-medium transition-all ${
+          activeTab === "my_day"
+            ? "bg-[#282a2f]/95 border border-white/[0.14] text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
+            : "border border-transparent text-white/60 hover:text-white hover:bg-white/[0.06]"
+        }`}
+      >
+        <span>MY DAY</span>
+        {(workspaceConfig.myDaySchedule?.blocks.length || 0) > 0 && (
+          <span className="rounded-full bg-white/10 px-1.5 py-0.2 text-[10px] font-semibold text-white/75">
+            {workspaceConfig.myDaySchedule?.blocks.length}
           </span>
         )}
       </button>
@@ -942,6 +976,19 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
               >
                 <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Sync Canvas Assignments Now</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlusMenuOpen(false);
+                  sendPrompt(
+                    "Show my current MY DAY schedule, display the live status bar UI, and summarize my schedule logistics."
+                  );
+                }}
+                className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-white/85 hover:bg-white/10 transition-colors"
+              >
+                <CalendarClock className="w-3.5 h-3.5 text-primary" />
+                <span>Show My Day &amp; Live Status Bar</span>
               </button>
               <button
                 type="button"
@@ -1229,14 +1276,14 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           <div className="mt-10 flex flex-wrap items-center justify-center gap-2 max-w-2xl">
             {[
               {
-                label: "Plan my focus queue",
+                label: "Show my day schedule",
                 prompt:
-                  "Look at my current task list and build a clear game plan for what I should tackle first today.",
+                  "Show my current MY DAY schedule, display the live status bar UI, and pull my schedule logistics.",
               },
               {
-                label: "Add tasks for tonight",
+                label: "Auto-arrange my day",
                 prompt:
-                  "Add 2 high-focus tasks under TODAY for tonight and set smart time estimates.",
+                  "Auto-arrange all my active tasks into my MY DAY schedule for the next 4 hours starting right now.",
               },
               {
                 label: "Organize & clean up board",
@@ -1281,6 +1328,14 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onSelectTab("my_day")}
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 px-3 py-1 text-xs text-white/75 hover:text-white transition-colors"
+          >
+            <CalendarClock className="w-3.5 h-3.5 text-primary" />
+            <span>MY DAY</span>
+          </button>
           <button
             type="button"
             onClick={() => onSelectTab("tasks")}
@@ -1336,14 +1391,27 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => onSelectTab("tasks")}
-                          className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/80 hover:text-white transition-colors"
-                        >
-                          <Table2 className="w-3 h-3 text-primary" />
-                          <span>View in Tasks</span>
-                        </button>
+                        {m.executedActions.some(
+                          (a) => a.category === "schedule"
+                        ) ? (
+                          <button
+                            type="button"
+                            onClick={() => onSelectTab("my_day")}
+                            className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/80 hover:text-white transition-colors"
+                          >
+                            <CalendarClock className="w-3 h-3 text-primary" />
+                            <span>View in MY DAY</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onSelectTab("tasks")}
+                            className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/80 hover:text-white transition-colors"
+                          >
+                            <Table2 className="w-3 h-3 text-primary" />
+                            <span>View in Tasks</span>
+                          </button>
+                        )}
 
                         {m.undoSnapshot && (
                           <button
@@ -1386,6 +1454,18 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                       ))}
                     </div>
                   </div>
+                )}
+
+                {/* Embedded Live MY DAY Status Bar & Schedule Card */}
+                {m.showMyDayCard && (
+                  <MyDayStatusBanner
+                    schedule={workspaceConfig.myDaySchedule}
+                    tasks={tasks}
+                    workspaceConfig={workspaceConfig}
+                    variant="chat"
+                    onOpenMyDay={() => onSelectTab("my_day")}
+                    onToggleBlockComplete={onToggleMyDayBlockComplete}
+                  />
                 )}
 
                 {/* Agent Markdown Reply */}

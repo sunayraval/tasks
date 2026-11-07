@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { generateText, tool, CoreMessage } from "ai";
+import { generateObject, generateText, tool, CoreMessage } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 import {
@@ -10,6 +10,8 @@ import {
   BADGE_COLOR_KEYS,
   BadgeColorKey,
   DEFAULT_WORKSPACE_CONFIG,
+  MyDayBlock,
+  MyDaySchedule,
   TaskItem,
   THEME_OPTIONS,
   ThemeName,
@@ -19,6 +21,22 @@ import {
   WorkspaceConfig,
   WorkspaceTab,
 } from "@/types/taskit";
+import {
+  addMinutesToTime,
+  cascadeFromBlockIndex,
+  computeDurationMinutes,
+  computeMyDayLiveTelemetry,
+  formatDurationCompact,
+  formatTime12h,
+  makeBlockId,
+  minutesToTimeString,
+  normalizeTimeString,
+  parseTimeToMinutes,
+  recommendTaskMinutes,
+  shiftScheduleBlocks,
+  smartHeuristicArrange,
+  swapScheduleBlocks,
+} from "@/utils/myDayUtils";
 
 export const maxDuration = 30;
 export const dynamic = "force-dynamic";
@@ -237,6 +255,219 @@ export async function POST(request: Request) {
     }
 
     // -------------------------------------------------------------------------
+    // MODE 1.5: AI Auto-Arrange MY DAY Schedule
+    // -------------------------------------------------------------------------
+    if (mode === "auto_arrange_day") {
+      const selectedTasks: TaskItem[] = (
+        Array.isArray(body.tasks) ? (body.tasks as TaskItem[]) : []
+      ).filter((t) => !isHeaderRow(t));
+      const startTime = normalizeTimeString(body.startTime, "09:00");
+      const endTime = normalizeTimeString(body.endTime, "17:00");
+      const includeBreaks = Boolean(body.includeBreaks);
+      const windowMins = computeDurationMinutes(startTime, endTime);
+
+      if (selectedTasks.length === 0) {
+        return NextResponse.json({
+          blocks: [],
+          summary: "No tasks were provided to arrange.",
+        });
+      }
+
+      if (!customApiKey || customApiKey.length < 20) {
+        const fallback = smartHeuristicArrange({
+          tasks: selectedTasks,
+          startTime,
+          endTime,
+          includeBreaks,
+        });
+        return NextResponse.json(fallback);
+      }
+
+      const google = createGoogleGenerativeAI({ apiKey: customApiKey });
+      const arrangeCandidates = [
+        "gemini-3.8-flash",
+        "gemini-1.5-flash",
+        "gemini-2.5-flash",
+      ];
+
+      const taskLines = selectedTasks
+        .map((t, i) => {
+          const rec = recommendTaskMinutes(t);
+          return `${i + 1}. ID="${t.id}" | Title="${t.title}" | Priority="${
+            t.priority
+          }" | Category="${t.type}" | RecommendedMinutes=${rec}${
+            t.due_date ? ` | Due=${t.due_date.slice(0, 10)}` : ""
+          }`;
+        })
+        .join("\n");
+
+      const arrangeSchema = z.object({
+        summary: z
+          .string()
+          .describe(
+            "Concise 1-2 sentence explanation of how tasks were ordered and fitted into the schedule window"
+          ),
+        blocks: z.array(
+          z.object({
+            taskId: z
+              .string()
+              .nullable()
+              .describe(
+                "Exact ID of the task from the list, or null ONLY if this is a short recharge break"
+              ),
+            title: z.string(),
+            startTime: z
+              .string()
+              .describe("24-hour HH:mm format, e.g. 09:00 or 14:30"),
+            endTime: z
+              .string()
+              .describe("24-hour HH:mm format, e.g. 09:45 or 15:15"),
+            notes: z.string().optional(),
+            isBreak: z.boolean().optional(),
+          })
+        ),
+      });
+
+      const arrangePrompt = `Arrange ALL ${
+        selectedTasks.length
+      } tasks below into an optimal, non-overlapping daily schedule starting at ${startTime} (${formatTime12h(
+        startTime
+      )}) with planned end time ${endTime} (${formatTime12h(
+        endTime
+      )}, total window = ${windowMins} minutes).
+
+RULES:
+1. Include EVERY task from the list below exactly once, using its exact taskId.
+2. Base each task's slot length on its RecommendedMinutes. If total task durations exceed ${windowMins} minutes, scale durations proportionally (minimum 15m per task) so the schedule fits cleanly and sequentially starting at ${startTime}.
+3. Front-load Urgent/High-priority tasks and imminent deadlines during peak focus, and alternate heavy cognitive tasks sensibly.
+4. ${
+        includeBreaks
+          ? "Insert short 10-minute recharge breaks (taskId: null, isBreak: true) after ~80-95 minutes of continuous deep work ONLY if window time permits."
+          : "Do NOT insert break blocks; schedule tasks back-to-back."
+      }
+5. Use strict 24-hour HH:mm strings for startTime and endTime in chronological order without overlaps.
+
+TASKS TO SCHEDULE:
+${taskLines}`;
+
+      for (const candidateModel of arrangeCandidates) {
+        try {
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error(`Timeout on ${candidateModel}`)),
+              7000
+            )
+          );
+
+          const res = await Promise.race([
+            generateObject({
+              model: google(candidateModel),
+              schema: arrangeSchema,
+              prompt: arrangePrompt,
+            }),
+            timeoutPromise,
+          ]);
+
+          const taskById = new Map(selectedTasks.map((t) => [t.id, t]));
+          const seenTaskIds = new Set<string>();
+          const normalizedBlocks: MyDayBlock[] = [];
+
+          for (const raw of res.object.blocks) {
+            const matchedTask = raw.taskId
+              ? taskById.get(raw.taskId) ||
+                selectedTasks.find(
+                  (t) =>
+                    !seenTaskIds.has(t.id) &&
+                    t.title.toLowerCase() === raw.title.trim().toLowerCase()
+                )
+              : undefined;
+
+            if (matchedTask) {
+              seenTaskIds.add(matchedTask.id);
+            }
+
+            const sTime = normalizeTimeString(raw.startTime, startTime);
+            const eTime = normalizeTimeString(
+              raw.endTime,
+              addMinutesToTime(
+                sTime,
+                matchedTask ? recommendTaskMinutes(matchedTask) : 15
+              )
+            );
+            const dur = computeDurationMinutes(sTime, eTime);
+
+            normalizedBlocks.push({
+              id: makeBlockId(),
+              taskId: matchedTask ? matchedTask.id : null,
+              title: matchedTask ? matchedTask.title : raw.title,
+              startTime: sTime,
+              endTime: eTime,
+              durationMinutes: dur,
+              category: matchedTask
+                ? matchedTask.type
+                : raw.isBreak
+                ? "Break"
+                : "Focus",
+              priority: matchedTask ? matchedTask.priority : "Low",
+              notes: raw.notes || matchedTask?.notes || "",
+              completed: matchedTask ? isDoneStatus(matchedTask.status) : false,
+              isBreak: Boolean(raw.isBreak && !matchedTask),
+            });
+          }
+
+          // Guarantee no selected task was accidentally omitted by the LLM
+          let appendCursor =
+            normalizedBlocks.length > 0
+              ? normalizedBlocks[normalizedBlocks.length - 1].endTime
+              : startTime;
+
+          for (const t of selectedTasks) {
+            if (!seenTaskIds.has(t.id)) {
+              const rec = recommendTaskMinutes(t);
+              const nextEnd = addMinutesToTime(appendCursor, rec);
+              normalizedBlocks.push({
+                id: makeBlockId(),
+                taskId: t.id,
+                title: t.title,
+                startTime: appendCursor,
+                endTime: nextEnd,
+                durationMinutes: rec,
+                category: t.type,
+                priority: t.priority,
+                notes: t.notes || "",
+                completed: isDoneStatus(t.status),
+                isBreak: false,
+              });
+              appendCursor = nextEnd;
+            }
+          }
+
+          return NextResponse.json({
+            blocks: normalizedBlocks,
+            summary: res.object.summary,
+            modelUsed: candidateModel,
+          });
+        } catch (err) {
+          const info = extractCleanErrorMessage(err);
+          if (info.isKeyError) {
+            return NextResponse.json(
+              { error: "INVALID_API_KEY", message: info.message },
+              { status: 401 }
+            );
+          }
+        }
+      }
+
+      const fallback = smartHeuristicArrange({
+        tasks: selectedTasks,
+        startTime,
+        endTime,
+        includeBreaks,
+      });
+      return NextResponse.json(fallback);
+    }
+
+    // -------------------------------------------------------------------------
     // MODE 2: Full Workspace Agent Chat
     // -------------------------------------------------------------------------
     if (!customApiKey || customApiKey.length < 20) {
@@ -295,6 +526,18 @@ export async function POST(request: Request) {
         day: "numeric",
       });
 
+    const localClockRef = new Date(clientNowMs - tzOffsetMinutes * 60 * 1000);
+    const clientLocalMinutesOfDay =
+      localClockRef.getUTCHours() * 60 +
+      localClockRef.getUTCMinutes() +
+      localClockRef.getUTCSeconds() / 60;
+    const clientLocalTimeHHMM = minutesToTimeString(
+      Math.floor(clientLocalMinutesOfDay)
+    );
+    const clientLocalDateYMD = `${localClockRef.getUTCFullYear()}-${String(
+      localClockRef.getUTCMonth() + 1
+    ).padStart(2, "0")}-${String(localClockRef.getUTCDate()).padStart(2, "0")}`;
+
     // Mutable working copies across multi-step tool calls in this turn
     let workingTasks: TaskItem[] = incomingTasks
       .map((t) => ({
@@ -312,6 +555,12 @@ export async function POST(request: Request) {
       types: [...incomingConfig.types],
       priorities: [...incomingConfig.priorities],
       tags: [...incomingConfig.tags],
+      myDaySchedule: incomingConfig.myDaySchedule
+        ? {
+            ...incomingConfig.myDaySchedule,
+            blocks: incomingConfig.myDaySchedule.blocks.map((b) => ({ ...b })),
+          }
+        : null,
     };
 
     const addedTasksMap = new Map<string, TaskItem>();
@@ -324,6 +573,7 @@ export async function POST(request: Request) {
     const executedActions: AgentExecutedAction[] = [];
     let triggerCanvasSync = false;
     let switchTab: WorkspaceTab | null = null;
+    let showMyDayCard = false;
 
     const recordAction = (
       category: AgentExecutedAction["category"],
@@ -462,21 +712,45 @@ export async function POST(request: Request) {
       })
       .join("\n");
 
+    const initialTelemetry = computeMyDayLiveTelemetry(
+      workingConfig.myDaySchedule,
+      workingTasks,
+      clientLocalMinutesOfDay
+    );
+
+    const serializedMyDay = initialTelemetry.hasSchedule
+      ? initialTelemetry.enrichedBlocks
+          .map(
+            (b, i) =>
+              `[SLOT ${i + 1}] ID="${b.id}" ${formatTime12h(
+                b.startTime
+              )}–${formatTime12h(b.endTime)} (${b.durationMinutes}m) "${
+                b.title
+              }" • State=${b.timeState.toUpperCase()} • Done=${b.isCompleted}`
+          )
+          .join("\n")
+      : "(No MY DAY schedule built yet)";
+
     const systemPrompt = `You are the Gemini Workspace Agent for "${workingConfig.brandName}" (${workingConfig.workspaceTitle}).
 ${TONE_PROMPTS[tone]}
 
-CURRENT USER LOCAL DATE: ${clientLocalDateReadable} (ISO: ${clientISO})
+CURRENT USER LOCAL DATE & TIME: ${clientLocalDateReadable}, ${formatTime12h(
+      clientLocalTimeHHMM
+    )} (24h: ${clientLocalTimeHHMM}, ISO: ${clientISO})
 
 CONVERSATIONAL FAST PATH:
-- For simple greetings, small talk, acknowledgments, or questions that don't ask to change the workspace (e.g. "yo", "hi", "hey", "hello", "how are you?", "what can you do?"), respond directly and naturally in text. DO NOT invoke any tools for simple conversational messages.
+- For simple greetings, small talk, acknowledgments, or questions that don't ask to change or inspect the workspace/schedule (e.g. "yo", "hi", "hey", "hello", "how are you?", "what can you do?"), respond directly and naturally in text. DO NOT invoke any tools for simple conversational messages.
 
 YOUR CAPABILITIES:
 You have direct, live read/write control over the user's entire workspace via your tools:
 1. Tasks: Add single or batch tasks, edit titles/statuses/priorities/categories/due dates/time estimates/tags/notes, write rich HTML study guides or checklists into a task's document ("content"), mark tasks Done or reopen them, delete tasks, and move/reorder/sort tasks anywhere in the table.
-2. Section Headers: Create, rename, move, or remove movable divider headers (like TODAY, TOMORROW, COLLEGE, SOON, REMEMBER, or custom sections).
-3. Themes & Atmosphere: Switch between preset themes (${THEME_OPTIONS.map((t) => `${t.id} ("${t.name}")`).join(", ")}) OR design bespoke custom 5-color hex palettes, switch ambient backgrounds (rain, cyber, lofi, particles), and adjust dim/blur.
-4. Workspace Settings & Customization: Update workspace title/subtitle/brand, toggle "Show completed tasks", change task document view mode (slide_drawer, center_modal, inline), change AI coaching tone, rename table columns, or create custom color-coded tags/categories/statuses/priorities.
-5. Integrations & Navigation: Trigger a live Canvas LMS sync or switch the user's active view to the Tasks table.
+2. MY DAY Schedule & Live Status Bar:
+   - Use \`show_my_day_schedule\` whenever the user asks to see their current schedule, asks what their day/plan looks like, asks what they should be working on right now, asks how much of their task or day is done, or asks for schedule logistics. Calling \`show_my_day_schedule\` renders the live MY DAY status bar UI & plan directly inside the chat AND gives you exact down-to-the-minute logistics to summarize!
+   - Use \`manage_my_day_schedule\` whenever the user asks to build, auto-arrange, add to, swap, reorder, shift, edit, or clear their MY DAY schedule (which also displays the live MY DAY status bar UI in chat).
+3. Section Headers: Create, rename, move, or remove movable divider headers (like TODAY, TOMORROW, COLLEGE, SOON, REMEMBER, or custom sections).
+4. Themes & Atmosphere: Switch between preset themes (${THEME_OPTIONS.map((t) => `${t.id} ("${t.name}")`).join(", ")}) OR design bespoke custom 5-color hex palettes, switch ambient backgrounds (rain, cyber, lofi, particles), and adjust dim/blur.
+5. Workspace Settings & Customization: Update workspace title/subtitle/brand, toggle "Show completed tasks", change task document view mode (slide_drawer, center_modal, inline), change AI coaching tone, rename table columns, or create custom color-coded tags/categories/statuses/priorities.
+6. Integrations & Navigation: Trigger a live Canvas LMS sync or switch the user's active view between Chat, Tasks, and MY DAY.
 
 GUIDELINES FOR THOUGHTFUL EXECUTION:
 - Execute user requests directly using the appropriate tools—do NOT ask for permission first unless a request is genuinely ambiguous. You can chain multiple tools in one turn!
@@ -492,6 +766,13 @@ CURRENT WORKSPACE CONFIGURATION:
 - Categories: ${workingConfig.types.map((t) => t.label).join(", ")}
 - Priorities: ${workingConfig.priorities.map((p) => p.label).join(", ")}
 - Tags: ${workingConfig.tags.map((t) => t.label).join(", ")}
+
+CURRENT MY DAY SCHEDULE (${
+      initialTelemetry.hasSchedule
+        ? `${Math.round(initialTelemetry.dayScheduleProgressPct)}% day elapsed • ${initialTelemetry.completedTaskBlocks}/${initialTelemetry.totalTaskBlocks} tasks done`
+        : "Empty"
+    }):
+${serializedMyDay}
 
 CURRENT BOARD (${workingTasks.length} rows in exact top-to-bottom table order):
 ${serializedBoard || "(No tasks currently on the board)"}`;
@@ -1361,18 +1642,503 @@ ${serializedBoard || "(No tasks currently on the board)"}`;
         },
       }),
 
+      show_my_day_schedule: tool({
+        description:
+          "Show the user's current MY DAY schedule and render the interactive MY DAY live status bar UI (current task progress bar + overall day schedule progress bar + full plan) directly inside the chat, while returning exact live schedule logistics.",
+        parameters: z.object({
+          include_unscheduled_summary: z
+            .boolean()
+            .optional()
+            .describe("Whether to also list unscheduled active tasks from the board"),
+        }),
+        execute: async ({ include_unscheduled_summary }) => {
+          showMyDayCard = true;
+          const live = computeMyDayLiveTelemetry(
+            workingConfig.myDaySchedule,
+            workingTasks,
+            clientLocalMinutesOfDay
+          );
+
+          const scheduledIds = new Set(
+            (workingConfig.myDaySchedule?.blocks || [])
+              .map((b) => b.taskId)
+              .filter(Boolean) as string[]
+          );
+          const unscheduledActive = include_unscheduled_summary
+            ? workingTasks
+                .filter(
+                  (t) =>
+                    !isHeaderRow(t) &&
+                    !isDoneStatus(t.status) &&
+                    !scheduledIds.has(t.id)
+                )
+                .map((t) => ({
+                  title: t.title,
+                  priority: t.priority,
+                  estimated_minutes: recommendTaskMinutes(t),
+                }))
+            : undefined;
+
+          return {
+            renderedStatusCardInChat: true,
+            currentLocalTime: formatTime12h(clientLocalTimeHHMM),
+            hasSchedule: live.hasSchedule,
+            phase: live.phase,
+            plannedWindow: live.hasSchedule
+              ? `${formatTime12h(live.dayStartTime)} – ${formatTime12h(
+                  live.dayEndTime
+                )}`
+              : null,
+            currentTaskStatus: live.currentBlock
+              ? {
+                  title: live.currentBlock.title,
+                  timeframe: `${formatTime12h(
+                    live.currentBlock.startTime
+                  )} – ${formatTime12h(live.currentBlock.endTime)}`,
+                  progressPercent: Math.round(live.currentTaskProgressPct),
+                  elapsedMinutes: live.currentTaskElapsedMinutes,
+                  remainingMinutes: live.currentTaskRemainingMinutes,
+                  isCompleted: live.currentBlock.isCompleted,
+                }
+              : null,
+            nextUpcomingBlock: live.nextBlock
+              ? {
+                  title: live.nextBlock.title,
+                  startsAt: formatTime12h(live.nextBlock.startTime),
+                  startsInMinutes: live.minutesUntilNextBlock,
+                }
+              : null,
+            dayLogistics: {
+              dayScheduleElapsedPercent: Math.round(live.dayScheduleProgressPct),
+              taskCompletionPercent: live.dayTaskCompletionPct,
+              completedTasks: live.completedTaskBlocks,
+              totalScheduledTasks: live.totalTaskBlocks,
+              remainingTasks: live.remainingTaskBlocks,
+              totalScheduledTime: formatDurationCompact(
+                live.totalScheduledMinutes
+              ),
+              elapsedScheduledTime: formatDurationCompact(
+                live.elapsedScheduledMinutes
+              ),
+              remainingScheduledTime: formatDurationCompact(
+                live.remainingScheduledMinutes
+              ),
+              freeBufferMinutes: live.freeBufferMinutes,
+              overdueUncheckedSlots: live.overdueBlocks.map(
+                (b) =>
+                  `${b.title} (${formatTime12h(b.startTime)}–${formatTime12h(
+                    b.endTime
+                  )})`
+              ),
+            },
+            schedulePlan: live.enrichedBlocks.map((b, i) => ({
+              order: i + 1,
+              title: b.title,
+              timeframe: `${formatTime12h(b.startTime)} – ${formatTime12h(
+                b.endTime
+              )}`,
+              durationMinutes: b.durationMinutes,
+              state: b.timeState,
+              completed: b.isCompleted,
+              isBreak: Boolean(b.isBreak),
+            })),
+            unscheduledActiveTasks: unscheduledActive,
+          };
+        },
+      }),
+
+      manage_my_day_schedule: tool({
+        description:
+          "Build, auto-arrange, add to, edit, swap, shift, or clear the user's MY DAY schedule, and display the updated live MY DAY status bar UI in chat.",
+        parameters: z.object({
+          action: z.enum([
+            "auto_arrange",
+            "set_blocks",
+            "add_block",
+            "update_block",
+            "swap_blocks",
+            "shift_schedule",
+            "remove_block",
+            "clear_schedule",
+          ]),
+          day_start_time: z
+            .string()
+            .optional()
+            .describe("Start time for auto_arrange or schedule window (e.g. '09:00' or '2:00 PM')"),
+          day_end_time: z
+            .string()
+            .optional()
+            .describe("Planned end time for auto_arrange (e.g. '17:00' or '6:00 PM')"),
+          include_all_active: z
+            .boolean()
+            .optional()
+            .describe("For auto_arrange: set true to schedule all active board tasks"),
+          task_queries: z
+            .array(z.string())
+            .optional()
+            .describe("For auto_arrange: specific task IDs or titles to include"),
+          include_breaks: z.boolean().optional(),
+          blocks: z
+            .array(
+              z.object({
+                task_id_or_title: z.string(),
+                start_time: z.string(),
+                end_time: z.string(),
+                notes: z.string().optional(),
+                is_break: z.boolean().optional(),
+              })
+            )
+            .optional()
+            .describe("For set_blocks: explicit ordered schedule blocks"),
+          block_query: z
+            .string()
+            .optional()
+            .describe("For add_block, update_block, remove_block, or swap_blocks (first block)"),
+          second_block_query: z
+            .string()
+            .optional()
+            .describe("For swap_blocks: ID or title of second block to swap with"),
+          start_time: z.string().optional(),
+          end_time: z.string().optional(),
+          notes: z.string().optional(),
+          is_break: z.boolean().optional(),
+          shift_minutes: z
+            .number()
+            .optional()
+            .describe("For shift_schedule: minutes to shift (+30 pushes later, -15 earlier)"),
+          align_to_now: z
+            .boolean()
+            .optional()
+            .describe("For shift_schedule: shift schedule so first block starts right now"),
+        }),
+        execute: async (args) => {
+          showMyDayCard = true;
+          const existing: MyDaySchedule = workingConfig.myDaySchedule || {
+            date: clientLocalDateYMD,
+            dayStartTime: clientLocalTimeHHMM,
+            dayEndTime: addMinutesToTime(clientLocalTimeHHMM, 240),
+            blocks: [],
+            autoCascadeTimes: true,
+            aiSummary: null,
+            updatedAt: new Date().toISOString(),
+          };
+
+          const findScheduleBlockIdx = (q: string | undefined): number => {
+            if (!q) return -1;
+            const clean = q.trim().toLowerCase();
+            return existing.blocks.findIndex(
+              (b) =>
+                b.id === q.trim() ||
+                b.taskId === q.trim() ||
+                b.title.toLowerCase() === clean ||
+                b.title.toLowerCase().includes(clean)
+            );
+          };
+
+          if (args.action === "clear_schedule") {
+            workingConfig.myDaySchedule = {
+              ...existing,
+              blocks: [],
+              aiSummary: null,
+              updatedAt: new Date().toISOString(),
+            };
+            configTouched = true;
+            recordAction("schedule", "Cleared MY DAY schedule");
+            return { success: true, count: 0 };
+          }
+
+          if (args.action === "auto_arrange") {
+            const sTime = normalizeTimeString(
+              args.day_start_time,
+              clientLocalTimeHHMM
+            );
+            const eTime = normalizeTimeString(
+              args.day_end_time,
+              addMinutesToTime(sTime, 240)
+            );
+
+            let pool: TaskItem[] = [];
+            if (args.task_queries && args.task_queries.length > 0 && !args.include_all_active) {
+              const seen = new Set<string>();
+              for (const q of args.task_queries) {
+                const found = findItem(q, { tasksOnly: true });
+                if (found && !seen.has(found.id)) {
+                  seen.add(found.id);
+                  pool.push(found);
+                }
+              }
+            }
+            if (pool.length === 0) {
+              pool = workingTasks.filter(
+                (t) => !isHeaderRow(t) && !isDoneStatus(t.status)
+              );
+            }
+
+            const arranged = smartHeuristicArrange({
+              tasks: pool,
+              startTime: sTime,
+              endTime: eTime,
+              includeBreaks: args.include_breaks ?? true,
+            });
+
+            workingConfig.myDaySchedule = {
+              date: clientLocalDateYMD,
+              dayStartTime: sTime,
+              dayEndTime: eTime,
+              blocks: arranged.blocks,
+              autoCascadeTimes: true,
+              aiSummary: arranged.summary,
+              updatedAt: new Date().toISOString(),
+            };
+            configTouched = true;
+            recordAction(
+              "schedule",
+              `Built MY DAY schedule (${arranged.blocks.length} slots, ${formatTime12h(
+                sTime
+              )} – ${formatTime12h(eTime)})`,
+              arranged.summary
+            );
+            return {
+              success: true,
+              scheduledCount: arranged.blocks.length,
+              summary: arranged.summary,
+            };
+          }
+
+          if (args.action === "set_blocks" && Array.isArray(args.blocks)) {
+            const built: MyDayBlock[] = args.blocks.map((raw) => {
+              const task = !raw.is_break
+                ? findItem(raw.task_id_or_title, { tasksOnly: true })
+                : undefined;
+              const s = normalizeTimeString(raw.start_time, clientLocalTimeHHMM);
+              const e = normalizeTimeString(
+                raw.end_time,
+                addMinutesToTime(s, task ? recommendTaskMinutes(task) : 30)
+              );
+              return {
+                id: makeBlockId(),
+                taskId: task ? task.id : null,
+                title: task ? task.title : raw.task_id_or_title,
+                startTime: s,
+                endTime: e,
+                durationMinutes: computeDurationMinutes(s, e),
+                category: task ? task.type : raw.is_break ? "Break" : "Focus",
+                priority: task ? task.priority : "Medium",
+                notes: raw.notes || task?.notes || "",
+                completed: task ? isDoneStatus(task.status) : false,
+                isBreak: Boolean(raw.is_break),
+              };
+            });
+
+            workingConfig.myDaySchedule = {
+              date: clientLocalDateYMD,
+              dayStartTime: built[0]?.startTime || existing.dayStartTime,
+              dayEndTime:
+                built[built.length - 1]?.endTime || existing.dayEndTime,
+              blocks: built,
+              autoCascadeTimes: true,
+              aiSummary: "Custom schedule arranged by Gemini Agent.",
+              updatedAt: new Date().toISOString(),
+            };
+            configTouched = true;
+            recordAction(
+              "schedule",
+              `Arranged ${built.length} blocks in MY DAY schedule`
+            );
+            return { success: true, scheduledCount: built.length };
+          }
+
+          if (args.action === "add_block") {
+            const q = args.block_query || "Focus Block";
+            const matched = !args.is_break
+              ? findItem(q, { tasksOnly: true })
+              : undefined;
+            const defaultStart =
+              existing.blocks.length > 0
+                ? existing.blocks[existing.blocks.length - 1].endTime
+                : clientLocalTimeHHMM;
+            const s = normalizeTimeString(args.start_time, defaultStart);
+            const recDur = matched ? recommendTaskMinutes(matched) : 30;
+            const e = normalizeTimeString(
+              args.end_time,
+              addMinutesToTime(s, recDur)
+            );
+            const newBlock: MyDayBlock = {
+              id: makeBlockId(),
+              taskId: matched ? matched.id : null,
+              title: matched ? matched.title : q,
+              startTime: s,
+              endTime: e,
+              durationMinutes: computeDurationMinutes(s, e),
+              category: matched
+                ? matched.type
+                : args.is_break
+                ? "Break"
+                : "Focus",
+              priority: matched ? matched.priority : "Medium",
+              notes: args.notes || matched?.notes || "",
+              completed: matched ? isDoneStatus(matched.status) : false,
+              isBreak: Boolean(args.is_break),
+            };
+            const nextBlocks = [...existing.blocks, newBlock];
+            workingConfig.myDaySchedule = {
+              ...existing,
+              dayStartTime: nextBlocks[0].startTime,
+              dayEndTime: nextBlocks[nextBlocks.length - 1].endTime,
+              blocks: nextBlocks,
+              updatedAt: new Date().toISOString(),
+            };
+            configTouched = true;
+            recordAction(
+              "schedule",
+              `Scheduled "${newBlock.title}" (${formatTime12h(s)} – ${formatTime12h(
+                e
+              )})`
+            );
+            return { success: true, added: newBlock.title };
+          }
+
+          if (args.action === "update_block") {
+            const idx = findScheduleBlockIdx(args.block_query);
+            if (idx === -1) {
+              return {
+                success: false,
+                error: "Could not find matching block in MY DAY schedule.",
+              };
+            }
+            const target = existing.blocks[idx];
+            const s = args.start_time
+              ? normalizeTimeString(args.start_time, target.startTime)
+              : target.startTime;
+            const e = args.end_time
+              ? normalizeTimeString(args.end_time, target.endTime)
+              : args.start_time
+              ? addMinutesToTime(s, target.durationMinutes)
+              : target.endTime;
+
+            let nextBlocks = existing.blocks.map((b, i) =>
+              i === idx
+                ? {
+                    ...b,
+                    startTime: s,
+                    endTime: e,
+                    durationMinutes: computeDurationMinutes(s, e),
+                    notes: args.notes !== undefined ? args.notes : b.notes,
+                  }
+                : b
+            );
+            if (existing.autoCascadeTimes ?? true) {
+              nextBlocks = cascadeFromBlockIndex(nextBlocks, idx);
+            }
+            workingConfig.myDaySchedule = {
+              ...existing,
+              dayStartTime: nextBlocks[0].startTime,
+              dayEndTime: nextBlocks[nextBlocks.length - 1].endTime,
+              blocks: nextBlocks,
+              updatedAt: new Date().toISOString(),
+            };
+            configTouched = true;
+            recordAction(
+              "schedule",
+              `Updated "${target.title}" to ${formatTime12h(s)} – ${formatTime12h(
+                e
+              )}`
+            );
+            return { success: true };
+          }
+
+          if (args.action === "swap_blocks") {
+            const idxA = findScheduleBlockIdx(args.block_query);
+            const idxB = findScheduleBlockIdx(args.second_block_query);
+            if (idxA === -1 || idxB === -1) {
+              return {
+                success: false,
+                error: "Could not find both blocks to swap in MY DAY.",
+              };
+            }
+            const swapped = swapScheduleBlocks(
+              existing.blocks,
+              idxA,
+              idxB,
+              existing.autoCascadeTimes ?? true
+            );
+            workingConfig.myDaySchedule = {
+              ...existing,
+              blocks: swapped,
+              updatedAt: new Date().toISOString(),
+            };
+            configTouched = true;
+            recordAction(
+              "schedule",
+              `Swapped "${existing.blocks[idxA].title}" and "${existing.blocks[idxB].title}" in MY DAY`
+            );
+            return { success: true };
+          }
+
+          if (args.action === "shift_schedule") {
+            if (existing.blocks.length === 0) {
+              return { success: false, error: "Schedule is currently empty." };
+            }
+            const delta = args.align_to_now
+              ? Math.round(clientLocalMinutesOfDay) -
+                parseTimeToMinutes(existing.blocks[0].startTime)
+              : args.shift_minutes || 0;
+            const shifted = shiftScheduleBlocks(existing.blocks, delta);
+            workingConfig.myDaySchedule = {
+              ...existing,
+              dayStartTime: shifted[0].startTime,
+              dayEndTime: shifted[shifted.length - 1].endTime,
+              blocks: shifted,
+              updatedAt: new Date().toISOString(),
+            };
+            configTouched = true;
+            recordAction(
+              "schedule",
+              args.align_to_now
+                ? "Aligned MY DAY schedule start to current time"
+                : `Shifted MY DAY schedule by ${delta > 0 ? `+${delta}m` : `${delta}m`}`
+            );
+            return { success: true };
+          }
+
+          if (args.action === "remove_block") {
+            const idx = findScheduleBlockIdx(args.block_query);
+            if (idx === -1) {
+              return { success: false, error: "Block not found in schedule." };
+            }
+            const removed = existing.blocks[idx];
+            const nextBlocks = existing.blocks.filter((_, i) => i !== idx);
+            workingConfig.myDaySchedule = {
+              ...existing,
+              blocks: nextBlocks,
+              updatedAt: new Date().toISOString(),
+            };
+            configTouched = true;
+            recordAction(
+              "schedule",
+              `Removed "${removed.title}" from MY DAY schedule`
+            );
+            return { success: true };
+          }
+
+          return { success: false };
+        },
+      }),
+
       workspace_utilities: tool({
         description:
-          "Trigger live Canvas LMS assignment sync or switch the user's active tab to the Tasks table.",
+          "Trigger live Canvas LMS assignment sync or switch the user's active tab between Chat, Tasks table, and MY DAY.",
         parameters: z.object({
           sync_canvas: z
             .boolean()
             .optional()
             .describe("Set true when user asks to sync or refresh Canvas assignments"),
           switch_to_tab: z
-            .enum(["chat", "tasks"])
+            .enum(["chat", "tasks", "my_day"])
             .optional()
-            .describe("Set to 'tasks' only when the user explicitly asks to switch to or open the Tasks table tab"),
+            .describe(
+              "Set to 'tasks' or 'my_day' only when the user explicitly asks to switch to or open that tab"
+            ),
         }),
         execute: async ({ sync_canvas, switch_to_tab }) => {
           if (sync_canvas) {
@@ -1500,6 +2266,7 @@ ${serializedBoard || "(No tasks currently on the board)"}`;
       workspaceConfigUpdates: configTouched ? workingConfig : null,
       triggerCanvasSync,
       switchTab,
+      showMyDayCard,
     };
 
     return NextResponse.json({
@@ -1523,5 +2290,8 @@ function workspaceConfigUpdatesAssign(
 ) {
   if (working.geminiApiKey === undefined && incoming.geminiApiKey) {
     working.geminiApiKey = incoming.geminiApiKey;
+  }
+  if (working.myDaySchedule === undefined && incoming.myDaySchedule) {
+    working.myDaySchedule = incoming.myDaySchedule;
   }
 }

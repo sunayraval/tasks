@@ -71,6 +71,30 @@ export interface ThemeColors {
   highlight: string;
 }
 
+export interface MyDayBlock {
+  id: string;
+  taskId: string | null;
+  title: string;
+  startTime: string; // "HH:mm" (24h format, e.g. "09:00", "14:30")
+  endTime: string; // "HH:mm" (24h format)
+  durationMinutes: number;
+  category?: string;
+  priority?: string;
+  notes?: string;
+  completed?: boolean;
+  isBreak?: boolean;
+}
+
+export interface MyDaySchedule {
+  date: string; // YYYY-MM-DD
+  dayStartTime: string; // "HH:mm"
+  dayEndTime: string; // "HH:mm"
+  blocks: MyDayBlock[];
+  autoCascadeTimes?: boolean;
+  aiSummary?: string | null;
+  updatedAt: string;
+}
+
 export interface WorkspaceConfig {
   workspaceTitle: string;
   workspaceSubtitle: string;
@@ -85,9 +109,10 @@ export interface WorkspaceConfig {
   priorities: CustomOptionItem[];
   tags: CustomOptionItem[];
   customThemeColors?: ThemeColors | null;
+  myDaySchedule?: MyDaySchedule | null;
 }
 
-export type WorkspaceTab = "chat" | "tasks";
+export type WorkspaceTab = "chat" | "tasks" | "my_day";
 
 export type AIModelChoice = "flash" | "pro";
 
@@ -158,7 +183,8 @@ export interface AgentExecutedAction {
     | "header"
     | "theme"
     | "settings"
-    | "sync";
+    | "sync"
+    | "schedule";
   summary: string;
   detail?: string;
 }
@@ -178,6 +204,7 @@ export interface AgentWorkspaceMutationPayload {
   workspaceConfigUpdates?: Partial<WorkspaceConfig> | null;
   triggerCanvasSync?: boolean;
   switchTab?: WorkspaceTab | null;
+  showMyDayCard?: boolean;
 }
 
 export interface AgentUndoSnapshot {
@@ -199,6 +226,7 @@ export interface HeroChatMessage {
   undoSnapshot?: AgentUndoSnapshot | null;
   undone?: boolean;
   isError?: boolean;
+  showMyDayCard?: boolean;
 }
 
 export const BADGE_COLOR_MAP: Record<
@@ -475,6 +503,7 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
   showCompletedTasks: false,
   geminiApiKey: null,
   customThemeColors: null,
+  myDaySchedule: null,
 };
 
 export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
@@ -527,5 +556,9 @@ export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
         ? raw.tags
         : DEFAULT_WORKSPACE_CONFIG.tags,
     customThemeColors: raw.customThemeColors || null,
+    myDaySchedule:
+      raw.myDaySchedule && Array.isArray(raw.myDaySchedule.blocks)
+        ? raw.myDaySchedule
+        : null,
   };
 }

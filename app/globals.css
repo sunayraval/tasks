@@ -291,3 +291,46 @@ select option {
   font-style: italic;
   margin: 0.75rem 0;
 }
+
+/* Accessible Custom Progress Bar (Modern Web Baseline) */
+progress.taskit-progress {
+  appearance: none;
+  border: 0 solid;
+  overflow: clip;
+  --progress-bar-radius: 9999px;
+  --progress-bar-track: rgba(255, 255, 255, 0.08);
+  --progress-bar-fill: linear-gradient(
+    90deg,
+    var(--primary) 0%,
+    var(--highlight) 100%
+  );
+  border-radius: var(--progress-bar-radius);
+  background: var(--progress-bar-track);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+progress.taskit-progress::-webkit-progress-bar {
+  background: transparent;
+}
+
+progress.taskit-progress::-webkit-progress-value {
+  background: var(--progress-bar-fill);
+  border-radius: var(--progress-bar-radius);
+  transition: inline-size 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+progress.taskit-progress::-moz-progress-bar {
+  background: var(--progress-bar-fill);
+  border-radius: var(--progress-bar-radius);
+  transition: inline-size 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  progress.taskit-progress::-webkit-progress-value {
+    transition: none;
+  }
+  progress.taskit-progress::-moz-progress-bar {
+    transition: none;
+  }
+}
+

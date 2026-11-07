@@ -9,6 +9,7 @@ import {
   WorkspaceTab,
 } from "@/types/taskit";
 import {
+  CalendarClock,
   Check,
   ChevronDown,
   LogIn,
@@ -163,37 +164,39 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           </div>
         </div>
 
-        {/* Center: Workspace Mode Switcher (Hidden completely when user opts out of AI) */}
-        {canAccessWorkspace && !aiTemporarilyDisabled && (
+        {/* Center: Workspace Mode Switcher (Chat hidden when user opts out of AI; Tasks & MY DAY always available) */}
+        {canAccessWorkspace && (
           <div
             role="tablist"
             aria-label="Workspace View Switcher"
             className="inline-flex items-center rounded-full border border-white/15 bg-black/45 p-1 backdrop-blur-xl shadow-inner"
           >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "chat"}
-              onClick={() => onSelectTab("chat")}
-              className={`relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
-                activeTab === "chat"
-                  ? "bg-white/15 text-white shadow-sm border border-white/15"
-                  : "text-white/60 hover:text-white border border-transparent"
-              }`}
-            >
-              <Sparkles
-                className={`w-3.5 h-3.5 ${
-                  activeTab === "chat" ? "text-primary" : "text-white/50"
+            {!aiTemporarilyDisabled && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "chat"}
+                onClick={() => onSelectTab("chat")}
+                className={`relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
+                  activeTab === "chat"
+                    ? "bg-white/15 text-white shadow-sm border border-white/15"
+                    : "text-white/60 hover:text-white border border-transparent"
                 }`}
-              />
-              <span>Chat</span>
-              {!hasGeminiApiKey && (
-                <span
-                  className="h-1.5 w-1.5 rounded-full bg-amber-400"
-                  title="Google AI API key required"
+              >
+                <Sparkles
+                  className={`w-3.5 h-3.5 ${
+                    activeTab === "chat" ? "text-primary" : "text-white/50"
+                  }`}
                 />
-              )}
-            </button>
+                <span>Chat</span>
+                {!hasGeminiApiKey && (
+                  <span
+                    className="h-1.5 w-1.5 rounded-full bg-amber-400"
+                    title="Google AI API key required"
+                  />
+                )}
+              </button>
+            )}
 
             <button
               type="button"
@@ -221,6 +224,36 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                   }`}
                 >
                   {activeTaskCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "my_day"}
+              onClick={() => onSelectTab("my_day")}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
+                activeTab === "my_day"
+                  ? "bg-white/15 text-white shadow-sm border border-white/15"
+                  : "text-white/60 hover:text-white border border-transparent"
+              }`}
+            >
+              <CalendarClock
+                className={`w-3.5 h-3.5 ${
+                  activeTab === "my_day" ? "text-primary" : "text-white/50"
+                }`}
+              />
+              <span>MY DAY</span>
+              {(workspaceConfig.myDaySchedule?.blocks.length || 0) > 0 && (
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
+                    activeTab === "my_day"
+                      ? "bg-primary/25 text-highlight"
+                      : "bg-white/10 text-white/65"
+                  }`}
+                >
+                  {workspaceConfig.myDaySchedule?.blocks.length}
                 </span>
               )}
             </button>

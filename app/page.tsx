@@ -21,6 +21,8 @@ import { CircularProgress } from "@/components/dashboard/CircularProgress";
 import { TaskTable } from "@/components/tasks/TaskTable";
 import { GeminiHeroChat } from "@/components/ai/GeminiHeroChat";
 import { GeminiSetupModal } from "@/components/ai/GeminiSetupModal";
+import { MyDayView } from "@/components/myday/MyDayView";
+import { EnrichedMyDayBlock } from "@/utils/myDayUtils";
 import {
   SettingsModal,
   SettingsTabId,
@@ -943,7 +945,7 @@ export default function TaskItWorkspacePage() {
 
       if (disabled) {
         setIsGeminiSetupOpen(false);
-        setActiveTab("tasks");
+        setActiveTab((prev) => (prev === "chat" ? "tasks" : prev));
         showToast(
           "AI features hidden for this session. Switch back anytime in Customize → AI."
         );
@@ -1306,9 +1308,38 @@ export default function TaskItWorkspacePage() {
     showToast("Signed out.");
   };
 
-  const effectiveTab: WorkspaceTab = aiTemporarilyDisabled
-    ? "tasks"
-    : activeTab;
+  const handleToggleMyDayBlockComplete = useCallback(
+    (block: EnrichedMyDayBlock) => {
+      const nextDone = !block.isCompleted;
+      if (block.taskId) {
+        handleUpdateTask(block.taskId, {
+          status: nextDone ? "Done" : "To Do",
+          completed_at: nextDone ? new Date().toISOString() : null,
+        });
+      }
+      const currentSchedule = workspaceConfig.myDaySchedule;
+      if (currentSchedule) {
+        const nextBlocks = currentSchedule.blocks.map((b) =>
+          b.id === block.id ? { ...b, completed: nextDone } : b
+        );
+        handleUpdateWorkspaceConfig({
+          myDaySchedule: {
+            ...currentSchedule,
+            blocks: nextBlocks,
+            updatedAt: new Date().toISOString(),
+          },
+        });
+      }
+    },
+    [
+      workspaceConfig.myDaySchedule,
+      handleUpdateTask,
+      handleUpdateWorkspaceConfig,
+    ]
+  );
+
+  const effectiveTab: WorkspaceTab =
+    aiTemporarilyDisabled && activeTab === "chat" ? "tasks" : activeTab;
 
   return (
     <div className="relative min-h-screen flex flex-col text-zinc-100">
@@ -1417,6 +1448,21 @@ export default function TaskItWorkspacePage() {
               }
               onApplyAgentMutation={handleApplyAgentMutation}
               onUndoAgentMessage={handleUndoAgentMessage}
+              onToggleMyDayBlockComplete={handleToggleMyDayBlockComplete}
+            />
+          ) : effectiveTab === "my_day" ? (
+            /* MY DAY Tab: Live Centered Clock + Dual Status Bars + Manual & AI Auto-Arrange Builder */
+            <MyDayView
+              tasks={tasks}
+              profile={profile}
+              workspaceConfig={workspaceConfig}
+              hasApiKey={hasGeminiApiKey}
+              effectiveApiKey={effectiveApiKey}
+              aiTemporarilyDisabled={aiTemporarilyDisabled}
+              onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
+              onUpdateTask={handleUpdateTask}
+              onOpenApiKeySetup={() => setIsGeminiSetupOpen(true)}
+              onShowToast={showToast}
             />
           ) : (
             /* Tasks Tab: Telemetry Header + Document-Style Resizable Task Table */
