@@ -1027,9 +1027,10 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
       {/* @ Mention Autocomplete Popover */}
       {mentionQuery !== null && mentionCandidates.length > 0 && (
         <div
+          style={{ backgroundColor: "rgba(18, 19, 24, 0.94)" }}
           className={`absolute left-2 right-2 ${
             isHeroEmpty ? "top-full mt-2" : "bottom-full mb-2"
-          } z-50 rounded-2xl border border-white/15 bg-[#191a1f]/98 backdrop-blur-2xl p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.85)] animate-in fade-in duration-150`}
+          } z-50 rounded-2xl border border-white/20 backdrop-blur-xl p-2 shadow-[0_24px_70px_rgba(0,0,0,0.85)] animate-in fade-in duration-150`}
         >
           <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/40 flex items-center justify-between">
             <span>Connectors, Skills &amp; Live Tasks</span>
@@ -1106,9 +1107,10 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
 
           {plusMenuOpen && (
             <div
+              style={{ backgroundColor: "rgba(18, 19, 24, 0.94)" }}
               className={`absolute left-0 ${
                 isHeroEmpty ? "top-full mt-3" : "bottom-full mb-3"
-              } w-64 rounded-2xl border border-white/15 bg-[#191a1f]/98 p-1.5 shadow-2xl backdrop-blur-2xl z-50 space-y-0.5`}
+              } w-64 rounded-2xl border border-white/20 p-2 shadow-[0_24px_70px_rgba(0,0,0,0.85)] backdrop-blur-xl z-50 space-y-1`}
             >
               <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/40">
                 Workspace Connectors &amp; Skills
@@ -1328,21 +1330,22 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
 
             {modelMenuOpen && (
               <div
+                style={{ backgroundColor: "rgba(18, 19, 24, 0.94)" }}
                 className={`absolute right-0 ${
                   isHeroEmpty ? "top-full mt-3" : "bottom-full mb-3"
-                } w-80 sm:w-[340px] max-h-[460px] overflow-y-auto rounded-2xl border border-white/15 bg-[#191a1f]/98 p-2.5 shadow-2xl backdrop-blur-2xl z-50 space-y-2.5`}
+                } w-80 sm:w-[350px] max-h-[480px] overflow-y-auto rounded-2xl border border-white/20 p-3 shadow-[0_24px_70px_rgba(0,0,0,0.85)] backdrop-blur-xl z-50 space-y-3`}
               >
                 {/* Section 1: NVIDIA NIM Leading Models */}
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between px-2.5 py-1">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
                       NVIDIA NIM Models (build.nvidia.com)
                     </span>
-                    <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-300">
+                    <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-300">
                       Free Inference
                     </span>
                   </div>
-                  <div className="space-y-1 max-h-52 overflow-y-auto pr-0.5">
+                  <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
                     {NVIDIA_MODEL_OPTIONS.map((m) => {
                       const isSelected =
                         (workspaceConfig.aiProvider || "nvidia") === "nvidia" &&
@@ -1361,20 +1364,20 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                           }}
                           className={`w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
                             isSelected
-                              ? "bg-primary/15 border border-primary/40 text-white"
-                              : "border border-transparent text-white/75 hover:bg-white/[0.06] hover:text-white"
+                              ? "bg-primary/20 border border-primary/50 text-white shadow-sm"
+                              : "border border-white/5 bg-white/[0.03] text-white/80 hover:bg-white/[0.08] hover:text-white"
                           }`}
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-semibold truncate">
+                              <span className="text-xs font-semibold truncate text-white">
                                 {m.name}
                               </span>
-                              <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.2 text-[9px] font-semibold text-white/70">
+                              <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold text-white/70">
                                 {m.badge}
                               </span>
                             </div>
-                            <div className="text-[10px] text-white/45 truncate">
+                            <div className="text-[10px] text-white/55 truncate mt-0.5">
                               {m.provider} • {m.desc}
                             </div>
                           </div>
@@ -1388,7 +1391,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                 </div>
 
                 {/* Section 2: Google Gemini (Paired) */}
-                <div className="border-t border-white/10 pt-2 space-y-1">
+                <div className="border-t border-white/10 pt-2.5 space-y-1.5">
                   <div className="flex items-center justify-between px-2.5 py-0.5">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
                       Google Gemini (Paired Failover)
@@ -1420,15 +1423,15 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                           onUpdateWorkspaceConfig({ aiProvider: "gemini" });
                           setModelMenuOpen(false);
                         }}
-                        className={`w-full flex items-center justify-between rounded-xl px-2.5 py-1.5 text-left transition-colors ${
+                        className={`w-full flex items-center justify-between rounded-xl px-2.5 py-2 text-left transition-colors ${
                           isSelected
-                            ? "bg-primary/15 border border-primary/40 text-white"
-                            : "border border-transparent text-white/70 hover:bg-white/[0.06] hover:text-white"
+                            ? "bg-primary/20 border border-primary/50 text-white shadow-sm"
+                            : "border border-white/5 bg-white/[0.03] text-white/80 hover:bg-white/[0.08] hover:text-white"
                         }`}
                       >
                         <div>
-                          <div className="text-xs font-semibold">{m.name}</div>
-                          <div className="text-[10px] text-white/45">
+                          <div className="text-xs font-semibold text-white">{m.name}</div>
+                          <div className="text-[10px] text-white/55 mt-0.5">
                             {m.desc}
                           </div>
                         </div>
@@ -1441,11 +1444,11 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                 </div>
 
                 {/* Section 3: Agent Personality */}
-                <div className="border-t border-white/10 pt-2 space-y-1">
-                  <div className="px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/40">
+                <div className="border-t border-white/10 pt-2.5 space-y-1.5">
+                  <div className="px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/45">
                     Agent Personality
                   </div>
-                  <div className="grid grid-cols-2 gap-1">
+                  <div className="grid grid-cols-2 gap-1.5">
                     {(Object.keys(TONE_META) as AITone[]).map((tk) => {
                       const active = profile.ai_tone === tk;
                       return (
@@ -1456,10 +1459,10 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                             onChangeTone(tk);
                             setModelMenuOpen(false);
                           }}
-                          className={`rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors ${
+                          className={`rounded-xl px-2.5 py-2 text-left text-[11px] transition-colors ${
                             active
-                              ? "bg-primary/20 border border-primary/40 text-highlight font-semibold"
-                              : "text-white/65 hover:bg-white/10 hover:text-white border border-transparent"
+                              ? "bg-primary/20 border border-primary/50 text-highlight font-semibold shadow-sm"
+                              : "border border-white/5 bg-white/[0.03] text-white/75 hover:bg-white/[0.08] hover:text-white"
                           }`}
                         >
                           {TONE_META[tk].label}
