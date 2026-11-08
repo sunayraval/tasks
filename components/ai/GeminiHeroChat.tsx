@@ -6,8 +6,11 @@ import {
   AgentQAPrompt,
   AgentWorkspaceMutationPayload,
   AIModelChoice,
+  AIProvider,
   AITone,
+  DEFAULT_NVIDIA_MODEL,
   HeroChatMessage,
+  NVIDIA_MODEL_OPTIONS,
   QASubmissionPayload,
   TaskItem,
   THEME_OPTIONS,
@@ -64,8 +67,10 @@ interface GeminiHeroChatProps {
   onSelectTab: (tab: WorkspaceTab) => void;
   onSaveApiKey: (
     key: string,
-    provider?: "groq" | "cerebras" | "gemini"
+    provider?: AIProvider,
+    nvidiaModel?: string
   ) => void;
+  onUpdateWorkspaceConfig: (updates: Partial<WorkspaceConfig>) => void;
   onOpenApiKeySetup: () => void;
   onOptOutTemporary: () => void;
   onChangeTone: (tone: AITone) => void;
@@ -296,6 +301,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   onConsumeQueuedPrompt,
   onSelectTab,
   onSaveApiKey,
+  onUpdateWorkspaceConfig,
   onOpenApiKeySetup,
   onOptOutTemporary,
   onChangeTone,
@@ -643,6 +649,8 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           userId: profile.id,
           tone: profile.ai_tone,
           modelChoice,
+          aiProvider: workspaceConfig.aiProvider || "nvidia",
+          nvidiaModel: workspaceConfig.nvidiaModel || DEFAULT_NVIDIA_MODEL,
           theme: profile.theme,
           videoPreset: profile.video_bg_preset,
           videoDim: profile.video_bg_dim,
@@ -752,11 +760,11 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
     setInlineVerifying(true);
     setInlineKeyError(null);
 
-    const detectedProvider = trimmed.startsWith("gsk_")
-      ? "groq"
-      : trimmed.startsWith("csk-")
-      ? "cerebras"
-      : "gemini";
+    const detectedProvider: AIProvider = trimmed.startsWith("nvapi-")
+      ? "nvidia"
+      : trimmed.startsWith("AIza")
+      ? "gemini"
+      : workspaceConfig.aiProvider || "nvidia";
 
     try {
       const res = await fetch("/api/chat", {
@@ -766,18 +774,23 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           mode: "verify",
           customApiKey: trimmed,
           aiProvider: detectedProvider,
+          nvidiaModel: workspaceConfig.nvidiaModel || DEFAULT_NVIDIA_MODEL,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.valid) {
         setInlineKeyError(
           data.error ||
-            "Invalid API key. Please check your key from Groq Cloud or Google AI Studio."
+            "Invalid API key. Please check your key from NVIDIA NIM (build.nvidia.com) or Google AI Studio."
         );
         return;
       }
       setInlineKeyDraft("");
-      onSaveApiKey(trimmed, detectedProvider);
+      onSaveApiKey(
+        trimmed,
+        detectedProvider,
+        workspaceConfig.nvidiaModel || DEFAULT_NVIDIA_MODEL
+      );
     } catch {
       setInlineKeyError("Could not verify key right now. Please try again.");
     } finally {
@@ -848,7 +861,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   );
 
   // ---------------------------------------------------------------------------
-  // STATE A: Missing Google AI API Key -> Clear "Please add your API key" Gate
+  // STATE A: Missing AI API Key -> Clear "Please add your API key" Gate
   // ---------------------------------------------------------------------------
   if (!hasApiKey) {
     return (
@@ -863,7 +876,11 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
               Please add your AI API key to use this feature
             </h1>
             <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-              Kite uses your free Groq Cloud API key (free forever, no credit card required) or Google AI Studio key to manage tasks, plan your day, and customize your workspace.
+              Kite pairs free inference on leading models via{" "}
+              <span className="text-white/90 font-medium">NVIDIA NIM</span>{" "}
+              (build.nvidia.com) with{" "}
+              <span className="text-white/90 font-medium">Google Gemini</span>{" "}
+              to manage tasks, plan your day, and customize your workspace.
             </p>
           </div>
 
@@ -876,7 +893,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                   setInlineKeyDraft(e.target.value);
                   if (inlineKeyError) setInlineKeyError(null);
                 }}
-                placeholder="Paste Groq (gsk_...) or Google AI key here"
+                placeholder="Paste NVIDIA NIM (nvapi-...) or Google AI key here"
                 className="flex-1 rounded-2xl border border-white/15 bg-black/60 px-4 py-2.5 text-xs sm:text-sm font-mono text-white placeholder-white/30 focus:border-primary focus:outline-none"
               />
               <button
@@ -904,15 +921,15 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
               onClick={onOpenApiKeySetup}
               className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 px-3.5 py-2 font-medium text-highlight transition-colors"
             >
-              <span>View Step-by-Step Setup Instructions</span>
+              <span>Setup Guide &amp; Model Selector</span>
             </button>
             <a
-              href="https://console.groq.com"
+              href="https://build.nvidia.com/models"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] px-3.5 py-2 text-white/75 hover:text-white transition-colors"
             >
-              <span>Get Free Groq Key (No Card)</span>
+              <span>Get Free NVIDIA NIM Key</span>
               <ExternalLink className="w-3 h-3" />
             </a>
             <button
@@ -1216,68 +1233,145 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           className="flex-1 resize-none bg-transparent py-2 px-1 text-sm sm:text-[15px] text-white placeholder-[#7c7f87] focus:outline-none max-h-44 leading-relaxed"
         />
 
-        {/* Right Controls: Flash/Pro Model Selector + Mic + Send */}
+        {/* Right Controls: NVIDIA NIM / Gemini Model Selector + Mic + Send */}
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 self-center">
-          {/* Model & Tone Dropdown ("Flash v") */}
+          {/* Model & Tone Dropdown */}
           <div ref={modelMenuRef} className="relative">
             <button
               type="button"
               onClick={() => setModelMenuOpen((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs sm:text-[13px] font-medium text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-              title="Select Gemini model & coaching style"
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs sm:text-[12px] font-medium text-white/85 hover:bg-white/10 hover:text-white transition-colors"
+              title="Select AI model (NVIDIA NIM or Google Gemini) & coaching style"
             >
-              <span>{modelChoice === "pro" ? "Pro" : "Flash"}</span>
-              <ChevronDown className="w-3.5 h-3.5 text-white/55" />
+              <span className="max-w-[140px] sm:max-w-[175px] truncate">
+                {(workspaceConfig.aiProvider || "nvidia") === "nvidia"
+                  ? NVIDIA_MODEL_OPTIONS.find(
+                      (m) =>
+                        m.id ===
+                        (workspaceConfig.nvidiaModel || DEFAULT_NVIDIA_MODEL)
+                    )?.shortName || "Nemotron 3.5 Super"
+                  : modelChoice === "pro"
+                  ? "Gemini 3.8 Pro"
+                  : "Gemini 3.8 Flash"}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-white/55 shrink-0" />
             </button>
 
             {modelMenuOpen && (
               <div
                 className={`absolute right-0 ${
                   isHeroEmpty ? "top-full mt-3" : "bottom-full mb-3"
-                } w-64 rounded-2xl border border-white/15 bg-[#191a1f]/98 p-2 shadow-2xl backdrop-blur-2xl z-50 space-y-2`}
+                } w-80 sm:w-[340px] max-h-[460px] overflow-y-auto rounded-2xl border border-white/15 bg-[#191a1f]/98 p-2.5 shadow-2xl backdrop-blur-2xl z-50 space-y-2.5`}
               >
+                {/* Section 1: NVIDIA NIM Leading Models */}
                 <div className="space-y-1">
-                  <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">
-                    Gemini Model
+                  <div className="flex items-center justify-between px-2.5 py-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                      NVIDIA NIM Models (build.nvidia.com)
+                    </span>
+                    <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-300">
+                      Free Inference
+                    </span>
+                  </div>
+                  <div className="space-y-1 max-h-52 overflow-y-auto pr-0.5">
+                    {NVIDIA_MODEL_OPTIONS.map((m) => {
+                      const isSelected =
+                        (workspaceConfig.aiProvider || "nvidia") === "nvidia" &&
+                        (workspaceConfig.nvidiaModel || DEFAULT_NVIDIA_MODEL) ===
+                          m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => {
+                            onUpdateWorkspaceConfig({
+                              aiProvider: "nvidia",
+                              nvidiaModel: m.id,
+                            });
+                            setModelMenuOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
+                            isSelected
+                              ? "bg-primary/15 border border-primary/40 text-white"
+                              : "border border-transparent text-white/75 hover:bg-white/[0.06] hover:text-white"
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-semibold truncate">
+                                {m.name}
+                              </span>
+                              <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.2 text-[9px] font-semibold text-white/70">
+                                {m.badge}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-white/45 truncate">
+                              {m.provider} • {m.desc}
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <Check className="w-4 h-4 text-primary shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Section 2: Google Gemini (Paired) */}
+                <div className="border-t border-white/10 pt-2 space-y-1">
+                  <div className="flex items-center justify-between px-2.5 py-0.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
+                      Google Gemini (Paired Failover)
+                    </span>
                   </div>
                   {(
                     [
                       {
                         id: "flash",
-                        name: "3.8 Flash",
+                        name: "Gemini 3.8 Flash",
                         desc: "Fast, agile task & board actions",
                       },
                       {
                         id: "pro",
-                        name: "3.8 Pro",
+                        name: "Gemini 3.8 Pro",
                         desc: "Deep planning & complex schedules",
                       },
                     ] as const
-                  ).map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => {
-                        setModelChoice(m.id);
-                        setModelMenuOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between rounded-xl px-2.5 py-2 text-left transition-colors ${
-                        modelChoice === m.id
-                          ? "bg-white/10 text-white"
-                          : "text-white/70 hover:bg-white/[0.06]"
-                      }`}
-                    >
-                      <div>
-                        <div className="text-xs font-semibold">{m.name}</div>
-                        <div className="text-[11px] text-white/45">{m.desc}</div>
-                      </div>
-                      {modelChoice === m.id && (
-                        <Check className="w-4 h-4 text-primary shrink-0" />
-                      )}
-                    </button>
-                  ))}
+                  ).map((m) => {
+                    const isSelected =
+                      workspaceConfig.aiProvider === "gemini" &&
+                      modelChoice === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setModelChoice(m.id);
+                          onUpdateWorkspaceConfig({ aiProvider: "gemini" });
+                          setModelMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between rounded-xl px-2.5 py-1.5 text-left transition-colors ${
+                          isSelected
+                            ? "bg-primary/15 border border-primary/40 text-white"
+                            : "border border-transparent text-white/70 hover:bg-white/[0.06] hover:text-white"
+                        }`}
+                      >
+                        <div>
+                          <div className="text-xs font-semibold">{m.name}</div>
+                          <div className="text-[10px] text-white/45">
+                            {m.desc}
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <Check className="w-4 h-4 text-primary shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
 
+                {/* Section 3: Agent Personality */}
                 <div className="border-t border-white/10 pt-2 space-y-1">
                   <div className="px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/40">
                     Agent Personality
@@ -1497,10 +1591,12 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           <span className="hidden sm:inline-flex items-center gap-1.5">
             <KiteLogoMark className="w-3.5 h-3.5 text-primary" />
             <span>
-              {workspaceConfig.aiProvider === "groq"
-                ? "Groq Cloud (LPU Fast)"
-                : workspaceConfig.aiProvider === "cerebras"
-                ? "Cerebras Llama 3.3 70B"
+              {(workspaceConfig.aiProvider || "nvidia") === "nvidia"
+                ? NVIDIA_MODEL_OPTIONS.find(
+                    (m) =>
+                      m.id ===
+                      (workspaceConfig.nvidiaModel || DEFAULT_NVIDIA_MODEL)
+                  )?.name || "NVIDIA NIM"
                 : `Gemini ${modelChoice === "pro" ? "3.8 Pro" : "3.8 Flash"}`}{" "}
               • {activeTaskCount} active task{activeTaskCount === 1 ? "" : "s"}
             </span>

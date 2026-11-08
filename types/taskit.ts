@@ -113,7 +113,93 @@ export interface MyDaySchedule {
   updatedAt: string;
 }
 
-export type AIProvider = "groq" | "cerebras" | "gemini";
+export type AIProvider = "nvidia" | "gemini";
+
+export interface NvidiaModelOption {
+  id: string;
+  name: string;
+  shortName: string;
+  badge: string;
+  desc: string;
+  provider: string;
+}
+
+export const NVIDIA_MODEL_OPTIONS: NvidiaModelOption[] = [
+  {
+    id: "nvidia/nemotron-3.5-super-vl-120b-a12b",
+    name: "Nemotron 3.5 Super 120B",
+    shortName: "Nemotron 3.5 Super",
+    badge: "Recommended",
+    desc: "Flagship agentic MoE built for tool calling & deep planning",
+    provider: "NVIDIA",
+  },
+  {
+    id: "nvidia/nemotron-3.5-lightning-30b-a3b",
+    name: "Nemotron 3.5 Lightning 30B",
+    shortName: "Nemotron Lightning",
+    badge: "Fastest",
+    desc: "Ultra-low latency 30B-A3B MoE for instant task execution",
+    provider: "NVIDIA",
+  },
+  {
+    id: "deepseek-ai/deepseek-v4.1-flash",
+    name: "DeepSeek V4.1 Flash",
+    shortName: "DeepSeek V4.1",
+    badge: "Reasoning",
+    desc: "High-speed structured reasoning & schedule optimization",
+    provider: "DeepSeek",
+  },
+  {
+    id: "mistralai/mistral-large-4-1t-a52b",
+    name: "Mistral Large 4 (1T MoE)",
+    shortName: "Mistral Large 4",
+    badge: "1T MoE",
+    desc: "Frontier 1-trillion parameter MoE with native function calling",
+    provider: "Mistral AI",
+  },
+  {
+    id: "moonshotai/kimi-k2.6",
+    name: "Kimi K2.6",
+    shortName: "Kimi K2.6",
+    badge: "Agentic",
+    desc: "Strong natural language understanding & multi-step workflows",
+    provider: "Moonshot AI",
+  },
+  {
+    id: "google/gemma-4-31b-it",
+    name: "Gemma 4 31B Instruct",
+    shortName: "Gemma 4 31B",
+    badge: "Google",
+    desc: "Clean instruction following & reliable workspace actions",
+    provider: "Google",
+  },
+  {
+    id: "minimaxai/minimax-m3.1-flash",
+    name: "MiniMax M3.1 Flash",
+    shortName: "MiniMax M3.1",
+    badge: "Fast",
+    desc: "Agile conversational planning & quick board updates",
+    provider: "MiniMax",
+  },
+  {
+    id: "z-ai/glm-5.3-flash",
+    name: "GLM 5.3 Flash",
+    shortName: "GLM 5.3 Flash",
+    badge: "Tool Use",
+    desc: "Fast agentic tool execution & task organization",
+    provider: "Z-AI",
+  },
+  {
+    id: "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+    name: "Llama 3.1 Nemotron Ultra 253B",
+    shortName: "Nemotron Ultra 253B",
+    badge: "253B",
+    desc: "Maximum accuracy & heavy reasoning for complex schedules",
+    provider: "NVIDIA",
+  },
+];
+
+export const DEFAULT_NVIDIA_MODEL = "nvidia/nemotron-3.5-super-vl-120b-a12b";
 
 export interface WorkspaceConfig {
   workspaceTitle: string;
@@ -122,9 +208,9 @@ export interface WorkspaceConfig {
   brandBadge: string;
   showCompletedTasks?: boolean;
   aiProvider?: AIProvider;
-  groqApiKey?: string | null;
-  cerebrasApiKey?: string | null;
+  nvidiaApiKey?: string | null;
   geminiApiKey?: string | null;
+  nvidiaModel?: string;
   columnHeaders: ColumnHeadersConfig;
   sections: CustomSectionItem[];
   statuses: CustomOptionItem[];
@@ -585,10 +671,10 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
     { id: "#Lab", label: "#Lab", color: "emerald" },
   ],
   showCompletedTasks: false,
-  aiProvider: "groq",
-  groqApiKey: null,
-  cerebrasApiKey: null,
+  aiProvider: "nvidia",
+  nvidiaApiKey: null,
   geminiApiKey: null,
+  nvidiaModel: DEFAULT_NVIDIA_MODEL,
   customThemeColors: null,
   myDaySchedule: null,
 };
@@ -599,6 +685,31 @@ export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
     typeof raw.brandName === "string" ? raw.brandName.trim() : "";
   const normalizedBrand =
     !rawBrand || rawBrand.toLowerCase() === "taskit" ? "kite" : rawBrand;
+
+  const nvidiaApiKey =
+    typeof raw.nvidiaApiKey === "string"
+      ? raw.nvidiaApiKey
+      : profile.custom_ai_api_key?.startsWith("nvapi-")
+      ? profile.custom_ai_api_key
+      : null;
+
+  const geminiApiKey =
+    typeof raw.geminiApiKey === "string"
+      ? raw.geminiApiKey
+      : profile.custom_ai_api_key?.startsWith("AIza")
+      ? profile.custom_ai_api_key
+      : null;
+
+  const resolvedProvider: AIProvider =
+    raw.aiProvider === "gemini"
+      ? "gemini"
+      : raw.aiProvider === "nvidia"
+      ? "nvidia"
+      : nvidiaApiKey
+      ? "nvidia"
+      : geminiApiKey
+      ? "gemini"
+      : "nvidia";
 
   return {
     workspaceTitle:
@@ -618,18 +729,13 @@ export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
       typeof raw.showCompletedTasks === "boolean"
         ? raw.showCompletedTasks
         : false,
-    aiProvider:
-      raw.aiProvider === "gemini"
-        ? "gemini"
-        : raw.aiProvider === "cerebras"
-        ? "cerebras"
-        : "groq",
-    groqApiKey:
-      typeof raw.groqApiKey === "string" ? raw.groqApiKey : null,
-    cerebrasApiKey:
-      typeof raw.cerebrasApiKey === "string" ? raw.cerebrasApiKey : null,
-    geminiApiKey:
-      typeof raw.geminiApiKey === "string" ? raw.geminiApiKey : null,
+    aiProvider: resolvedProvider,
+    nvidiaApiKey,
+    geminiApiKey,
+    nvidiaModel:
+      typeof raw.nvidiaModel === "string" && raw.nvidiaModel.trim()
+        ? raw.nvidiaModel.trim()
+        : DEFAULT_NVIDIA_MODEL,
     columnHeaders: {
       ...DEFAULT_WORKSPACE_CONFIG.columnHeaders,
       ...(raw.columnHeaders || {}),

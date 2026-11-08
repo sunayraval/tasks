@@ -12,6 +12,7 @@ import {
   AITone,
   BADGE_COLOR_KEYS,
   BadgeColorKey,
+  DEFAULT_NVIDIA_MODEL,
   DEFAULT_WORKSPACE_CONFIG,
   MyDayBlock,
   MyDaySchedule,
@@ -311,7 +312,7 @@ function parseFlexibleDueDate(
 
 function extractCleanErrorMessage(
   err: unknown,
-  provider: AIProvider = "groq"
+  provider: AIProvider = "nvidia"
 ): {
   status: number;
   message: string;
@@ -320,16 +321,10 @@ function extractCleanErrorMessage(
   const raw = err instanceof Error ? err.message : String(err || "");
   const lower = raw.toLowerCase();
   const providerLabel =
-    provider === "groq"
-      ? "Groq Cloud"
-      : provider === "cerebras"
-      ? "Cerebras Cloud"
-      : "Google Gemini";
+    provider === "nvidia" ? "NVIDIA NIM" : "Google Gemini";
   const keyFormat =
-    provider === "groq"
-      ? "keys start with gsk_..."
-      : provider === "cerebras"
-      ? "keys start with csk-..."
+    provider === "nvidia"
+      ? "keys start with nvapi-..."
       : "keys start with AIza...";
 
   if (
@@ -338,9 +333,11 @@ function extractCleanErrorMessage(
     lower.includes("invalid api key") ||
     lower.includes("invalid_api_key") ||
     lower.includes("incorrect api key") ||
+    lower.includes("authorization failed") ||
     lower.includes("permission_denied") ||
     lower.includes("unauthenticated") ||
-    lower.includes("401")
+    lower.includes("401") ||
+    lower.includes("403")
   ) {
     return {
       status: 401,
@@ -355,7 +352,7 @@ function extractCleanErrorMessage(
   ) {
     return {
       status: 429,
-      message: `${providerLabel} rate limit reached. Please wait a few seconds and try again.`,
+      message: `${providerLabel} rate limit reached. Please wait a few seconds or switch models in the chat bar.`,
       isKeyError: false,
     };
   }
@@ -371,30 +368,47 @@ export async function POST(request: Request) {
     const body = await request.json();
     const mode: string = body.mode || "chat";
     const customApiKey: string = (body.customApiKey || "").trim();
-    const explicitProvider: AIProvider | undefined =
+    const rawExplicitProvider: string | undefined =
       body.aiProvider || body.workspaceConfig?.aiProvider;
+    const requestedNvidiaModel: string = (
+      body.nvidiaModel ||
+      body.workspaceConfig?.nvidiaModel ||
+      DEFAULT_NVIDIA_MODEL
+    ).trim();
 
-    const detectedProvider: AIProvider = explicitProvider
-      ? explicitProvider
-      : customApiKey.startsWith("gsk_")
-      ? "groq"
-      : customApiKey.startsWith("csk-")
-      ? "cerebras"
-      : customApiKey.startsWith("AIza")
-      ? "gemini"
-      : process.env.GROQ_API_KEY
-      ? "groq"
-      : process.env.CEREBRAS_API_KEY
-      ? "cerebras"
-      : "gemini";
+    const nvidiaKey: string =
+      (customApiKey.startsWith("nvapi-") ? customApiKey : "") ||
+      (body.workspaceConfig?.nvidiaApiKey || "").trim() ||
+      (rawExplicitProvider === "nvidia" ? customApiKey : "") ||
+      process.env.NVIDIA_API_KEY ||
+      "";
+
+    const geminiKey: string =
+      (customApiKey.startsWith("AIza") ? customApiKey : "") ||
+      (body.workspaceConfig?.geminiApiKey || "").trim() ||
+      (rawExplicitProvider === "gemini" ? customApiKey : "") ||
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+      "";
+
+    const detectedProvider: AIProvider =
+      rawExplicitProvider === "gemini"
+        ? "gemini"
+        : rawExplicitProvider === "nvidia"
+        ? "nvidia"
+        : customApiKey.startsWith("AIza")
+        ? "gemini"
+        : customApiKey.startsWith("nvapi-")
+        ? "nvidia"
+        : nvidiaKey
+        ? "nvidia"
+        : geminiKey
+        ? "gemini"
+        : "nvidia";
 
     const effectiveApiKey =
-      customApiKey ||
-      (detectedProvider === "groq"
-        ? process.env.GROQ_API_KEY || ""
-        : detectedProvider === "cerebras"
-        ? process.env.CEREBRAS_API_KEY || ""
-        : process.env.GOOGLE_GENERATIVE_AI_API_KEY || "");
+      detectedProvider === "nvidia"
+        ? nvidiaKey || customApiKey
+        : geminiKey || customApiKey;
 
     // -------------------------------------------------------------------------
     // MODE 1: Live API Key Verification
@@ -405,93 +419,76 @@ export async function POST(request: Request) {
           {
             valid: false,
             error:
-              detectedProvider === "groq"
-                ? "Please enter a valid Groq Cloud API key (starts with gsk_...)."
-                : detectedProvider === "cerebras"
-                ? "Please enter a valid Cerebras Cloud API key (starts with csk-...)."
+              detectedProvider === "nvidia"
+                ? "Please enter a valid NVIDIA NIM API key (starts with nvapi-...)."
                 : "Please enter a complete Google AI Studio API key (starts with AIza...).",
           },
           { status: 400 }
         );
       }
 
-      if (detectedProvider === "groq") {
+      if (detectedProvider === "nvidia") {
         try {
-          const res = await fetch("https://api.groq.com/openai/v1/models", {
-            headers: {
-              Authorization: `Bearer ${effectiveApiKey}`,
-            },
-          });
+          const verifyModels = Array.from(
+            new Set([
+              requestedNvidiaModel,
+              "nvidia/nemotron-3.5-lightning-30b-a3b",
+              "deepseek-ai/deepseek-v4.1-flash",
+              "google/gemma-3-12b-it",
+            ])
+          );
 
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            const errMsg =
-              errData.error?.message ||
-              "Groq Cloud rejected this API key. Please verify your key at console.groq.com.";
-            return NextResponse.json(
-              { valid: false, error: errMsg },
-              { status: res.status }
+          let lastVerifyError = "Could not verify NVIDIA NIM API key.";
+
+          for (const vm of verifyModels) {
+            const res = await fetch(
+              "https://integrate.api.nvidia.com/v1/chat/completions",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${effectiveApiKey}`,
+                },
+                body: JSON.stringify({
+                  model: vm,
+                  messages: [{ role: "user", content: "Hi" }],
+                  max_tokens: 3,
+                }),
+              }
             );
+
+            if (res.status === 401 || res.status === 403) {
+              return NextResponse.json(
+                {
+                  valid: false,
+                  error:
+                    "NVIDIA NIM rejected this API key (Authorization failed). Please copy your nvapi-... key from build.nvidia.com.",
+                },
+                { status: 401 }
+              );
+            }
+
+            if (res.ok) {
+              return NextResponse.json({
+                valid: true,
+                provider: "nvidia",
+                model: vm,
+              });
+            }
+
+            const errData = await res.json().catch(() => ({}));
+            lastVerifyError =
+              errData.detail ||
+              errData.error?.message ||
+              `Model ${vm} returned status ${res.status}`;
           }
 
-          const data = await res.json();
-          const rawModels: { id: string }[] = data.data || [];
-          const modelIds = rawModels.map((m) => m.id);
-
-          const preferred = [
-            "openai/gpt-oss-120b",
-            "openai/gpt-oss-20b",
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant",
-            "qwen/qwen3.8-27b",
-          ];
-          const matchedModel =
-            preferred.find((p) => modelIds.includes(p)) ||
-            modelIds.find((id) => !id.includes("whisper") && !id.includes("guard")) ||
-            "openai/gpt-oss-120b";
-
-          return NextResponse.json({
-            valid: true,
-            provider: "groq",
-            model: matchedModel,
-          });
-        } catch (err) {
-          const info = extractCleanErrorMessage(err, "groq");
           return NextResponse.json(
-            { valid: false, error: info.message },
-            { status: info.status }
+            { valid: false, error: lastVerifyError },
+            { status: 400 }
           );
-        }
-      }
-
-      if (detectedProvider === "cerebras") {
-        try {
-          const cerebras = createOpenAI({
-            baseURL: "https://api.cerebras.ai/v1",
-            apiKey: effectiveApiKey,
-          });
-
-          await Promise.race([
-            generateText({
-              model: cerebras("llama3.1-8b"),
-              prompt: "Reply with OK",
-              maxTokens: 5,
-            }),
-            new Promise<never>((_, reject) =>
-              setTimeout(
-                () => reject(new Error("Timeout verifying Cerebras API key")),
-                6000
-              )
-            ),
-          ]);
-
-          return NextResponse.json({
-            valid: true,
-            provider: "cerebras",
-            model: "llama3.1-8b",
-          });
         } catch (err) {
-          const info = extractCleanErrorMessage(err, "cerebras");
+          const info = extractCleanErrorMessage(err, "nvidia");
           return NextResponse.json(
             { valid: false, error: info.message },
             { status: info.status }
@@ -770,11 +767,9 @@ ${taskLines}`;
         {
           error: "MISSING_API_KEY",
           reply:
-            detectedProvider === "groq"
-              ? "Please add your Groq Cloud API key in Preferences to use this feature."
-              : detectedProvider === "cerebras"
-              ? "Please add your Cerebras Cloud API key in Preferences to use this feature."
-              : "Please add your Google AI API key to use this feature.",
+            detectedProvider === "nvidia"
+              ? "Please add your NVIDIA NIM API key (nvapi-...) or Google Gemini key in Settings → AI."
+              : "Please add your Google AI API key or NVIDIA NIM key in Settings → AI.",
         },
         { status: 401 }
       );
@@ -2788,62 +2783,41 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
     let succeeded = false;
     const tStart = Date.now();
 
-    if (detectedProvider === "groq") {
-      // Execute with Groq Cloud (300-800+ tokens/sec, ultra-low latency, free forever)
-      const groq = createOpenAI({
-        baseURL: "https://api.groq.com/openai/v1",
-        apiKey: effectiveApiKey,
+    const runNvidiaChat = async (apiKeyToUse: string): Promise<boolean> => {
+      if (!apiKeyToUse || apiKeyToUse.length < 15) return false;
+      const nvidia = createOpenAI({
+        baseURL: "https://integrate.api.nvidia.com/v1",
+        apiKey: apiKeyToUse,
+        compatibility: "compatible",
       });
 
-      // Preferred models in priority order: production models followed by legacy
-      let groqModels = [
-        "openai/gpt-oss-120b",
-        "openai/gpt-oss-20b",
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
-        "qwen/qwen3.8-27b",
-      ];
+      const nvidiaCandidates = Array.from(
+        new Set([
+          requestedNvidiaModel,
+          "nvidia/nemotron-3.5-super-vl-120b-a12b",
+          "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "deepseek-ai/deepseek-v4.1-flash",
+          "mistralai/mistral-large-4-1t-a52b",
+          "moonshotai/kimi-k2.6",
+          "google/gemma-4-31b-it",
+        ])
+      );
 
-      try {
-        const mRes = await fetch("https://api.groq.com/openai/v1/models", {
-          headers: { Authorization: `Bearer ${effectiveApiKey}` },
-        });
-        if (mRes.ok) {
-          const mData = await mRes.json();
-          const remoteIds: string[] = (mData.data || []).map(
-            (m: { id: string }) => m.id
-          );
-          if (remoteIds.length > 0) {
-            const valid = groqModels.filter((id) => remoteIds.includes(id));
-            if (valid.length > 0) {
-              groqModels = valid;
-            } else {
-              const otherChat = remoteIds.filter(
-                (id) => !id.includes("whisper") && !id.includes("guard")
-              );
-              if (otherChat.length > 0) {
-                groqModels = otherChat;
-              }
-            }
-          }
-        }
-      } catch {}
+      usedModel = nvidiaCandidates[0];
 
-      usedModel = groqModels[0];
-
-      for (const candidate of groqModels) {
+      for (const candidate of nvidiaCandidates) {
         const candStart = Date.now();
         try {
           const timeoutPromise = new Promise<never>((_, reject) =>
             setTimeout(
-              () => reject(new Error(`Timeout on Groq model ${candidate}`)),
-              qaSubmission ? 12000 : 8000
+              () => reject(new Error(`Timeout on NVIDIA model ${candidate}`)),
+              qaSubmission ? 12000 : 8500
             )
           );
 
           const result = await Promise.race([
             generateText({
-              model: groq(candidate),
+              model: nvidia(candidate),
               system: systemPrompt,
               messages: conversationMessages,
               tools,
@@ -2853,132 +2827,53 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
             timeoutPromise,
           ]);
 
-          usedModel = `groq/${candidate}`;
+          usedModel = candidate;
           replyText = (result.text || "").trim();
           succeeded = true;
           console.log(
-            `[Groq Chat] Model "${candidate}" generated response in ${
+            `[NVIDIA NIM] Model "${candidate}" generated response in ${
               Date.now() - candStart
             }ms`
           );
-          break;
+          return true;
         } catch (err) {
           lastError = err;
           console.warn(
-            `[Groq Chat] Candidate "${candidate}" attempt failed in ${
+            `[NVIDIA NIM] Candidate "${candidate}" attempt failed in ${
               Date.now() - candStart
             }ms:`,
             err
           );
-          const rawErr = err instanceof Error ? err.message : String(err || "");
-          // If model does not exist or account lacks access, smoothly try next candidate
-          if (
-            rawErr.includes("does not exist") ||
-            rawErr.includes("not have access") ||
-            rawErr.includes("model_not_found") ||
-            rawErr.includes("decommissioned")
-          ) {
-            continue;
+          if (executedActions.length > 0 || qaState.prompt) {
+            succeeded = true;
+            return true;
           }
-
-          const info = extractCleanErrorMessage(err, "groq");
-          if (info.isKeyError || executedActions.length > 0 || qaState.prompt) {
-            if (executedActions.length > 0 || qaState.prompt) {
-              succeeded = true;
-              break;
-            }
-            return NextResponse.json(
-              {
-                error: "INVALID_API_KEY",
-                reply: info.message,
-              },
-              { status: 401 }
-            );
+          const info = extractCleanErrorMessage(err, "nvidia");
+          if (info.isKeyError) {
+            return false;
           }
         }
       }
-    } else if (detectedProvider === "cerebras") {
-      // Execute with Cerebras Cloud (~450 to 2,000+ tokens/sec, ultra-low latency)
-      const cerebras = createOpenAI({
-        baseURL: "https://api.cerebras.ai/v1",
-        apiKey: effectiveApiKey,
-      });
+      return false;
+    };
 
-      const cerebrasModels = ["llama-3.3-70b", "llama3.1-8b"];
-      usedModel = cerebrasModels[0];
-
-      for (const candidate of cerebrasModels) {
-        const candStart = Date.now();
-        try {
-          const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(
-              () => reject(new Error(`Timeout on Cerebras model ${candidate}`)),
-              qaSubmission ? 12000 : 8000
-            )
-          );
-
-          const result = await Promise.race([
-            generateText({
-              model: cerebras(candidate),
-              system: systemPrompt,
-              messages: conversationMessages,
-              tools,
-              maxSteps: qaSubmission ? 5 : 4,
-              maxTokens: 1200,
-            }),
-            timeoutPromise,
-          ]);
-
-          usedModel = `cerebras/${candidate}`;
-          replyText = (result.text || "").trim();
-          succeeded = true;
-          console.log(
-            `[Cerebras Chat] Model "${candidate}" generated response in ${
-              Date.now() - candStart
-            }ms`
-          );
-          break;
-        } catch (err) {
-          lastError = err;
-          console.warn(
-            `[Cerebras Chat] Candidate "${candidate}" attempt failed in ${
-              Date.now() - candStart
-            }ms:`,
-            err
-          );
-          const info = extractCleanErrorMessage(err, "cerebras");
-          if (info.isKeyError || executedActions.length > 0 || qaState.prompt) {
-            if (executedActions.length > 0 || qaState.prompt) {
-              succeeded = true;
-              break;
-            }
-            return NextResponse.json(
-              {
-                error: "INVALID_API_KEY",
-                reply: info.message,
-              },
-              { status: 401 }
-            );
-          }
-        }
-      }
-    } else {
-      // Execute Gemini with smart model fallback and latency optimization
-      const google = createGoogleGenerativeAI({ apiKey: effectiveApiKey });
+    const runGeminiChat = async (apiKeyToUse: string): Promise<boolean> => {
+      if (!apiKeyToUse || apiKeyToUse.length < 15) return false;
+      const google = createGoogleGenerativeAI({ apiKey: apiKeyToUse });
       const modelChain =
         modelChoice === "pro"
           ? ["gemini-3.8-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
           : ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-2.5-flash"];
 
       usedModel = modelChain[0];
-      const candidateTimeoutMs = qaSubmission ? 12000 : 5500;
+      const candidateTimeoutMs = qaSubmission ? 12000 : 6000;
 
       for (const candidate of modelChain) {
         const candStart = Date.now();
         try {
           const timeoutPromise = new Promise<never>((_, reject) =>
             setTimeout(
-              () => reject(new Error(`Timeout on model ${candidate}`)),
+              () => reject(new Error(`Timeout on Gemini model ${candidate}`)),
               candidateTimeoutMs
             )
           );
@@ -3003,7 +2898,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               Date.now() - candStart
             }ms`
           );
-          break;
+          return true;
         } catch (err) {
           lastError = err;
           console.warn(
@@ -3012,22 +2907,30 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
             }ms:`,
             err
           );
+          if (executedActions.length > 0 || qaState.prompt) {
+            succeeded = true;
+            return true;
+          }
           const info = extractCleanErrorMessage(err, "gemini");
-          // Do not retry other models if the API key itself is invalid OR if tools already mutated state
-          if (info.isKeyError || executedActions.length > 0 || qaState.prompt) {
-            if (executedActions.length > 0 || qaState.prompt) {
-              succeeded = true;
-              break;
-            }
-            return NextResponse.json(
-              {
-                error: "INVALID_API_KEY",
-                reply: info.message,
-              },
-              { status: 401 }
-            );
+          if (info.isKeyError) {
+            return false;
           }
         }
+      }
+      return false;
+    };
+
+    if (detectedProvider === "nvidia") {
+      const ok = await runNvidiaChat(nvidiaKey || effectiveApiKey);
+      // Paired fallback: if NVIDIA fails/times out and user also has a Gemini key saved, automatically use Gemini
+      if (!ok && !succeeded && geminiKey.length >= 15) {
+        await runGeminiChat(geminiKey);
+      }
+    } else {
+      const ok = await runGeminiChat(geminiKey || effectiveApiKey);
+      // Paired fallback: if Gemini hits a rate limit/timeout and user also has an NVIDIA NIM key saved, automatically use NVIDIA
+      if (!ok && !succeeded && nvidiaKey.length >= 15) {
+        await runNvidiaChat(nvidiaKey);
       }
     }
 
@@ -3039,7 +2942,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
       const info = extractCleanErrorMessage(lastError, detectedProvider);
       return NextResponse.json(
         {
-          error: "AI_EXECUTION_ERROR",
+          error: info.isKeyError ? "INVALID_API_KEY" : "AI_EXECUTION_ERROR",
           reply: info.message,
         },
         { status: info.status }
@@ -3112,14 +3015,14 @@ function workspaceConfigUpdatesAssign(
   if (working.aiProvider === undefined && incoming.aiProvider) {
     working.aiProvider = incoming.aiProvider;
   }
-  if (working.groqApiKey === undefined && incoming.groqApiKey) {
-    working.groqApiKey = incoming.groqApiKey;
-  }
-  if (working.cerebrasApiKey === undefined && incoming.cerebrasApiKey) {
-    working.cerebrasApiKey = incoming.cerebrasApiKey;
+  if (working.nvidiaApiKey === undefined && incoming.nvidiaApiKey) {
+    working.nvidiaApiKey = incoming.nvidiaApiKey;
   }
   if (working.geminiApiKey === undefined && incoming.geminiApiKey) {
     working.geminiApiKey = incoming.geminiApiKey;
+  }
+  if (working.nvidiaModel === undefined && incoming.nvidiaModel) {
+    working.nvidiaModel = incoming.nvidiaModel;
   }
   if (working.myDaySchedule === undefined && incoming.myDaySchedule) {
     working.myDaySchedule = incoming.myDaySchedule;

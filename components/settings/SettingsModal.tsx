@@ -2,14 +2,17 @@
 
 import React, { useState, useEffect } from "react";
 import {
+  AIProvider,
   AITone,
   BADGE_COLOR_KEYS,
   BADGE_COLOR_MAP,
   BadgeColorKey,
   ColumnHeadersConfig,
   CustomOptionItem,
+  DEFAULT_NVIDIA_MODEL,
   DEFAULT_WORKSPACE_CONFIG,
   getBadgeClasses,
+  NVIDIA_MODEL_OPTIONS,
   THEME_OPTIONS,
   ThemeName,
   UserProfile,
@@ -67,7 +70,8 @@ interface SettingsModalProps {
   onSetAiTemporarilyDisabled: (disabled: boolean) => void;
   onSaveApiKey: (
     key: string | null,
-    provider?: "groq" | "cerebras" | "gemini"
+    provider?: AIProvider,
+    nvidiaModel?: string
   ) => void;
   onUpdateProfile: (updates: Partial<UserProfile>) => void;
   onUpdateWorkspaceConfig: (updates: Partial<WorkspaceConfig>) => void;
@@ -256,13 +260,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [gcalMessage, setGcalMessage] = useState<string>("");
   const [copiedIcs, setCopiedIcs] = useState(false);
   const [newSectionTitle, setNewSectionTitle] = useState("");
-  const [aiProvider, setAiProvider] = useState<"groq" | "cerebras" | "gemini">(
+  const [aiProvider, setAiProvider] = useState<AIProvider>(
     workspaceConfig.aiProvider ||
-      (effectiveApiKey.startsWith("gsk_")
-        ? "groq"
-        : effectiveApiKey.startsWith("csk-")
-        ? "cerebras"
-        : "groq")
+      (effectiveApiKey.startsWith("AIza") ? "gemini" : "nvidia")
   );
   const [apiKeyDraft, setApiKeyDraft] = useState<string>(effectiveApiKey || "");
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
@@ -280,19 +280,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setApiKeyDraft(effectiveApiKey || "");
-      if (effectiveApiKey.startsWith("gsk_")) {
-        setAiProvider("groq");
-      } else if (effectiveApiKey.startsWith("csk-")) {
-        setAiProvider("cerebras");
-      } else if (effectiveApiKey.startsWith("AIza")) {
-        setAiProvider("gemini");
-      } else if (workspaceConfig.aiProvider) {
-        setAiProvider(workspaceConfig.aiProvider);
-      }
+      const nextProvider: AIProvider =
+        workspaceConfig.aiProvider ||
+        (effectiveApiKey.startsWith("AIza") ? "gemini" : "nvidia");
+      setAiProvider(nextProvider);
+      const providerKey =
+        nextProvider === "nvidia"
+          ? workspaceConfig.nvidiaApiKey ||
+            (effectiveApiKey.startsWith("nvapi-") ? effectiveApiKey : "")
+          : workspaceConfig.geminiApiKey ||
+            (effectiveApiKey.startsWith("AIza") ? effectiveApiKey : "");
+      setApiKeyDraft(providerKey || effectiveApiKey || "");
       setApiKeyStatus(null);
     }
-  }, [isOpen, effectiveApiKey, workspaceConfig.aiProvider]);
+  }, [
+    isOpen,
+    effectiveApiKey,
+    workspaceConfig.aiProvider,
+    workspaceConfig.nvidiaApiKey,
+    workspaceConfig.geminiApiKey,
+  ]);
 
   if (!isOpen) return null;
 
@@ -305,11 +312,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setApiKeyStatus({
         type: "error",
         text:
-          aiProvider === "groq"
-            ? "Please paste your Groq Cloud API key first."
-            : aiProvider === "cerebras"
-            ? "Please paste your Cerebras Cloud API key first."
-            : "Please paste your Google AI API key first.",
+          aiProvider === "nvidia"
+            ? "Please paste your NVIDIA NIM API key (nvapi-...) first."
+            : "Please paste your Google Gemini API key (AIza...) first.",
       });
       return;
     }
@@ -324,6 +329,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           mode: "verify",
           customApiKey: trimmed,
           aiProvider,
+          nvidiaModel: workspaceConfig.nvidiaModel || DEFAULT_NVIDIA_MODEL,
         }),
       });
       const data = await res.json();
@@ -332,25 +338,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           type: "error",
           text:
             data.error ||
-            (aiProvider === "groq"
-              ? "Groq Cloud rejected this API key (starts with gsk_...)."
-              : aiProvider === "cerebras"
-              ? "Cerebras Cloud rejected this API key (starts with csk-...)."
+            (aiProvider === "nvidia"
+              ? "NVIDIA NIM rejected this API key (starts with nvapi-...)."
               : "Google AI rejected this API key (starts with AIza...)."),
         });
         return;
       }
 
-      onSaveApiKey(trimmed, aiProvider);
+      onSaveApiKey(
+        trimmed,
+        aiProvider,
+        workspaceConfig.nvidiaModel || DEFAULT_NVIDIA_MODEL
+      );
       onSetAiTemporarilyDisabled(false);
       setApiKeyStatus({
         type: "success",
         text: `Verified & connected! Your ${
-          aiProvider === "groq"
-            ? "Groq Cloud"
-            : aiProvider === "cerebras"
-            ? "Cerebras Cloud"
-            : "Google Gemini"
+          aiProvider === "nvidia" ? "NVIDIA NIM" : "Google Gemini"
         } Agent is active.`,
       });
     } catch {
@@ -1180,10 +1184,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div>
                     <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
                       <KeyRound className="w-4 h-4 text-primary" />
-                      AI Provider &amp; API Key Setup
+                      AI Provider &amp; Model Setup (NVIDIA NIM + Google Gemini)
                     </h4>
                     <p className="text-[11px] text-white/55 mt-0.5">
-                      Choose your preferred AI provider. Groq Cloud is 100% free forever with no credit card required and delivers ~500 tok/s.
+                      Pair NVIDIA NIM (free inference on leading models at build.nvidia.com) with Google Gemini for automatic failover.
                     </p>
                   </div>
 
@@ -1191,12 +1195,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1 text-[10px] font-semibold text-emerald-300">
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       Connected (
-                      {aiProvider === "groq"
-                        ? "Groq"
-                        : aiProvider === "cerebras"
-                        ? "Cerebras"
-                        : "Gemini"}{" "}
-                      • {effectiveApiKey.slice(0, 5)}••••
+                      {aiProvider === "nvidia" ? "NVIDIA NIM" : "Google Gemini"}{" "}
+                      • {effectiveApiKey.slice(0, 6)}••••
                       {effectiveApiKey.slice(-4)})
                     </span>
                   ) : (
@@ -1208,28 +1208,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* Provider Selector Tabs */}
-                <div className="grid grid-cols-3 gap-2 rounded-xl bg-white/[0.04] p-1 border border-white/10">
+                <div className="grid grid-cols-2 gap-2 rounded-xl bg-white/[0.04] p-1 border border-white/10">
                   <button
                     type="button"
                     onClick={() => {
-                      setAiProvider("groq");
+                      setAiProvider("nvidia");
+                      onUpdateWorkspaceConfig({ aiProvider: "nvidia" });
+                      setApiKeyDraft(
+                        workspaceConfig.nvidiaApiKey ||
+                          (effectiveApiKey.startsWith("nvapi-") ? effectiveApiKey : "")
+                      );
                       if (apiKeyStatus) setApiKeyStatus(null);
                     }}
                     className={`flex items-center justify-center gap-1.5 rounded-lg py-2 px-2 text-xs font-bold transition-all ${
-                      aiProvider === "groq"
+                      aiProvider === "nvidia"
                         ? "bg-primary text-black shadow-neon"
                         : "text-white/70 hover:text-white hover:bg-white/5"
                     }`}
                   >
-                    <span>Groq Cloud</span>
+                    <span>NVIDIA NIM</span>
                     <span
                       className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold uppercase tracking-wider ${
-                        aiProvider === "groq"
+                        aiProvider === "nvidia"
                           ? "bg-black/20 text-black"
                           : "bg-emerald-500/20 text-emerald-300"
                       }`}
                     >
-                      Free Forever
+                      Free Inference
                     </span>
                   </button>
 
@@ -1237,6 +1242,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     type="button"
                     onClick={() => {
                       setAiProvider("gemini");
+                      onUpdateWorkspaceConfig({ aiProvider: "gemini" });
+                      setApiKeyDraft(
+                        workspaceConfig.geminiApiKey ||
+                          (effectiveApiKey.startsWith("AIza") ? effectiveApiKey : "")
+                      );
                       if (apiKeyStatus) setApiKeyStatus(null);
                     }}
                     className={`flex items-center justify-center gap-1.5 rounded-lg py-2 px-2 text-xs font-bold transition-all ${
@@ -1246,77 +1256,101 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     }`}
                   >
                     <span>Google Gemini</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAiProvider("cerebras");
-                      if (apiKeyStatus) setApiKeyStatus(null);
-                    }}
-                    className={`flex items-center justify-center gap-1.5 rounded-lg py-2 px-2 text-xs font-bold transition-all ${
-                      aiProvider === "cerebras"
-                        ? "bg-primary text-black shadow-neon"
-                        : "text-white/70 hover:text-white hover:bg-white/5"
-                    }`}
-                  >
-                    <span>Cerebras Cloud</span>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold uppercase tracking-wider ${
+                        aiProvider === "gemini"
+                          ? "bg-black/20 text-black"
+                          : "bg-white/10 text-white/60"
+                      }`}
+                    >
+                      Paired
+                    </span>
                   </button>
                 </div>
 
-                {/* Dynamic 3-Step Instructions */}
-                {aiProvider === "groq" ? (
-                  <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3.5 space-y-2 text-[11px] text-white/75">
-                    <div className="font-semibold text-white/90">
-                      How to get a free Groq Cloud API key (~20 seconds, no credit card):
+                {/* NVIDIA NIM Model Selector */}
+                {aiProvider === "nvidia" && (
+                  <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-white/90">
+                        Active NVIDIA NIM Model
+                      </label>
+                      <span className="text-[10px] text-white/45">
+                        Also switchable anytime in the chat bar
+                      </span>
                     </div>
-                    <ol className="list-decimal pl-4 space-y-1 text-white/65">
-                      <li>
-                        Open{" "}
-                        <a
-                          href="https://console.groq.com"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-highlight underline underline-offset-2 hover:brightness-110 font-medium"
-                        >
-                          console.groq.com
-                          <ExternalLink className="w-3 h-3" />
-                        </a>{" "}
-                        and sign in with GitHub, Google, or email.
-                      </li>
-                      <li>
-                        Click <strong className="text-white/90">&ldquo;API Keys&rdquo;</strong> in the left sidebar and click <strong className="text-white/90">&ldquo;Create API Key&rdquo;</strong>.
-                      </li>
-                      <li>
-                        Copy the key (starts with <code className="text-highlight">gsk_...</code>),
-                        paste it below, and click <strong className="text-white/90">Verify &amp; Save Key</strong>.
-                      </li>
-                    </ol>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      {NVIDIA_MODEL_OPTIONS.map((m) => {
+                        const isSelected =
+                          (workspaceConfig.nvidiaModel || DEFAULT_NVIDIA_MODEL) ===
+                          m.id;
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() =>
+                              onUpdateWorkspaceConfig({
+                                nvidiaModel: m.id,
+                                aiProvider: "nvidia",
+                              })
+                            }
+                            className={`flex flex-col items-start rounded-lg border px-2.5 py-2 text-left transition-all ${
+                              isSelected
+                                ? "border-primary/60 bg-primary/15 text-white"
+                                : "border-white/10 bg-black/30 text-white/70 hover:border-white/25 hover:text-white"
+                            }`}
+                          >
+                            <div className="flex w-full items-center justify-between gap-1.5">
+                              <span className="text-[11px] font-bold truncate">
+                                {m.name}
+                              </span>
+                              <span
+                                className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold ${
+                                  isSelected
+                                    ? "bg-primary text-black"
+                                    : "bg-white/10 text-white/65"
+                                }`}
+                              >
+                                {m.badge}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-white/45 truncate w-full mt-0.5">
+                              {m.provider} • {m.desc}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                ) : aiProvider === "cerebras" ? (
+                )}
+
+                {/* Dynamic 3-Step Instructions */}
+                {aiProvider === "nvidia" ? (
                   <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3.5 space-y-2 text-[11px] text-white/75">
                     <div className="font-semibold text-white/90">
-                      How to get a Cerebras Cloud API key:
+                      How to get a free NVIDIA NIM API key (~30 seconds):
                     </div>
                     <ol className="list-decimal pl-4 space-y-1 text-white/65">
                       <li>
                         Open{" "}
                         <a
-                          href="https://cloud.cerebras.ai"
+                          href="https://build.nvidia.com/models"
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-1 text-highlight underline underline-offset-2 hover:brightness-110 font-medium"
                         >
-                          cloud.cerebras.ai
+                          build.nvidia.com/models
                           <ExternalLink className="w-3 h-3" />
                         </a>{" "}
-                        and sign in.
+                        and sign in with your email, Google, or NVIDIA account.
                       </li>
                       <li>
-                        Navigate to <strong className="text-white/90">&ldquo;API Keys&rdquo;</strong> and click <strong className="text-white/90">&ldquo;Create API Key&rdquo;</strong>.
+                        Click any model and click{" "}
+                        <strong className="text-white/90">&ldquo;Get API Key&rdquo;</strong>{" "}
+                        (or <strong className="text-white/90">&ldquo;Generate Key&rdquo;</strong>) in the top right.
                       </li>
                       <li>
-                        Copy the key (starts with <code className="text-highlight">csk-...</code>),
+                        Copy the key (starts with <code className="text-highlight">nvapi-...</code>),
                         paste it below, and click <strong className="text-white/90">Verify &amp; Save Key</strong>.
                       </li>
                     </ol>
@@ -1369,16 +1403,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         onChange={(e) => {
                           const val = e.target.value;
                           setApiKeyDraft(val);
-                          if (val.startsWith("gsk_")) setAiProvider("groq");
-                          if (val.startsWith("csk-")) setAiProvider("cerebras");
+                          if (val.startsWith("nvapi-")) setAiProvider("nvidia");
                           if (val.startsWith("AIza")) setAiProvider("gemini");
                           if (apiKeyStatus) setApiKeyStatus(null);
                         }}
                         placeholder={
-                          aiProvider === "groq"
-                            ? "Paste Groq API key (gsk_...)"
-                            : aiProvider === "cerebras"
-                            ? "Paste Cerebras API key (csk-...)"
+                          aiProvider === "nvidia"
+                            ? "Paste NVIDIA NIM API key (nvapi-...)"
                             : "Paste Google AI API key (AIzaSy...)"
                         }
                         autoComplete="off"
@@ -1417,15 +1448,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       )}
                     </button>
 
-                    {hasSavedKey && (
+                    {apiKeyDraft.trim() && (
                       <button
                         type="button"
                         onClick={() => {
                           setApiKeyDraft("");
-                          onSaveApiKey(null);
+                          onSaveApiKey(null, aiProvider);
                           setApiKeyStatus({
                             type: "success",
-                            text: "Removed saved Google AI API key.",
+                            text: `Removed saved ${
+                              aiProvider === "nvidia"
+                                ? "NVIDIA NIM"
+                                : "Google Gemini"
+                            } API key.`,
                           });
                         }}
                         className="inline-flex items-center justify-center gap-1 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2.5 text-xs font-semibold text-red-300 hover:bg-red-500/20 transition-colors shrink-0"

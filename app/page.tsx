@@ -2,8 +2,10 @@
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
+  AIProvider,
   AgentUndoSnapshot,
   AgentWorkspaceMutationPayload,
+  DEFAULT_NVIDIA_MODEL,
   DEFAULT_WORKSPACE_CONFIG,
   getWorkspaceConfig,
   HeroChatMessage,
@@ -159,47 +161,46 @@ export default function KiteWorkspacePage() {
   const canAccessWorkspace = isAuthenticated || !supabaseEnabled;
 
   const effectiveApiKey = useMemo(() => {
-    const provider = workspaceConfig.aiProvider || "groq";
-    if (provider === "groq") {
-      const key =
-        workspaceConfig.groqApiKey ||
-        (profile.custom_ai_api_key?.startsWith("gsk_")
-          ? profile.custom_ai_api_key
-          : null) ||
-        (localApiKey?.startsWith("gsk_") ? localApiKey : null) ||
-        workspaceConfig.cerebrasApiKey ||
-        workspaceConfig.geminiApiKey ||
-        profile.custom_ai_api_key ||
-        localApiKey ||
-        "";
-      return key.trim();
+    const isSupportedKey = (k?: string | null): k is string =>
+      Boolean(
+        k &&
+          k.trim().length >= 15 &&
+          !k.trim().startsWith("gsk_") &&
+          !k.trim().startsWith("csk-")
+      );
+
+    const provider = workspaceConfig.aiProvider || "nvidia";
+    const nvKey =
+      (isSupportedKey(workspaceConfig.nvidiaApiKey)
+        ? workspaceConfig.nvidiaApiKey
+        : null) ||
+      (profile.custom_ai_api_key?.startsWith("nvapi-")
+        ? profile.custom_ai_api_key
+        : null) ||
+      (localApiKey?.startsWith("nvapi-") ? localApiKey : null);
+
+    const gemKey =
+      (isSupportedKey(workspaceConfig.geminiApiKey)
+        ? workspaceConfig.geminiApiKey
+        : null) ||
+      (profile.custom_ai_api_key?.startsWith("AIza")
+        ? profile.custom_ai_api_key
+        : null) ||
+      (localApiKey?.startsWith("AIza") ? localApiKey : null);
+
+    const fallbackKey = isSupportedKey(profile.custom_ai_api_key)
+      ? profile.custom_ai_api_key
+      : isSupportedKey(localApiKey)
+      ? localApiKey
+      : "";
+
+    if (provider === "nvidia") {
+      return (nvKey || gemKey || fallbackKey || "").trim();
     }
-    if (provider === "cerebras") {
-      const key =
-        workspaceConfig.cerebrasApiKey ||
-        (profile.custom_ai_api_key?.startsWith("csk-")
-          ? profile.custom_ai_api_key
-          : null) ||
-        (localApiKey?.startsWith("csk-") ? localApiKey : null) ||
-        workspaceConfig.groqApiKey ||
-        workspaceConfig.geminiApiKey ||
-        profile.custom_ai_api_key ||
-        localApiKey ||
-        "";
-      return key.trim();
-    }
-    const key =
-      workspaceConfig.geminiApiKey ||
-      workspaceConfig.groqApiKey ||
-      workspaceConfig.cerebrasApiKey ||
-      profile.custom_ai_api_key ||
-      localApiKey ||
-      "";
-    return key.trim();
+    return (gemKey || nvKey || fallbackKey || "").trim();
   }, [
     workspaceConfig.aiProvider,
-    workspaceConfig.groqApiKey,
-    workspaceConfig.cerebrasApiKey,
+    workspaceConfig.nvidiaApiKey,
     workspaceConfig.geminiApiKey,
     profile.custom_ai_api_key,
     localApiKey,
@@ -1004,7 +1005,7 @@ export default function KiteWorkspacePage() {
 
   // 11b. Save or clear AI API key across localStorage, profile, and workspaceConfig
   const handleSaveApiKey = useCallback(
-    (key: string | null, provider?: "groq" | "cerebras" | "gemini") => {
+    (key: string | null, provider?: AIProvider, nvidiaModel?: string) => {
       const cleaned = key ? key.trim() : null;
       setLocalApiKey(cleaned || "");
 
@@ -1018,23 +1019,20 @@ export default function KiteWorkspacePage() {
         } catch {}
       }
 
-      const detectedProvider: "groq" | "cerebras" | "gemini" =
+      const detectedProvider: AIProvider =
         provider ||
-        (cleaned?.startsWith("gsk_")
-          ? "groq"
-          : cleaned?.startsWith("csk-")
-          ? "cerebras"
+        (cleaned?.startsWith("nvapi-")
+          ? "nvidia"
           : cleaned?.startsWith("AIza")
           ? "gemini"
-          : workspaceConfig.aiProvider || "groq");
+          : workspaceConfig.aiProvider || "nvidia");
 
       handleUpdateProfile({ custom_ai_api_key: cleaned });
       handleUpdateWorkspaceConfig({
         aiProvider: detectedProvider,
-        ...(detectedProvider === "groq"
-          ? { groqApiKey: cleaned }
-          : detectedProvider === "cerebras"
-          ? { cerebrasApiKey: cleaned }
+        ...(nvidiaModel ? { nvidiaModel } : {}),
+        ...(detectedProvider === "nvidia"
+          ? { nvidiaApiKey: cleaned }
           : { geminiApiKey: cleaned }),
       });
 
@@ -1048,17 +1046,20 @@ export default function KiteWorkspacePage() {
         setIsGeminiSetupOpen(false);
         setActiveTab("chat");
         showToast(
-          detectedProvider === "groq"
-            ? "Groq Cloud connected (Fast LPU • Free Forever)!"
-            : detectedProvider === "cerebras"
-            ? "Cerebras Cloud connected (~2,000 tok/s)!"
+          detectedProvider === "nvidia"
+            ? "NVIDIA NIM connected (Free Inference on Leading Models)!"
             : "Google Gemini connected!"
         );
       } else {
         showToast("Removed saved AI API key.");
       }
     },
-    [handleUpdateProfile, handleUpdateWorkspaceConfig, showToast, workspaceConfig.aiProvider]
+    [
+      handleUpdateProfile,
+      handleUpdateWorkspaceConfig,
+      showToast,
+      workspaceConfig.aiProvider,
+    ]
   );
 
   // 11c. Apply live mutations executed by the Gemini Workspace Agent & persist to Supabase
@@ -1477,7 +1478,10 @@ export default function KiteWorkspacePage() {
                   queuedPrompt={queuedChatPrompt}
                   onConsumeQueuedPrompt={() => setQueuedChatPrompt(null)}
                   onSelectTab={setActiveTab}
-                  onSaveApiKey={(key) => handleSaveApiKey(key)}
+                  onSaveApiKey={(key, provider, nvidiaModel) =>
+                    handleSaveApiKey(key, provider, nvidiaModel)
+                  }
+                  onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
                   onOpenApiKeySetup={() => setIsGeminiSetupOpen(true)}
                   onOptOutTemporary={() => handleSetAiTemporarilyDisabled(true)}
                   onChangeTone={(tone) => handleUpdateProfile({ ai_tone: tone })}
@@ -1547,13 +1551,18 @@ export default function KiteWorkspacePage() {
         )}
       </div>
 
-      {/* Google AI API Key Onboarding & Setup Modal */}
+      {/* NVIDIA NIM + Google Gemini API Key Onboarding & Setup Modal */}
       {canAccessWorkspace && (
         <GeminiSetupModal
           isOpen={isGeminiSetupOpen}
           initialKey={effectiveApiKey}
-          initialProvider={workspaceConfig.aiProvider || "groq"}
-          onSaveApiKey={(key, provider) => handleSaveApiKey(key, provider)}
+          initialProvider={workspaceConfig.aiProvider || "nvidia"}
+          initialNvidiaModel={
+            workspaceConfig.nvidiaModel || DEFAULT_NVIDIA_MODEL
+          }
+          onSaveApiKey={(key, provider, nvidiaModel) =>
+            handleSaveApiKey(key, provider, nvidiaModel)
+          }
           onOptOutTemporary={() => handleSetAiTemporarilyDisabled(true)}
           onClose={() => setIsGeminiSetupOpen(false)}
         />
