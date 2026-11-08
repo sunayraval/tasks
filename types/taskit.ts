@@ -199,7 +199,7 @@ export const NVIDIA_MODEL_OPTIONS: NvidiaModelOption[] = [
   },
 ];
 
-export const DEFAULT_NVIDIA_MODEL = "nvidia/nemotron-3.5-super-vl-120b-a12b";
+export const DEFAULT_NVIDIA_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b";
 
 export interface WorkspaceConfig {
   workspaceTitle: string;

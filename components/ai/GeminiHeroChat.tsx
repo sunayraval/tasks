@@ -633,7 +633,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
     const controller = new AbortController();
     const abortTimeout = setTimeout(() => {
       controller.abort();
-    }, 22000);
+    }, 45000);
 
     try {
       const now = new Date();
@@ -727,7 +727,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           id: `err-${Date.now()}`,
           role: "assistant",
           content: isTimeout
-            ? "The AI model took longer than 20s to respond. Please try again."
+            ? "The AI agent took longer than 45s to respond. Please check your internet connection or try again."
             : "Network hiccup while reaching the AI agent endpoint. Please try again.",
           timestamp: nowLabel,
           isError: true,

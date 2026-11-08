@@ -44,7 +44,7 @@ import {
   swapScheduleBlocks,
 } from "@/utils/myDayUtils";
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 const TONE_PROMPTS: Record<AITone, string> = {
@@ -2795,6 +2795,12 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
     let succeeded = false;
     const tStart = Date.now();
 
+    const isGreeting =
+      /^(hi|hey|hello|yo|sup|howdy|good morning|good afternoon|good evening)[!.]*$/i.test(
+        userMessage.trim()
+      );
+    const effectiveTools = isGreeting ? {} : tools;
+
     const runNvidiaChat = async (apiKeyToUse: string): Promise<boolean> => {
       if (!apiKeyToUse || apiKeyToUse.length < 15) return false;
       const nvidia = createOpenAI({
@@ -2803,27 +2809,22 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
         compatibility: "compatible",
       });
 
-      const nvidiaCandidates = Array.from(
-        new Set([
-          requestedNvidiaModel,
-          "nvidia/nemotron-3.5-super-vl-120b-a12b",
-          "nvidia/nemotron-3.5-lightning-30b-a3b",
-          "deepseek-ai/deepseek-v4.1-flash",
-          "mistralai/mistral-large-4-1t-a52b",
-          "moonshotai/kimi-k2.6",
-          "google/gemma-4-31b-it",
-        ])
-      );
+      const primaryModel = requestedNvidiaModel || DEFAULT_NVIDIA_MODEL;
+      const backupModel =
+        primaryModel !== "nvidia/nemotron-3.5-lightning-30b-a3b"
+          ? "nvidia/nemotron-3.5-lightning-30b-a3b"
+          : "deepseek-ai/deepseek-v4.1-flash";
 
-      usedModel = nvidiaCandidates[0];
+      const candidates = [primaryModel, backupModel];
+      const candidateTimeoutMs = qaSubmission ? 25000 : 20000;
 
-      for (const candidate of nvidiaCandidates) {
+      for (const candidate of candidates) {
         const candStart = Date.now();
         try {
           const timeoutPromise = new Promise<never>((_, reject) =>
             setTimeout(
               () => reject(new Error(`Timeout on NVIDIA model ${candidate}`)),
-              qaSubmission ? 12000 : 8500
+              candidateTimeoutMs
             )
           );
 
@@ -2832,8 +2833,8 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               model: nvidia(candidate),
               system: systemPrompt,
               messages: conversationMessages,
-              tools,
-              maxSteps: qaSubmission ? 5 : 4,
+              tools: effectiveTools,
+              maxSteps: isGreeting ? 1 : qaSubmission ? 5 : 4,
               maxTokens: 1200,
             }),
             timeoutPromise,
@@ -2874,11 +2875,11 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
       const google = createGoogleGenerativeAI({ apiKey: apiKeyToUse });
       const modelChain =
         modelChoice === "pro"
-          ? ["gemini-1.5-pro", "gemini-2.0-flash", "gemini-1.5-flash"]
-          : ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
+          ? ["gemini-1.5-pro", "gemini-2.0-flash"]
+          : ["gemini-2.0-flash", "gemini-1.5-flash"];
 
       usedModel = modelChain[0];
-      const candidateTimeoutMs = qaSubmission ? 12000 : 7000;
+      const candidateTimeoutMs = qaSubmission ? 25000 : 20000;
 
       for (const candidate of modelChain) {
         const candStart = Date.now();
@@ -2895,8 +2896,8 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               model: google(candidate),
               system: systemPrompt,
               messages: conversationMessages,
-              tools,
-              maxSteps: qaSubmission ? 5 : 4,
+              tools: effectiveTools,
+              maxSteps: isGreeting ? 1 : qaSubmission ? 5 : 4,
               maxTokens: 1200,
             }),
             timeoutPromise,
