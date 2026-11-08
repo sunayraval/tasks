@@ -57,6 +57,7 @@ import {
   Clock,
   Coffee,
   GripVertical,
+  HelpCircle,
   KeyRound,
   ListPlus,
   Loader2,
@@ -81,6 +82,7 @@ interface MyDayViewProps {
   onUpdateTask: (taskId: string, updates: Partial<TaskItem>) => void;
   onOpenApiKeySetup: () => void;
   onShowToast: (msg: string) => void;
+  onLaunchGuidedDayPlan?: () => void;
 }
 
 interface SortableBlockCardProps {
@@ -523,6 +525,7 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
   onUpdateTask,
   onOpenApiKeySetup,
   onShowToast,
+  onLaunchGuidedDayPlan,
 }) => {
   const schedule = workspaceConfig.myDaySchedule || null;
   const blocks = useMemo(() => schedule?.blocks || [], [schedule]);
@@ -1075,8 +1078,24 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
 
                   <div className="max-h-56 overflow-y-auto space-y-1.5 rounded-2xl border border-white/10 bg-black/35 p-2">
                     {filteredManualTasks.length === 0 ? (
-                      <div className="py-6 text-center text-xs text-white/45">
-                        No matching tasks found in your Tasks table.
+                      <div className="py-5 px-3 text-center space-y-2.5 text-xs text-white/50">
+                        <div>
+                          {tableTasks.length === 0
+                            ? "Your Tasks list is currently empty."
+                            : "No matching tasks found in your Tasks table."}
+                        </div>
+                        {activeTableTasks.length === 0 &&
+                          !aiTemporarilyDisabled &&
+                          onLaunchGuidedDayPlan && (
+                            <button
+                              type="button"
+                              onClick={onLaunchGuidedDayPlan}
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/15 hover:bg-primary/25 px-3 py-1.5 text-[11px] font-semibold text-highlight transition-colors"
+                            >
+                              <HelpCircle className="w-3.5 h-3.5 text-primary" />
+                              <span>Ask AI Q&amp;A to Plan My Day</span>
+                            </button>
+                          )}
                       </div>
                     ) : (
                       filteredManualTasks.map((t) => {
@@ -1356,56 +1375,78 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
                 </div>
 
                 <div className="max-h-52 overflow-y-auto space-y-1 rounded-2xl border border-white/10 bg-black/35 p-2">
-                  {filteredAiTasks.map((t) => {
-                    const checked = aiSelectedIds.has(t.id);
-                    const recMins = recommendTaskMinutes(t);
-                    const done = isTaskDoneStatus(t);
+                  {filteredAiTasks.length === 0 ? (
+                    <div className="py-5 px-3 text-center space-y-2.5 text-xs text-white/50">
+                      <div>
+                        {tableTasks.length === 0
+                          ? "No tasks on your list yet."
+                          : "No matching tasks found."}
+                      </div>
+                      {activeTableTasks.length === 0 &&
+                        !aiTemporarilyDisabled &&
+                        onLaunchGuidedDayPlan && (
+                          <button
+                            type="button"
+                            onClick={onLaunchGuidedDayPlan}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/15 hover:bg-primary/25 px-3 py-1.5 text-[11px] font-semibold text-highlight transition-colors"
+                          >
+                            <HelpCircle className="w-3.5 h-3.5 text-primary" />
+                            <span>Let AI Ask Questions &amp; Build My Day</span>
+                          </button>
+                        )}
+                    </div>
+                  ) : (
+                    filteredAiTasks.map((t) => {
+                      const checked = aiSelectedIds.has(t.id);
+                      const recMins = recommendTaskMinutes(t);
+                      const done = isTaskDoneStatus(t);
 
-                    return (
-                      <label
-                        key={t.id}
-                        className={`flex items-center justify-between gap-2.5 rounded-xl border px-3 py-2 text-xs cursor-pointer transition-colors ${
-                          checked
-                            ? "border-primary/45 bg-primary/15 text-white"
-                            : "border-transparent bg-white/[0.02] hover:bg-white/[0.06] text-white/70"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => {
-                              setAiSelectedIds((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(t.id)) next.delete(t.id);
-                                else next.add(t.id);
-                                return next;
-                              });
-                            }}
-                            className="rounded accent-[var(--primary)] shrink-0"
-                          />
-                          <div className="min-w-0">
-                            <div
-                              className={`font-medium truncate ${
-                                done ? "line-through text-white/45" : ""
-                              }`}
-                            >
-                              {t.title}
-                            </div>
-                            <div className="text-[10px] text-white/45">
-                              {t.priority} • {t.type}
+                      return (
+                        <label
+                          key={t.id}
+                          className={`flex items-center justify-between gap-2.5 rounded-xl border px-3 py-2 text-xs cursor-pointer transition-colors ${
+                            checked
+                              ? "border-primary/45 bg-primary/15 text-white"
+                              : "border-transparent bg-white/[0.02] hover:bg-white/[0.06] text-white/70"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                setAiSelectedIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(t.id)) next.delete(t.id);
+                                  else next.add(t.id);
+                                  return next;
+                                });
+                              }}
+                              className="rounded accent-[var(--primary)] shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <div
+                                className={`font-medium truncate ${
+                                  done ? "line-through text-white/45" : ""
+                                }`}
+                              >
+                                {t.title}
+                              </div>
+                              <div className="text-[10px] text-white/45">
+                                {t.priority} • {t.type}
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        <span className="rounded-md border border-white/10 bg-black/40 px-2 py-0.5 font-mono text-[10px] text-highlight shrink-0">
-                          {t.estimated_minutes > 0
-                            ? `${t.estimated_minutes}m rec`
-                            : `~${recMins}m`}
-                        </span>
-                      </label>
-                    );
-                  })}
+                          <span className="rounded-md border border-white/10 bg-black/40 px-2 py-0.5 font-mono text-[10px] text-highlight shrink-0">
+                            {t.estimated_minutes > 0
+                              ? `${t.estimated_minutes}m rec`
+                              : `~${recMins}m`}
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
@@ -1586,21 +1627,33 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
                   Your my day schedule is open
                 </h4>
                 <p className="text-xs text-white/55 leading-relaxed">
-                  Use <strong>Manual Build</strong> on the left to pick tasks
-                  with custom timeframes, or switch to{" "}
-                  <strong>AI Auto-Arrange</strong> to automatically fit your
-                  tasks between your start and end time.
+                  {activeTableTasks.length === 0
+                    ? "Don't have tasks on your list yet? Let kite ask you a few quick questions to populate both your Tasks list and your my day schedule."
+                    : "Use Manual Build on the left to pick tasks with custom timeframes, or switch to AI Auto-Arrange to automatically fit your tasks between your start and end time."}
                 </p>
               </div>
-              <div className="pt-1">
-                <button
-                  type="button"
-                  onClick={() => setBuilderMode("ai")}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/15 hover:bg-primary/25 px-4 py-2 text-xs font-bold text-highlight transition-colors"
-                >
-                  <Wand2 className="w-3.5 h-3.5" />
-                  <span>Try AI Auto-Arrange</span>
-                </button>
+              <div className="pt-1 flex flex-wrap items-center justify-center gap-2">
+                {activeTableTasks.length === 0 &&
+                !aiTemporarilyDisabled &&
+                onLaunchGuidedDayPlan ? (
+                  <button
+                    type="button"
+                    onClick={onLaunchGuidedDayPlan}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-extrabold text-black shadow-neon hover:brightness-110 transition-all"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5" />
+                    <span>Plan My Day via Guided Q&amp;A</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setBuilderMode("ai")}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/15 hover:bg-primary/25 px-4 py-2 text-xs font-bold text-highlight transition-colors"
+                  >
+                    <Wand2 className="w-3.5 h-3.5" />
+                    <span>Try AI Auto-Arrange</span>
+                  </button>
+                )}
               </div>
             </div>
           ) : (

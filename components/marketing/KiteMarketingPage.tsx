@@ -1273,8 +1273,8 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
                 <div className="grid grid-cols-2 gap-2">
                   {(
                     [
+                      { id: "aurora", label: "Clean Aurora" },
                       { id: "cyber", label: "Cyber Horizon" },
-                      { id: "rain", label: "Midnight Rain" },
                       { id: "lofi", label: "Lofi Bokeh" },
                       { id: "particles", label: "Starlight Drift" },
                     ] as const

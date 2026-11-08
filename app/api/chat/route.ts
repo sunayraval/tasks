@@ -4,6 +4,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 import {
   AgentExecutedAction,
+  AgentQAPrompt,
   AgentWorkspaceMutationPayload,
   AIModelChoice,
   AITone,
@@ -12,6 +13,8 @@ import {
   DEFAULT_WORKSPACE_CONFIG,
   MyDayBlock,
   MyDaySchedule,
+  normalizeVideoPreset,
+  QASubmissionPayload,
   TaskItem,
   THEME_OPTIONS,
   ThemeName,
@@ -77,6 +80,113 @@ function isHeaderRow(t: TaskItem): boolean {
 function isDoneStatus(status: string): boolean {
   const s = (status || "").trim().toLowerCase();
   return s === "done" || s === "completed" || s === "complete";
+}
+
+function isEmptyBoardDayPlanRequest(rawMsg: string): boolean {
+  const msg = (rawMsg || "").trim();
+  if (!msg) return false;
+  const lower = msg.toLowerCase();
+
+  // Standard quick-prompt chip for auto-arranging active tasks when board is empty
+  if (lower.includes("auto-arrange all my active tasks")) {
+    return true;
+  }
+
+  // If the user already supplied concrete tasks in their prompt (e.g. colon list, multi-comma list, or explicit "add ..."), let the agent process them directly
+  if (
+    msg.includes(":") ||
+    msg.includes("\n") ||
+    /\b(i need to|i have to|i gotta|add\s+these|tasks\s+are)\b/i.test(lower) ||
+    ((msg.match(/,/g) || []).length >= 2 && msg.length > 60)
+  ) {
+    return false;
+  }
+
+  return (
+    /\b(plan|arrange|auto[- ]?arrange|schedule|build|set\s*up|organize|structure|map\s*out|figure\s*out)\b[\s\S]{0,40}\b(my\s+day|the\s+day|today|my\s+schedule|today'?s\s+schedule|daily\s+plan|my\s+my\s+day)\b/i.test(
+      lower
+    ) ||
+    /\b(help\s+(me\s+)?plan(\s+out)?|what\s+should\s+i\s+(work\s+on|do)\s+today|plan\s+today)\b/i.test(
+      lower
+    )
+  );
+}
+
+function buildEmptyBoardDayQAPrompt(
+  originalRequest: string,
+  defaultStartHHMM: string,
+  defaultEndHHMM: string
+): AgentQAPrompt {
+  return {
+    id: `qa-${Date.now()}`,
+    purpose: "plan_day",
+    originalRequest,
+    consentTitle: "Can I ask a few questions to fulfill your request?",
+    consentSubtitle:
+      "You don't have any active tasks on your list yet. Answer a few quick questions so I can gauge your tasks for today, populate your Tasks list, and build your my day schedule.",
+    submitLabel: "Populate Tasks & Build my day",
+    status: "consent",
+    questions: [
+      {
+        id: "tasks_braindump",
+        question:
+          "What tasks, assignments, or errands do you want to accomplish today?",
+        helperText:
+          "List anything on your plate (comma-separated or one per line)—I'll infer priorities, categories, and durations automatically.",
+        inputType: "textarea",
+        required: true,
+        quickChips: [
+          "Study / Homework",
+          "Deep Work / Project",
+          "Meetings / Calls",
+          "Errands & Admin",
+          "Workout / Health",
+          "Emails & Follow-ups",
+        ],
+        placeholder:
+          "e.g., Finish calc problem set, write history outline, 45m workout, reply to internship emails...",
+      },
+      {
+        id: "priority_order",
+        question: "How should I prioritize and sequence your day?",
+        inputType: "single_choice",
+        options: [
+          "Hardest / highest-impact task first",
+          "Quick wins first to build momentum",
+          "Strict deadline & urgency order",
+          "Balanced mix of deep focus & lighter tasks",
+        ],
+      },
+      {
+        id: "day_timeframe",
+        question: "What timeframe do you want scheduled in my day?",
+        helperText:
+          "Choose a quick window or set your exact start and planned end times.",
+        inputType: "timeframe",
+        defaultStartTime: defaultStartHHMM,
+        defaultEndTime: defaultEndHHMM,
+      },
+      {
+        id: "pacing_style",
+        question: "How should your focus blocks and breaks be paced?",
+        inputType: "single_choice",
+        options: [
+          "Focused 45–60m blocks + short recharge breaks",
+          "Deep 90m flow blocks + breaks",
+          "30m Pomodoro sprints + 5–10m breaks",
+          "Back-to-back blocks (no breaks)",
+        ],
+      },
+    ],
+  };
+}
+
+function parseFallbackTaskTitles(rawAnswer: string): string[] {
+  return rawAnswer
+    .split(/[\n;,]+/)
+    .map((s) => s.replace(/^[-*•\d.)\s]+/, "").trim())
+    .filter((s) => s.length >= 2)
+    .slice(0, 12);
 }
 
 function formatHeaderTitle(raw: string): string {
@@ -496,7 +606,7 @@ ${taskLines}`;
     const modelChoice: AIModelChoice =
       body.modelChoice === "pro" ? "pro" : "flash";
     const currentTheme: ThemeName = body.theme || "cyber_ocean";
-    const videoPreset: VideoPresetName = body.videoPreset || "rain";
+    const videoPreset: VideoPresetName = normalizeVideoPreset(body.videoPreset);
     const videoDim: number =
       typeof body.videoDim === "number" ? body.videoDim : 0.45;
     const videoBlur: number =
@@ -508,6 +618,10 @@ ${taskLines}`;
     };
     const history: Array<{ role: "user" | "assistant"; content: string }> =
       Array.isArray(body.history) ? body.history : [];
+    const qaSubmission: QASubmissionPayload | null =
+      body.qaSubmission && Array.isArray(body.qaSubmission.answers)
+        ? body.qaSubmission
+        : null;
 
     const clientISO: string = body.clientISO || new Date().toISOString();
     const clientNowMs = !isNaN(new Date(clientISO).getTime())
@@ -534,6 +648,10 @@ ${taskLines}`;
     const clientLocalTimeHHMM = minutesToTimeString(
       Math.floor(clientLocalMinutesOfDay)
     );
+    const roundedStartMins =
+      (Math.ceil(clientLocalMinutesOfDay / 15) * 15) % (24 * 60);
+    const defaultStartHHMM = minutesToTimeString(roundedStartMins);
+    const defaultEndHHMM = addMinutesToTime(defaultStartHHMM, 240);
     const clientLocalDateYMD = `${localClockRef.getUTCFullYear()}-${String(
       localClockRef.getUTCMonth() + 1
     ).padStart(2, "0")}-${String(localClockRef.getUTCDate()).padStart(2, "0")}`;
@@ -563,17 +681,52 @@ ${taskLines}`;
         : null,
     };
 
+    const activeRealTasks = workingTasks.filter(
+      (t) => !isHeaderRow(t) && !isDoneStatus(t.status)
+    );
+
+    // Instant Empty-Board Day-Planning Q&A Prompt Fast-Path
+    if (
+      activeRealTasks.length === 0 &&
+      !qaSubmission &&
+      isEmptyBoardDayPlanRequest(userMessage)
+    ) {
+      const qaPrompt = buildEmptyBoardDayQAPrompt(
+        userMessage,
+        defaultStartHHMM,
+        defaultEndHHMM
+      );
+      return NextResponse.json({
+        reply:
+          "You don't have any active tasks on your list yet—let me gauge what's on your plate today so I can populate both your **Tasks** list and your **my day** schedule.",
+        modelUsed: "kite-qa-engine",
+        latencyMs: 5,
+        mutation: {
+          executedActions: [],
+          tasksMutation: null,
+          profileUpdates: null,
+          workspaceConfigUpdates: null,
+          triggerCanvasSync: false,
+          switchTab: null,
+          showMyDayCard: false,
+          qaPrompt,
+        } satisfies AgentWorkspaceMutationPayload,
+      });
+    }
+
     const addedTasksMap = new Map<string, TaskItem>();
     const modifiedTaskIds = new Set<string>();
     const deletedTaskIds = new Set<string>();
     let reordered = false;
     let tasksTouched = false;
     let configTouched = false;
+    let scheduleMutatedInTurn = false;
     const profileUpdates: Partial<UserProfile> = {};
     const executedActions: AgentExecutedAction[] = [];
     let triggerCanvasSync = false;
     let switchTab: WorkspaceTab | null = null;
     let showMyDayCard = false;
+    const qaState: { prompt: AgentQAPrompt | null } = { prompt: null };
 
     const recordAction = (
       category: AgentExecutedAction["category"],
@@ -731,6 +884,36 @@ ${taskLines}`;
           .join("\n")
       : "(No MY DAY schedule built yet)";
 
+    const qaSubmissionDirective = qaSubmission
+      ? `
+===========================================================================
+GUIDED Q&A ANSWERS SUBMITTED BY USER (Original Request: "${qaSubmission.originalRequest}" • Purpose: "${qaSubmission.purpose}"):
+${qaSubmission.answers
+  .map((a, idx) => `${idx + 1}. Q: ${a.question}\n   A: ${a.answer}`)
+  .join("\n")}
+${
+  qaSubmission.startTime && qaSubmission.endTime
+    ? `Requested Schedule Timeframe: ${qaSubmission.startTime} to ${qaSubmission.endTime}`
+    : ""
+}
+
+MANDATORY EXECUTION FOR THIS Q&A SUBMISSION:
+1. Extract every task, assignment, errand, or goal described in the user's answers (breaking broad goals into concrete, actionable tasks if helpful). Assign smart priorities, categories (${workingConfig.types
+          .map((t) => t.label)
+          .join(", ")}), tags, due_date ('today' for today's tasks), and realistic \`estimated_minutes\` matching their pacing answer, and call \`add_tasks\` NOW to populate their Tasks list (under 'TODAY' if headers exist).
+2. ${
+          qaSubmission.purpose === "plan_day" || qaSubmission.startTime
+            ? `Immediately call \`manage_my_day_schedule\` (using \`action: "auto_arrange"\` with \`day_start_time: "${
+                qaSubmission.startTime || defaultStartHHMM
+              }"\`, \`day_end_time: "${
+                qaSubmission.endTime || defaultEndHHMM
+              }"\`, \`include_all_active: true\`, and \`include_breaks\` matching their pacing answer) so those newly added tasks are ALSO populated directly into their \`my day\` schedule and the live \`my day\` status bar UI is shown!`
+            : `If their request or answers also involve scheduling today's plan, call \`manage_my_day_schedule\` as well.`
+        }
+3. Respond warmly and concisely summarizing the tasks you added to their list and how you structured their \`my day\` plan!
+===========================================================================`
+      : "";
+
     const systemPrompt = `You are the Gemini Workspace Agent for "${workingConfig.brandName}" (${workingConfig.workspaceTitle}).
 ${TONE_PROMPTS[tone]}
 
@@ -748,12 +931,15 @@ You have direct, live read/write control over the user's entire workspace via yo
    - Use \`show_my_day_schedule\` whenever the user asks to see their current schedule, asks what their day/plan looks like, asks what they should be working on right now, asks how much of their task or day is done, or asks for schedule logistics. Calling \`show_my_day_schedule\` renders the live my day status bar UI & plan directly inside the chat AND gives you exact down-to-the-minute logistics to summarize!
    - Use \`manage_my_day_schedule\` whenever the user asks to build, auto-arrange, add to, swap, reorder, shift, edit, or clear their my day schedule (which also displays the live my day status bar UI in chat).
 3. Section Headers: Create, rename, move, or remove movable divider headers (like TODAY, TOMORROW, COLLEGE, SOON, REMEMBER, or custom sections).
-4. Themes & Atmosphere: Switch between preset themes (${THEME_OPTIONS.map((t) => `${t.id} ("${t.name}")`).join(", ")}) OR design bespoke custom 5-color hex palettes, switch ambient backgrounds (rain, cyber, lofi, particles), and adjust dim/blur.
+4. Themes & Atmosphere: Switch between preset themes (${THEME_OPTIONS.map((t) => `${t.id} ("${t.name}")`).join(", ")}) OR design bespoke custom 5-color hex palettes, switch ambient backgrounds (aurora, cyber, lofi, particles), and adjust dim/blur.
 5. Workspace Settings & Customization: Update workspace title/subtitle/brand, toggle "Show completed tasks", change task document view mode (slide_drawer, center_modal, inline), change AI coaching tone, rename table columns, or create custom color-coded tags/categories/statuses/priorities.
 6. Integrations & Navigation: Trigger a live Canvas LMS sync or switch the user's active view between Chat, Tasks, and my day.
+7. Interactive Guided Q&A (\`prompt_user_qa\`):
+   - Use \`prompt_user_qa\` at moments when gauging user input via a structured Q&A UI will produce a dramatically better plan—specifically: (a) when the user asks to plan/organize their day or routine and has 0 active tasks on their board without naming tasks, (b) when the user asks to break down a broad goal, exam study plan, or multi-step project without enough context, or (c) when the user asks you to ask them questions / interview them to figure out their tasks or schedule.
+   - \`prompt_user_qa\` renders a consent card first ("Can I ask a few questions to fulfill your request?") and then collects structured answers so you can populate their Tasks list and \`my day\` schedule. Do NOT use \`prompt_user_qa\` for direct, clear commands where you already have enough info to act immediately.
 
 GUIDELINES FOR THOUGHTFUL EXECUTION:
-- Execute user requests directly using the appropriate tools—do NOT ask for permission first unless a request is genuinely ambiguous. You can chain multiple tools in one turn!
+- Execute clear user requests directly using the appropriate tools—do NOT ask for permission first unless using \`prompt_user_qa\` for underspecified planning/empty-list day discovery. You can chain multiple tools in one turn!
 - When adding tasks, choose smart, helpful defaults for priority, category (${workingConfig.types.map((t) => t.label).join(", ")}), estimated_minutes, and tags (${workingConfig.tags.map((t) => t.label).join(", ")}), and place them under the most fitting section header (e.g. TODAY, TOMORROW, SOON, COLLEGE) if headers exist on the board.
 - If the user mentions a task with @ or by partial name, match it accurately to the board items below.
 - Keep your text response clean, natural, well-structured (use concise Markdown bullets or bold highlights where helpful), and confirm what you just did or answer their question thoughtfully.
@@ -775,7 +961,7 @@ CURRENT MY DAY SCHEDULE (${
 ${serializedMyDay}
 
 CURRENT BOARD (${workingTasks.length} rows in exact top-to-bottom table order):
-${serializedBoard || "(No tasks currently on the board)"}`;
+${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective}`;
 
     // Assemble multi-turn conversation messages (last 6 turns for instant context ingestion)
     const conversationMessages: CoreMessage[] = [
@@ -1474,7 +1660,7 @@ ${serializedBoard || "(No tasks currently on the board)"}`;
             .optional()
             .describe("Optional bespoke 5-color dark-mode palette"),
           video_bg_preset: z
-            .enum(["rain", "cyber", "lofi", "particles"])
+            .enum(["aurora", "cyber", "lofi", "particles"])
             .optional()
             .describe("Ambient background engine preset"),
           video_bg_dim: z
@@ -1813,6 +1999,7 @@ ${serializedBoard || "(No tasks currently on the board)"}`;
         }),
         execute: async (args) => {
           showMyDayCard = true;
+          scheduleMutatedInTurn = true;
           const existing: MyDaySchedule = workingConfig.myDaySchedule || {
             date: clientLocalDateYMD,
             dayStartTime: clientLocalTimeHHMM,
@@ -2155,6 +2342,98 @@ ${serializedBoard || "(No tasks currently on the board)"}`;
           };
         },
       }),
+      ...(qaSubmission
+        ? {}
+        : {
+            prompt_user_qa: tool({
+              description:
+                "Prompt an interactive Q&A UI card in chat (asking 'Can I ask a few questions to fulfill your request?' first) to gauge missing tasks, goals, or schedule preferences from the user before creating tasks or building a plan.",
+              parameters: z.object({
+                purpose: z
+                  .enum([
+                    "plan_day",
+                    "project_breakdown",
+                    "workspace_setup",
+                    "general",
+                  ])
+                  .describe(
+                    "Use 'plan_day' when gauging tasks & timeframe to populate both the Tasks list and my day schedule"
+                  ),
+                consent_title: z
+                  .string()
+                  .optional()
+                  .describe(
+                    "Defaults to 'Can I ask a few questions to fulfill your request?'"
+                  ),
+                consent_subtitle: z
+                  .string()
+                  .describe(
+                    "1-2 sentence explanation of how answering these quick questions will help fulfill their request"
+                  ),
+                submit_label: z
+                  .string()
+                  .optional()
+                  .describe(
+                    "Submit button text, e.g. 'Populate Tasks & Build my day' or 'Build My Plan'"
+                  ),
+                questions: z
+                  .array(
+                    z.object({
+                      id: z.string().describe("Unique snake_case question id"),
+                      question: z.string().describe("Clear, concise question"),
+                      helperText: z.string().optional(),
+                      inputType: z
+                        .enum([
+                          "textarea",
+                          "text",
+                          "single_choice",
+                          "multi_choice",
+                          "timeframe",
+                        ])
+                        .describe("UI control best suited for this question"),
+                      options: z
+                        .array(z.string())
+                        .optional()
+                        .describe(
+                          "2-5 concise options when inputType is single_choice or multi_choice"
+                        ),
+                      placeholder: z.string().optional(),
+                      quickChips: z.array(z.string()).optional(),
+                      required: z.boolean().optional(),
+                    })
+                  )
+                  .min(2)
+                  .max(5),
+              }),
+              execute: async (args) => {
+                qaState.prompt = {
+                  id: `qa-${Date.now()}`,
+                  purpose: args.purpose,
+                  originalRequest: userMessage,
+                  consentTitle:
+                    args.consent_title?.trim() ||
+                    "Can I ask a few questions to fulfill your request?",
+                  consentSubtitle: args.consent_subtitle.trim(),
+                  submitLabel: args.submit_label?.trim(),
+                  status: "consent",
+                  questions: args.questions.map((q) => ({
+                    ...q,
+                    ...(q.inputType === "timeframe"
+                      ? {
+                          defaultStartTime: defaultStartHHMM,
+                          defaultEndTime: defaultEndHHMM,
+                        }
+                      : {}),
+                  })),
+                };
+                return {
+                  success: true,
+                  promptedQA: true,
+                  questionCount: args.questions.length,
+                };
+              },
+            }),
+          }),
     };
 
     // Execute Gemini with smart model fallback and latency optimization
@@ -2169,6 +2448,7 @@ ${serializedBoard || "(No tasks currently on the board)"}`;
     let lastError: unknown = null;
     let succeeded = false;
     const tStart = Date.now();
+    const candidateTimeoutMs = qaSubmission ? 10500 : 5500;
 
     for (const candidate of modelChain) {
       const candStart = Date.now();
@@ -2176,7 +2456,7 @@ ${serializedBoard || "(No tasks currently on the board)"}`;
         const timeoutPromise = new Promise<never>((_, reject) =>
           setTimeout(
             () => reject(new Error(`Timeout on model ${candidate}`)),
-            5500
+            candidateTimeoutMs
           )
         );
 
@@ -2186,7 +2466,7 @@ ${serializedBoard || "(No tasks currently on the board)"}`;
             system: systemPrompt,
             messages: conversationMessages,
             tools,
-            maxSteps: 4,
+            maxSteps: qaSubmission ? 5 : 4,
             maxTokens: 1200,
           }),
           timeoutPromise,
@@ -2211,8 +2491,8 @@ ${serializedBoard || "(No tasks currently on the board)"}`;
         );
         const info = extractCleanErrorMessage(err);
         // Do not retry other models if the API key itself is invalid OR if tools already mutated state
-        if (info.isKeyError || executedActions.length > 0) {
-          if (executedActions.length > 0) {
+        if (info.isKeyError || executedActions.length > 0 || qaState.prompt) {
+          if (executedActions.length > 0 || qaState.prompt) {
             succeeded = true;
             break;
           }
@@ -2227,6 +2507,112 @@ ${serializedBoard || "(No tasks currently on the board)"}`;
       }
     }
 
+    // Deterministic Safety Net for Guided Q&A Day Planning Submissions:
+    // Guarantee that answers always populate BOTH the Tasks list AND the my day schedule!
+    if (qaSubmission && qaSubmission.purpose === "plan_day") {
+      const combinedAnswersLower = qaSubmission.answers
+        .map((a) => a.answer.toLowerCase())
+        .join(" ");
+
+      const currentActiveOnBoard = workingTasks.filter(
+        (t) => !isHeaderRow(t) && !isDoneStatus(t.status)
+      );
+
+      if (currentActiveOnBoard.length === 0 && qaSubmission.answers.length > 0) {
+        const rawBraindump = qaSubmission.answers[0]?.answer || "";
+        const parsedTitles = parseFallbackTaskTitles(rawBraindump);
+        const nowISO = new Date().toISOString();
+        const defaultEst = combinedAnswersLower.includes("90m")
+          ? 75
+          : combinedAnswersLower.includes("30m")
+          ? 30
+          : 45;
+
+        for (let i = 0; i < parsedTitles.length; i++) {
+          const newId = makeUuid();
+          const newTask: TaskItem = {
+            id: newId,
+            user_id: userId,
+            title: parsedTitles[i],
+            content: "",
+            status: workingConfig.statuses[0]?.label || "To Do",
+            type: workingConfig.types[0]?.label || "General",
+            priority: i === 0 ? "High" : "Medium",
+            due_date: parseFlexibleDueDate("today", clientNowMs, tzOffsetMinutes),
+            estimated_minutes: defaultEst,
+            tags: ["#Today"],
+            notes: "",
+            is_canvas_assignment: false,
+            canvas_course_code: null,
+            custom_properties: {},
+            section_group: "TODAY",
+            order_index: workingTasks.length,
+            completed_at: null,
+            created_at: nowISO,
+            updated_at: nowISO,
+          };
+          workingTasks.push(newTask);
+          addedTasksMap.set(newId, newTask);
+        }
+
+        if (parsedTitles.length > 0) {
+          reindexWorkingTasks();
+          tasksTouched = true;
+          succeeded = true;
+          recordAction(
+            "create",
+            `Added ${parsedTitles.length} task${
+              parsedTitles.length === 1 ? "" : "s"
+            } to Tasks list`,
+            parsedTitles.join(" • ")
+          );
+        }
+      }
+
+      const refreshedActivePool = workingTasks.filter(
+        (t) => !isHeaderRow(t) && !isDoneStatus(t.status)
+      );
+
+      if (!scheduleMutatedInTurn && refreshedActivePool.length > 0) {
+        const sTime = normalizeTimeString(
+          qaSubmission.startTime,
+          defaultStartHHMM
+        );
+        const eTime = normalizeTimeString(
+          qaSubmission.endTime,
+          addMinutesToTime(sTime, 240)
+        );
+        const includeBreaks = !combinedAnswersLower.includes("no breaks");
+        const arranged = smartHeuristicArrange({
+          tasks: refreshedActivePool,
+          startTime: sTime,
+          endTime: eTime,
+          includeBreaks,
+        });
+
+        workingConfig.myDaySchedule = {
+          date: clientLocalDateYMD,
+          dayStartTime: sTime,
+          dayEndTime: eTime,
+          blocks: arranged.blocks,
+          autoCascadeTimes: true,
+          aiSummary: arranged.summary,
+          updatedAt: new Date().toISOString(),
+        };
+        configTouched = true;
+        showMyDayCard = true;
+        scheduleMutatedInTurn = true;
+        succeeded = true;
+        recordAction(
+          "schedule",
+          `Built my day schedule (${arranged.blocks.length} slots, ${formatTime12h(
+            sTime
+          )} – ${formatTime12h(eTime)})`,
+          arranged.summary
+        );
+      }
+    }
+
     if (!succeeded) {
       const info = extractCleanErrorMessage(lastError);
       return NextResponse.json(
@@ -2238,7 +2624,9 @@ ${serializedBoard || "(No tasks currently on the board)"}`;
       );
     }
 
-    if (!replyText && executedActions.length > 0) {
+    if (!replyText && qaState.prompt) {
+      replyText = qaState.prompt.consentSubtitle;
+    } else if (!replyText && executedActions.length > 0) {
       replyText = `Done! Here is what I updated across your workspace:\n${executedActions
         .map((a) => `• **${a.summary}**${a.detail ? ` — ${a.detail}` : ""}`)
         .join("\n")}`;
@@ -2267,6 +2655,7 @@ ${serializedBoard || "(No tasks currently on the board)"}`;
       triggerCanvasSync,
       switchTab,
       showMyDayCard,
+      qaPrompt: qaState.prompt,
     };
 
     return NextResponse.json({

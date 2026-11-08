@@ -860,7 +860,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
                   {(
                     [
-                      { id: "rain", label: "🌧️ Cyber Rain" },
+                      { id: "aurora", label: "🌅 Clean Aurora" },
                       { id: "cyber", label: "🕸️ Neural Grid" },
                       { id: "lofi", label: "✨ Lofi Bokeh" },
                       { id: "particles", label: "🌌 Deep Particles" },
@@ -916,7 +916,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         type="button"
                         onClick={async () => {
                           await clearCustomVideoFromIDB();
-                          onUpdateProfile({ video_bg_preset: "rain" });
+                          onUpdateProfile({ video_bg_preset: "aurora" });
                           setUploadStatus(
                             "Cleared custom video from IndexedDB."
                           );

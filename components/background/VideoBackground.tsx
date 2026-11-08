@@ -2,13 +2,13 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { get, set, del } from "idb-keyval";
-import { VideoPresetName } from "@/types/taskit";
+import { normalizeVideoPreset, VideoPresetName } from "@/types/taskit";
 import { BatteryCharging, PauseCircle } from "lucide-react";
 
 export const IDB_VIDEO_KEY = "custom_video_bg";
 
 interface VideoBackgroundProps {
-  preset: VideoPresetName;
+  preset: VideoPresetName | string;
   dim: number; // 0.1 to 0.85
   blur: number; // 0 to 24 (px)
   customVideoVersion?: number;
@@ -23,19 +23,20 @@ export async function clearCustomVideoFromIDB(): Promise<void> {
 }
 
 export const VideoBackground: React.FC<VideoBackgroundProps> = ({
-  preset,
+  preset: rawPreset,
   dim,
   blur,
   customVideoVersion = 0,
 }) => {
+  const preset = normalizeVideoPreset(rawPreset);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [videoSrc, setVideoSrc] = useState<string>(`/bg/${preset}.webm`);
+  const [videoSrc, setVideoSrc] = useState<string>("");
   const [videoLoaded, setVideoLoaded] = useState<boolean>(false);
   const [isPausedBySaver, setIsPausedBySaver] = useState<boolean>(false);
   const [batterySaverActive, setBatterySaverActive] = useState<boolean>(false);
 
-  // Load either custom IndexedDB blob or preset path
+  // Load custom IndexedDB blob when preset === "custom"
   useEffect(() => {
     let objectUrl: string | null = null;
     let isMounted = true;
@@ -55,7 +56,7 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
         }
       }
       if (isMounted) {
-        setVideoSrc(`/bg/${preset === "custom" ? "rain" : preset}.webm`);
+        setVideoSrc("");
       }
     }
 
@@ -143,7 +144,7 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
     };
   }, [batterySaverActive]);
 
-  // Zero-bandwidth procedural ambient canvas engine
+  // Zero-bandwidth procedural ambient canvas engine (rain animation completely removed)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -161,21 +162,16 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
     };
     window.addEventListener("resize", handleResize);
 
-    const count = preset === "rain" ? 120 : preset === "cyber" ? 70 : 60;
+    const count = preset === "aurora" ? 0 : preset === "cyber" ? 70 : 60;
     const items = Array.from({ length: count }, (_, idx) => ({
       x: Math.random() * width,
       y: Math.random() * height,
-      len: 16 + Math.random() * 28,
       speedX:
-        preset === "rain"
-          ? -0.6
-          : preset === "cyber"
+        preset === "cyber"
           ? (Math.random() - 0.5) * 0.9
           : (Math.random() - 0.5) * 0.35,
       speedY:
-        preset === "rain"
-          ? 7 + Math.random() * 6
-          : preset === "cyber"
+        preset === "cyber"
           ? (Math.random() - 0.5) * 0.9
           : -0.3 - Math.random() * 0.5,
       radius: 1.8 + Math.random() * 4,
@@ -230,25 +226,7 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
         ctx.fillStyle = grad2;
         ctx.fillRect(0, 0, width, height);
 
-        if (preset === "rain") {
-          ctx.strokeStyle = highlight;
-          ctx.lineWidth = 1.3;
-          for (const drop of items) {
-            ctx.globalAlpha = drop.alpha * 0.75;
-            ctx.beginPath();
-            ctx.moveTo(drop.x, drop.y);
-            ctx.lineTo(drop.x + drop.speedX * 3, drop.y + drop.len);
-            ctx.stroke();
-
-            drop.x += drop.speedX;
-            drop.y += drop.speedY;
-            if (drop.y > height) {
-              drop.y = -25;
-              drop.x = Math.random() * width;
-            }
-            if (drop.x < 0) drop.x = width;
-          }
-        } else if (preset === "cyber") {
+        if (preset === "cyber") {
           ctx.strokeStyle = primary;
           for (let i = 0; i < items.length; i++) {
             const a = items[i];
@@ -304,7 +282,7 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
             ctx.arc(orb.x, orb.y, orb.radius * 10, 0, Math.PI * 2);
             ctx.fill();
           }
-        } else {
+        } else if (preset === "particles") {
           for (const p of items) {
             p.x += p.speedX;
             p.y += p.speedY;
@@ -359,21 +337,23 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
         className="absolute inset-0 w-full h-full object-cover opacity-95"
       />
 
-      {/* Fullscreen fixed HTML5 Video element for WebM presets & IndexedDB custom uploads */}
-      <video
-        ref={videoRef}
-        key={videoSrc}
-        src={videoSrc}
-        autoPlay
-        loop
-        muted
-        playsInline
-        onLoadedData={() => setVideoLoaded(true)}
-        onError={() => setVideoLoaded(false)}
-        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
-          videoLoaded ? "opacity-100" : "opacity-0"
-        }`}
-      />
+      {/* Fullscreen fixed HTML5 Video element for IndexedDB custom uploads */}
+      {videoSrc && (
+        <video
+          ref={videoRef}
+          key={videoSrc}
+          src={videoSrc}
+          autoPlay
+          loop
+          muted
+          playsInline
+          onLoadedData={() => setVideoLoaded(true)}
+          onError={() => setVideoLoaded(false)}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
+            videoLoaded ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      )}
 
       {/* Theme-tinted Frosted Glass & Dim Overlay */}
       <div

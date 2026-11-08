@@ -3,10 +3,12 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   AgentExecutedAction,
+  AgentQAPrompt,
   AgentWorkspaceMutationPayload,
   AIModelChoice,
   AITone,
   HeroChatMessage,
+  QASubmissionPayload,
   TaskItem,
   THEME_OPTIONS,
   UserProfile,
@@ -25,6 +27,7 @@ import {
   CornerDownLeft,
   ExternalLink,
   Heading,
+  HelpCircle,
   KeyRound,
   Loader2,
   MessageSquare,
@@ -44,6 +47,7 @@ import {
 import { MyDayStatusBanner } from "@/components/myday/MyDayStatusBanner";
 import { EnrichedMyDayBlock } from "@/utils/myDayUtils";
 import { KiteFlyingLoader, KiteLogoMark } from "@/components/ui/KiteBrand";
+import { AgentQACard } from "@/components/ai/AgentQACard";
 
 interface GeminiHeroChatProps {
   tasks: TaskItem[];
@@ -55,6 +59,8 @@ interface GeminiHeroChatProps {
   effectiveApiKey: string;
   activeTab: WorkspaceTab;
   heroResetNonce?: number;
+  queuedPrompt?: { nonce: number; text: string } | null;
+  onConsumeQueuedPrompt?: () => void;
   onSelectTab: (tab: WorkspaceTab) => void;
   onSaveApiKey: (key: string) => void;
   onOpenApiKeySetup: () => void;
@@ -283,6 +289,8 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   effectiveApiKey,
   activeTab,
   heroResetNonce,
+  queuedPrompt,
+  onConsumeQueuedPrompt,
   onSelectTab,
   onSaveApiKey,
   onOpenApiKeySetup,
@@ -336,6 +344,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const plusMenuRef = useRef<HTMLDivElement | null>(null);
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
+  const lastConsumedPromptNonceRef = useRef<number | null>(null);
   interface SpeechRecognitionLike {
     lang: string;
     interimResults: boolean;
@@ -410,6 +419,14 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
     const q = mentionQuery.toLowerCase().trim();
 
     const skills: MentionCandidate[] = [
+      {
+        id: "skill-guided-plan",
+        kind: "skill",
+        label: "@Plan My Day (Q&A)",
+        sublabel:
+          "Interactive Q&A to gauge your tasks and populate Tasks + my day",
+        insertText: "Help me plan my day ",
+      },
       {
         id: "skill-myday",
         kind: "skill",
@@ -550,7 +567,23 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
     recognition.start();
   };
 
-  const sendPrompt = async (overridePrompt?: string) => {
+  const updateMessageQAPrompt = (
+    messageId: string,
+    updater: (prev: AgentQAPrompt) => AgentQAPrompt
+  ) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId && msg.qaPrompt
+          ? { ...msg, qaPrompt: updater(msg.qaPrompt) }
+          : msg
+      )
+    );
+  };
+
+  const sendPrompt = async (
+    overridePrompt?: string,
+    qaSubmission?: QASubmissionPayload
+  ) => {
     const promptText = (overridePrompt ?? input).trim();
     if (!promptText || isThinking) return;
 
@@ -622,6 +655,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
             month: "long",
             day: "numeric",
           }),
+          ...(qaSubmission ? { qaSubmission } : {}),
         }),
       });
 
@@ -668,6 +702,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
         executedActions: mutation?.executedActions || [],
         undoSnapshot: undoSnap,
         showMyDayCard: Boolean(mutation?.showMyDayCard),
+        qaPrompt: mutation?.qaPrompt || null,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -692,6 +727,20 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
       setIsThinking(false);
     }
   };
+
+  const sendPromptRef = useRef(sendPrompt);
+  sendPromptRef.current = sendPrompt;
+
+  useEffect(() => {
+    if (
+      queuedPrompt &&
+      queuedPrompt.nonce !== lastConsumedPromptNonceRef.current
+    ) {
+      lastConsumedPromptNonceRef.current = queuedPrompt.nonce;
+      onConsumeQueuedPrompt?.();
+      sendPromptRef.current(queuedPrompt.text);
+    }
+  }, [queuedPrompt, onConsumeQueuedPrompt]);
 
   const handleInlineKeySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -994,6 +1043,17 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
               >
                 <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Sync Canvas Assignments Now</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlusMenuOpen(false);
+                  sendPrompt("Help me plan my day");
+                }}
+                className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-white/85 hover:bg-white/10 transition-colors"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-primary" />
+                <span>Plan My Day (Guided Q&amp;A)</span>
               </button>
               <button
                 type="button"
@@ -1348,28 +1408,51 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
 
           {/* Subtle Optional Quick Prompts */}
           <div className="mt-9 flex flex-wrap items-center justify-center gap-2 max-w-2xl">
-            {[
-              {
-                label: "Show my day schedule",
-                prompt:
-                  "Show my current my day schedule, display the live status bar UI, and pull my schedule logistics.",
-              },
-              {
-                label: "Auto-arrange my day",
-                prompt:
-                  "Auto-arrange all my active tasks into my my day schedule for the next 4 hours starting right now.",
-              },
-              {
-                label: "Organize & clean up board",
-                prompt:
-                  "Sort my tasks by priority inside each section and clean up anything out of place.",
-              },
-              {
-                label: "Change workspace theme",
-                prompt:
-                  "Switch my workspace theme to Electric Lavender with Lofi Bokeh ambiance.",
-              },
-            ].map((chip) => (
+            {(activeTaskCount === 0
+              ? [
+                  {
+                    label: "Help me plan my day",
+                    prompt: "Help me plan my day",
+                  },
+                  {
+                    label: "Show my day schedule",
+                    prompt:
+                      "Show my current my day schedule, display the live status bar UI, and pull my schedule logistics.",
+                  },
+                  {
+                    label: "Break down a project",
+                    prompt:
+                      "Help me plan and break down a big project I need to tackle today.",
+                  },
+                  {
+                    label: "Change workspace theme",
+                    prompt:
+                      "Switch my workspace theme to Electric Lavender with Lofi Bokeh ambiance.",
+                  },
+                ]
+              : [
+                  {
+                    label: "Show my day schedule",
+                    prompt:
+                      "Show my current my day schedule, display the live status bar UI, and pull my schedule logistics.",
+                  },
+                  {
+                    label: "Auto-arrange my day",
+                    prompt:
+                      "Auto-arrange all my active tasks into my my day schedule for the next 4 hours starting right now.",
+                  },
+                  {
+                    label: "Organize & clean up board",
+                    prompt:
+                      "Sort my tasks by priority inside each section and clean up anything out of place.",
+                  },
+                  {
+                    label: "Change workspace theme",
+                    prompt:
+                      "Switch my workspace theme to Electric Lavender with Lofi Bokeh ambiance.",
+                  },
+                ]
+            ).map((chip) => (
               <button
                 key={chip.label}
                 type="button"
@@ -1457,6 +1540,15 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
             );
           }
 
+          const hasScheduleAction = Boolean(
+            m.executedActions?.some((a) => a.category === "schedule")
+          );
+          const hasTaskOrBoardAction = Boolean(
+            m.executedActions?.some(
+              (a) => a.category !== "schedule" && a.category !== "theme"
+            )
+          );
+
           return (
             <div key={m.id} className="flex items-start gap-3.5">
               {/* Minimalist Kite Avatar */}
@@ -1478,19 +1570,8 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        {m.executedActions.some(
-                          (a) => a.category === "schedule"
-                        ) ? (
-                          <button
-                            type="button"
-                            onClick={() => onSelectTab("my_day")}
-                            className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/80 hover:text-white transition-colors"
-                          >
-                            <CalendarClock className="w-3 h-3 text-primary" />
-                            <span>View in my day</span>
-                          </button>
-                        ) : (
+                      <div className="flex flex-wrap items-center gap-2">
+                        {(hasTaskOrBoardAction || !hasScheduleAction) && (
                           <button
                             type="button"
                             onClick={() => onSelectTab("tasks")}
@@ -1498,6 +1579,17 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                           >
                             <Table2 className="w-3 h-3 text-primary" />
                             <span>View in Tasks</span>
+                          </button>
+                        )}
+
+                        {hasScheduleAction && (
+                          <button
+                            type="button"
+                            onClick={() => onSelectTab("my_day")}
+                            className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/80 hover:text-white transition-colors"
+                          >
+                            <CalendarClock className="w-3 h-3 text-primary" />
+                            <span>View in my day</span>
                           </button>
                         )}
 
@@ -1578,6 +1670,43 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                     </div>
                   )}
                 </div>
+
+                {/* Interactive Guided Q&A Card */}
+                {m.qaPrompt && (
+                  <AgentQACard
+                    qaPrompt={m.qaPrompt}
+                    disabled={isThinking}
+                    onAcceptConsent={() =>
+                      updateMessageQAPrompt(m.id, (prev) => ({
+                        ...prev,
+                        status: "answering",
+                      }))
+                    }
+                    onDismiss={() => {
+                      updateMessageQAPrompt(m.id, (prev) => ({
+                        ...prev,
+                        status: "dismissed",
+                      }));
+                      setTimeout(() => {
+                        textareaRef.current?.focus();
+                      }, 50);
+                    }}
+                    onReopen={() =>
+                      updateMessageQAPrompt(m.id, (prev) => ({
+                        ...prev,
+                        status: "answering",
+                      }))
+                    }
+                    onSubmitAnswers={(payload, summaryText) => {
+                      updateMessageQAPrompt(m.id, (prev) => ({
+                        ...prev,
+                        status: "submitted",
+                        submittedAnswers: payload.answers,
+                      }));
+                      sendPrompt(summaryText, payload);
+                    }}
+                  />
+                )}
               </div>
             </div>
           );

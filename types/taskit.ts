@@ -8,7 +8,25 @@ export type ThemeName =
   | "rose_nebula"
   | "custom";
 
-export type VideoPresetName = "rain" | "cyber" | "lofi" | "particles" | "custom";
+export type VideoPresetName =
+  | "aurora"
+  | "cyber"
+  | "lofi"
+  | "particles"
+  | "custom";
+
+export function normalizeVideoPreset(raw: unknown): VideoPresetName {
+  if (
+    raw === "aurora" ||
+    raw === "cyber" ||
+    raw === "lofi" ||
+    raw === "particles" ||
+    raw === "custom"
+  ) {
+    return raw;
+  }
+  return "aurora";
+}
 
 export type AITone = "locked_in" | "chill_coach" | "hyper_drive" | "executive";
 
@@ -197,6 +215,65 @@ export interface AgentTasksMutation {
   reordered: boolean;
 }
 
+export type QAQuestionInputType =
+  | "textarea"
+  | "text"
+  | "single_choice"
+  | "multi_choice"
+  | "timeframe";
+
+export interface QAQuestionItem {
+  id: string;
+  question: string;
+  helperText?: string;
+  inputType: QAQuestionInputType;
+  options?: string[];
+  placeholder?: string;
+  quickChips?: string[];
+  required?: boolean;
+  defaultStartTime?: string;
+  defaultEndTime?: string;
+}
+
+export type QAPromptPurpose =
+  | "plan_day"
+  | "project_breakdown"
+  | "workspace_setup"
+  | "general";
+
+export type QAPromptStatus =
+  | "consent"
+  | "answering"
+  | "submitted"
+  | "dismissed";
+
+export interface QASubmissionAnswer {
+  questionId: string;
+  question: string;
+  answer: string;
+}
+
+export interface QASubmissionPayload {
+  promptId: string;
+  purpose: QAPromptPurpose;
+  originalRequest: string;
+  answers: QASubmissionAnswer[];
+  startTime?: string;
+  endTime?: string;
+}
+
+export interface AgentQAPrompt {
+  id: string;
+  purpose: QAPromptPurpose;
+  originalRequest: string;
+  consentTitle: string;
+  consentSubtitle: string;
+  submitLabel?: string;
+  questions: QAQuestionItem[];
+  status?: QAPromptStatus;
+  submittedAnswers?: QASubmissionAnswer[];
+}
+
 export interface AgentWorkspaceMutationPayload {
   executedActions: AgentExecutedAction[];
   tasksMutation?: AgentTasksMutation | null;
@@ -205,6 +282,7 @@ export interface AgentWorkspaceMutationPayload {
   triggerCanvasSync?: boolean;
   switchTab?: WorkspaceTab | null;
   showMyDayCard?: boolean;
+  qaPrompt?: AgentQAPrompt | null;
 }
 
 export interface AgentUndoSnapshot {
@@ -227,6 +305,7 @@ export interface HeroChatMessage {
   undone?: boolean;
   isError?: boolean;
   showMyDayCard?: boolean;
+  qaPrompt?: AgentQAPrompt | null;
 }
 
 export const BADGE_COLOR_MAP: Record<

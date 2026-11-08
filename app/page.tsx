@@ -7,6 +7,7 @@ import {
   DEFAULT_WORKSPACE_CONFIG,
   getWorkspaceConfig,
   HeroChatMessage,
+  normalizeVideoPreset,
   SectionGroup,
   TaskItem,
   UserProfile,
@@ -123,6 +124,10 @@ export default function KiteWorkspacePage() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("chat");
   const [heroResetNonce, setHeroResetNonce] = useState<number>(0);
+  const [queuedChatPrompt, setQueuedChatPrompt] = useState<{
+    nonce: number;
+    text: string;
+  } | null>(null);
   const [localApiKey, setLocalApiKey] = useState<string>("");
   const [aiTemporarilyDisabled, setAiTemporarilyDisabled] =
     useState<boolean>(false);
@@ -294,6 +299,7 @@ export default function KiteWorkspacePage() {
             setProfile((prev) => ({
               ...prev,
               ...dbProfile,
+              video_bg_preset: normalizeVideoPreset(dbProfile.video_bg_preset),
               custom_theme_json:
                 dbProfile.custom_theme_json || prev.custom_theme_json,
             }));
@@ -1409,6 +1415,8 @@ export default function KiteWorkspacePage() {
                   effectiveApiKey={effectiveApiKey}
                   activeTab={effectiveTab}
                   heroResetNonce={heroResetNonce}
+                  queuedPrompt={queuedChatPrompt}
+                  onConsumeQueuedPrompt={() => setQueuedChatPrompt(null)}
                   onSelectTab={setActiveTab}
                   onSaveApiKey={(key) => handleSaveApiKey(key)}
                   onOpenApiKeySetup={() => setIsGeminiSetupOpen(true)}
@@ -1438,6 +1446,13 @@ export default function KiteWorkspacePage() {
                   onUpdateTask={handleUpdateTask}
                   onOpenApiKeySetup={() => setIsGeminiSetupOpen(true)}
                   onShowToast={showToast}
+                  onLaunchGuidedDayPlan={() => {
+                    setActiveTab("chat");
+                    setQueuedChatPrompt({
+                      nonce: Date.now(),
+                      text: "Help me plan my day",
+                    });
+                  }}
                 />
               ) : (
                 /* Tasks Tab: Telemetry Header + Document-Style Resizable Task Table */
