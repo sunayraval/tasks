@@ -252,6 +252,75 @@ const FormattedAgentMarkdown: React.FC<{ content: string }> = ({ content }) => {
       continue;
     }
 
+    // Markdown Table (| Col 1 | Col 2 |)
+    if (
+      trimmed.startsWith("|") &&
+      trimmed.endsWith("|") &&
+      idx + 1 < lines.length &&
+      /^\|(?:\s*:?-+:?\s*\|)+$/.test(lines[idx + 1].trim())
+    ) {
+      const headerCells = trimmed
+        .slice(1, -1)
+        .split("|")
+        .map((c) => c.trim());
+      idx += 2; // skip header and separator row
+      const rows: string[][] = [];
+
+      while (
+        idx < lines.length &&
+        lines[idx].trim().startsWith("|") &&
+        lines[idx].trim().endsWith("|")
+      ) {
+        const rowCells = lines[idx]
+          .trim()
+          .slice(1, -1)
+          .split("|")
+          .map((c) => c.trim());
+        rows.push(rowCells);
+        idx++;
+      }
+
+      blocks.push(
+        <div
+          key={`table-${idx}`}
+          className="my-3 overflow-x-auto rounded-xl border border-white/12 bg-black/45 shadow-lg backdrop-blur-md"
+        >
+          <table className="w-full border-collapse text-left text-xs sm:text-[13px]">
+            <thead>
+              <tr className="border-b border-white/12 bg-white/[0.05]">
+                {headerCells.map((h, i) => (
+                  <th
+                    key={i}
+                    className="px-3.5 py-2.5 font-semibold text-white/90 whitespace-nowrap"
+                  >
+                    {renderInlineFormatting(h)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.07]">
+              {rows.map((row, rIdx) => (
+                <tr
+                  key={rIdx}
+                  className="hover:bg-white/[0.03] transition-colors"
+                >
+                  {row.map((cell, cIdx) => (
+                    <td
+                      key={cIdx}
+                      className="px-3.5 py-2 text-white/80 leading-relaxed font-normal"
+                    >
+                      {renderInlineFormatting(cell)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
     // Standard paragraph
     blocks.push(
       <p key={`p-${idx}`} className="leading-relaxed text-white/90">
