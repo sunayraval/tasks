@@ -376,18 +376,27 @@ export async function POST(request: Request) {
       DEFAULT_NVIDIA_MODEL
     ).trim();
 
+    const isNvKey = (k?: string | null): boolean =>
+      Boolean(k && k.trim().startsWith("nvapi-") && k.trim().length >= 15);
+    const isGemKey = (k?: string | null): boolean =>
+      Boolean(k && k.trim().startsWith("AIza") && k.trim().length >= 15);
+
     const nvidiaKey: string =
-      (customApiKey.startsWith("nvapi-") ? customApiKey : "") ||
-      (body.workspaceConfig?.nvidiaApiKey || "").trim() ||
-      (rawExplicitProvider === "nvidia" ? customApiKey : "") ||
-      process.env.NVIDIA_API_KEY ||
+      (isNvKey(customApiKey) ? customApiKey : "") ||
+      (isNvKey(body.workspaceConfig?.nvidiaApiKey)
+        ? body.workspaceConfig.nvidiaApiKey
+        : "") ||
+      (isNvKey(process.env.NVIDIA_API_KEY) ? process.env.NVIDIA_API_KEY : "") ||
       "";
 
     const geminiKey: string =
-      (customApiKey.startsWith("AIza") ? customApiKey : "") ||
-      (body.workspaceConfig?.geminiApiKey || "").trim() ||
-      (rawExplicitProvider === "gemini" ? customApiKey : "") ||
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+      (isGemKey(customApiKey) ? customApiKey : "") ||
+      (isGemKey(body.workspaceConfig?.geminiApiKey)
+        ? body.workspaceConfig.geminiApiKey
+        : "") ||
+      (isGemKey(process.env.GOOGLE_GENERATIVE_AI_API_KEY)
+        ? process.env.GOOGLE_GENERATIVE_AI_API_KEY
+        : "") ||
       "";
 
     const detectedProvider: AIProvider =
@@ -395,9 +404,9 @@ export async function POST(request: Request) {
         ? "gemini"
         : rawExplicitProvider === "nvidia"
         ? "nvidia"
-        : customApiKey.startsWith("AIza")
+        : isGemKey(customApiKey)
         ? "gemini"
-        : customApiKey.startsWith("nvapi-")
+        : isNvKey(customApiKey)
         ? "nvidia"
         : nvidiaKey
         ? "nvidia"
@@ -406,15 +415,14 @@ export async function POST(request: Request) {
         : "nvidia";
 
     const effectiveApiKey =
-      detectedProvider === "nvidia"
-        ? nvidiaKey || customApiKey
-        : geminiKey || customApiKey;
+      detectedProvider === "nvidia" ? nvidiaKey : geminiKey;
 
     // -------------------------------------------------------------------------
     // MODE 1: Live API Key Verification
     // -------------------------------------------------------------------------
     if (mode === "verify") {
-      if (!effectiveApiKey || effectiveApiKey.length < 15) {
+      const keyToVerify = customApiKey || effectiveApiKey;
+      if (!keyToVerify || keyToVerify.length < 15) {
         return NextResponse.json(
           {
             valid: false,
@@ -498,9 +506,9 @@ export async function POST(request: Request) {
 
       const google = createGoogleGenerativeAI({ apiKey: effectiveApiKey });
       const verifyCandidates = [
-        "gemini-3.8-flash",
+        "gemini-2.0-flash",
         "gemini-1.5-flash",
-        "gemini-2.5-flash",
+        "gemini-1.5-pro",
       ];
       let lastErr: unknown = null;
 
@@ -575,11 +583,13 @@ export async function POST(request: Request) {
         return NextResponse.json(fallback);
       }
 
-      const google = createGoogleGenerativeAI({ apiKey: customApiKey });
+      const google = createGoogleGenerativeAI({
+        apiKey: geminiKey || customApiKey,
+      });
       const arrangeCandidates = [
-        "gemini-3.8-flash",
+        "gemini-2.0-flash",
         "gemini-1.5-flash",
-        "gemini-2.5-flash",
+        "gemini-1.5-pro",
       ];
 
       const taskLines = selectedTasks
@@ -768,8 +778,10 @@ ${taskLines}`;
           error: "MISSING_API_KEY",
           reply:
             detectedProvider === "nvidia"
-              ? "Please add your NVIDIA NIM API key (nvapi-...) or Google Gemini key in Settings → AI."
-              : "Please add your Google AI API key or NVIDIA NIM key in Settings → AI.",
+              ? `Please enter your free NVIDIA NIM API key (starts with nvapi-...) from https://build.nvidia.com/models to use ${
+                  requestedNvidiaModel || "Nemotron"
+                }, or switch to Google Gemini in the model selector.`
+              : "Please enter your Google AI Studio API key (starts with AIzaSy...) in Settings → AI to use Google Gemini, or switch to NVIDIA NIM.",
         },
         { status: 401 }
       );
@@ -2862,11 +2874,11 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
       const google = createGoogleGenerativeAI({ apiKey: apiKeyToUse });
       const modelChain =
         modelChoice === "pro"
-          ? ["gemini-3.8-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
-          : ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-2.5-flash"];
+          ? ["gemini-1.5-pro", "gemini-2.0-flash", "gemini-1.5-flash"]
+          : ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
 
       usedModel = modelChain[0];
-      const candidateTimeoutMs = qaSubmission ? 12000 : 6000;
+      const candidateTimeoutMs = qaSubmission ? 12000 : 7000;
 
       for (const candidate of modelChain) {
         const candStart = Date.now();
@@ -2921,15 +2933,25 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
     };
 
     if (detectedProvider === "nvidia") {
-      const ok = await runNvidiaChat(nvidiaKey || effectiveApiKey);
-      // Paired fallback: if NVIDIA fails/times out and user also has a Gemini key saved, automatically use Gemini
-      if (!ok && !succeeded && geminiKey.length >= 15) {
+      const ok = await runNvidiaChat(nvidiaKey);
+      // Paired fallback: only if NVIDIA is rate-limited/network error (NOT an invalid key) and user has a Gemini key
+      const isKeyErr =
+        lastError && extractCleanErrorMessage(lastError, "nvidia").isKeyError;
+      if (!ok && !succeeded && !isKeyErr && geminiKey.length >= 15) {
+        console.log(
+          "[NVIDIA NIM] Rate limit or service error; failing over to paired Google Gemini key..."
+        );
         await runGeminiChat(geminiKey);
       }
     } else {
-      const ok = await runGeminiChat(geminiKey || effectiveApiKey);
-      // Paired fallback: if Gemini hits a rate limit/timeout and user also has an NVIDIA NIM key saved, automatically use NVIDIA
-      if (!ok && !succeeded && nvidiaKey.length >= 15) {
+      const ok = await runGeminiChat(geminiKey);
+      // Paired fallback: only if Gemini is rate-limited/network error (NOT an invalid key) and user has an NVIDIA NIM key
+      const isKeyErr =
+        lastError && extractCleanErrorMessage(lastError, "gemini").isKeyError;
+      if (!ok && !succeeded && !isKeyErr && nvidiaKey.length >= 15) {
+        console.log(
+          "[Google Gemini] Rate limit or service error; failing over to paired NVIDIA NIM key..."
+        );
         await runNvidiaChat(nvidiaKey);
       }
     }

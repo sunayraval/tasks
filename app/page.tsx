@@ -161,43 +161,36 @@ export default function KiteWorkspacePage() {
   const canAccessWorkspace = isAuthenticated || !supabaseEnabled;
 
   const effectiveApiKey = useMemo(() => {
-    const isSupportedKey = (k?: string | null): k is string =>
-      Boolean(
-        k &&
-          k.trim().length >= 15 &&
-          !k.trim().startsWith("gsk_") &&
-          !k.trim().startsWith("csk-")
-      );
+    const isNvKey = (k?: string | null): k is string =>
+      Boolean(k && k.trim().startsWith("nvapi-") && k.trim().length >= 15);
+    const isGemKey = (k?: string | null): k is string =>
+      Boolean(k && k.trim().startsWith("AIza") && k.trim().length >= 15);
 
-    const provider = workspaceConfig.aiProvider || "nvidia";
+    const provider: AIProvider = workspaceConfig.aiProvider || "nvidia";
     const nvKey =
-      (isSupportedKey(workspaceConfig.nvidiaApiKey)
+      (isNvKey(workspaceConfig.nvidiaApiKey)
         ? workspaceConfig.nvidiaApiKey
         : null) ||
       (profile.custom_ai_api_key?.startsWith("nvapi-")
         ? profile.custom_ai_api_key
         : null) ||
-      (localApiKey?.startsWith("nvapi-") ? localApiKey : null);
+      (localApiKey?.startsWith("nvapi-") ? localApiKey : null) ||
+      "";
 
     const gemKey =
-      (isSupportedKey(workspaceConfig.geminiApiKey)
+      (isGemKey(workspaceConfig.geminiApiKey)
         ? workspaceConfig.geminiApiKey
         : null) ||
       (profile.custom_ai_api_key?.startsWith("AIza")
         ? profile.custom_ai_api_key
         : null) ||
-      (localApiKey?.startsWith("AIza") ? localApiKey : null);
-
-    const fallbackKey = isSupportedKey(profile.custom_ai_api_key)
-      ? profile.custom_ai_api_key
-      : isSupportedKey(localApiKey)
-      ? localApiKey
-      : "";
+      (localApiKey?.startsWith("AIza") ? localApiKey : null) ||
+      "";
 
     if (provider === "nvidia") {
-      return (nvKey || gemKey || fallbackKey || "").trim();
+      return nvKey.trim();
     }
-    return (gemKey || nvKey || fallbackKey || "").trim();
+    return gemKey.trim();
   }, [
     workspaceConfig.aiProvider,
     workspaceConfig.nvidiaApiKey,
