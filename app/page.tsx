@@ -159,26 +159,46 @@ export default function KiteWorkspacePage() {
   const canAccessWorkspace = isAuthenticated || !supabaseEnabled;
 
   const effectiveApiKey = useMemo(() => {
-    const provider = workspaceConfig.aiProvider || "cerebras";
+    const provider = workspaceConfig.aiProvider || "groq";
+    if (provider === "groq") {
+      const key =
+        workspaceConfig.groqApiKey ||
+        (profile.custom_ai_api_key?.startsWith("gsk_")
+          ? profile.custom_ai_api_key
+          : null) ||
+        (localApiKey?.startsWith("gsk_") ? localApiKey : null) ||
+        workspaceConfig.cerebrasApiKey ||
+        workspaceConfig.geminiApiKey ||
+        profile.custom_ai_api_key ||
+        localApiKey ||
+        "";
+      return key.trim();
+    }
+    if (provider === "cerebras") {
+      const key =
+        workspaceConfig.cerebrasApiKey ||
+        (profile.custom_ai_api_key?.startsWith("csk-")
+          ? profile.custom_ai_api_key
+          : null) ||
+        (localApiKey?.startsWith("csk-") ? localApiKey : null) ||
+        workspaceConfig.groqApiKey ||
+        workspaceConfig.geminiApiKey ||
+        profile.custom_ai_api_key ||
+        localApiKey ||
+        "";
+      return key.trim();
+    }
     const key =
-      provider === "cerebras"
-        ? workspaceConfig.cerebrasApiKey ||
-          (profile.custom_ai_api_key?.startsWith("csk-")
-            ? profile.custom_ai_api_key
-            : null) ||
-          (localApiKey?.startsWith("csk-") ? localApiKey : null) ||
-          workspaceConfig.geminiApiKey ||
-          profile.custom_ai_api_key ||
-          localApiKey ||
-          ""
-        : workspaceConfig.geminiApiKey ||
-          workspaceConfig.cerebrasApiKey ||
-          profile.custom_ai_api_key ||
-          localApiKey ||
-          "";
+      workspaceConfig.geminiApiKey ||
+      workspaceConfig.groqApiKey ||
+      workspaceConfig.cerebrasApiKey ||
+      profile.custom_ai_api_key ||
+      localApiKey ||
+      "";
     return key.trim();
   }, [
     workspaceConfig.aiProvider,
+    workspaceConfig.groqApiKey,
     workspaceConfig.cerebrasApiKey,
     workspaceConfig.geminiApiKey,
     profile.custom_ai_api_key,
@@ -984,7 +1004,7 @@ export default function KiteWorkspacePage() {
 
   // 11b. Save or clear AI API key across localStorage, profile, and workspaceConfig
   const handleSaveApiKey = useCallback(
-    (key: string | null, provider?: "cerebras" | "gemini") => {
+    (key: string | null, provider?: "groq" | "cerebras" | "gemini") => {
       const cleaned = key ? key.trim() : null;
       setLocalApiKey(cleaned || "");
 
@@ -998,16 +1018,22 @@ export default function KiteWorkspacePage() {
         } catch {}
       }
 
-      const isCerebras = provider
-        ? provider === "cerebras"
-        : cleaned
-        ? cleaned.startsWith("csk-")
-        : (workspaceConfig.aiProvider || "cerebras") === "cerebras";
+      const detectedProvider: "groq" | "cerebras" | "gemini" =
+        provider ||
+        (cleaned?.startsWith("gsk_")
+          ? "groq"
+          : cleaned?.startsWith("csk-")
+          ? "cerebras"
+          : cleaned?.startsWith("AIza")
+          ? "gemini"
+          : workspaceConfig.aiProvider || "groq");
 
       handleUpdateProfile({ custom_ai_api_key: cleaned });
       handleUpdateWorkspaceConfig({
-        aiProvider: isCerebras ? "cerebras" : "gemini",
-        ...(isCerebras
+        aiProvider: detectedProvider,
+        ...(detectedProvider === "groq"
+          ? { groqApiKey: cleaned }
+          : detectedProvider === "cerebras"
           ? { cerebrasApiKey: cleaned }
           : { geminiApiKey: cleaned }),
       });
@@ -1022,7 +1048,9 @@ export default function KiteWorkspacePage() {
         setIsGeminiSetupOpen(false);
         setActiveTab("chat");
         showToast(
-          isCerebras
+          detectedProvider === "groq"
+            ? "Groq Cloud connected (Llama 3.3 70B • Free Forever)!"
+            : detectedProvider === "cerebras"
             ? "Cerebras Cloud connected (~2,000 tok/s)!"
             : "Google Gemini connected!"
         );
@@ -1524,7 +1552,7 @@ export default function KiteWorkspacePage() {
         <GeminiSetupModal
           isOpen={isGeminiSetupOpen}
           initialKey={effectiveApiKey}
-          initialProvider={workspaceConfig.aiProvider || "cerebras"}
+          initialProvider={workspaceConfig.aiProvider || "groq"}
           onSaveApiKey={(key, provider) => handleSaveApiKey(key, provider)}
           onOptOutTemporary={() => handleSetAiTemporarilyDisabled(true)}
           onClose={() => setIsGeminiSetupOpen(false)}

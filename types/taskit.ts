@@ -113,7 +113,7 @@ export interface MyDaySchedule {
   updatedAt: string;
 }
 
-export type AIProvider = "cerebras" | "gemini";
+export type AIProvider = "groq" | "cerebras" | "gemini";
 
 export interface WorkspaceConfig {
   workspaceTitle: string;
@@ -122,6 +122,7 @@ export interface WorkspaceConfig {
   brandBadge: string;
   showCompletedTasks?: boolean;
   aiProvider?: AIProvider;
+  groqApiKey?: string | null;
   cerebrasApiKey?: string | null;
   geminiApiKey?: string | null;
   columnHeaders: ColumnHeadersConfig;
@@ -584,7 +585,8 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
     { id: "#Lab", label: "#Lab", color: "emerald" },
   ],
   showCompletedTasks: false,
-  aiProvider: "cerebras",
+  aiProvider: "groq",
+  groqApiKey: null,
   cerebrasApiKey: null,
   geminiApiKey: null,
   customThemeColors: null,
@@ -616,7 +618,14 @@ export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
       typeof raw.showCompletedTasks === "boolean"
         ? raw.showCompletedTasks
         : false,
-    aiProvider: raw.aiProvider === "gemini" ? "gemini" : "cerebras",
+    aiProvider:
+      raw.aiProvider === "gemini"
+        ? "gemini"
+        : raw.aiProvider === "cerebras"
+        ? "cerebras"
+        : "groq",
+    groqApiKey:
+      typeof raw.groqApiKey === "string" ? raw.groqApiKey : null,
     cerebrasApiKey:
       typeof raw.cerebrasApiKey === "string" ? raw.cerebrasApiKey : null,
     geminiApiKey:

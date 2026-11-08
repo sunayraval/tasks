@@ -311,7 +311,7 @@ function parseFlexibleDueDate(
 
 function extractCleanErrorMessage(
   err: unknown,
-  provider: AIProvider = "cerebras"
+  provider: AIProvider = "groq"
 ): {
   status: number;
   message: string;
@@ -320,9 +320,15 @@ function extractCleanErrorMessage(
   const raw = err instanceof Error ? err.message : String(err || "");
   const lower = raw.toLowerCase();
   const providerLabel =
-    provider === "cerebras" ? "Cerebras Cloud" : "Google Gemini";
+    provider === "groq"
+      ? "Groq Cloud"
+      : provider === "cerebras"
+      ? "Cerebras Cloud"
+      : "Google Gemini";
   const keyFormat =
-    provider === "cerebras"
+    provider === "groq"
+      ? "keys start with gsk_..."
+      : provider === "cerebras"
       ? "keys start with csk-..."
       : "keys start with AIza...";
 
@@ -370,17 +376,23 @@ export async function POST(request: Request) {
 
     const detectedProvider: AIProvider = explicitProvider
       ? explicitProvider
+      : customApiKey.startsWith("gsk_")
+      ? "groq"
       : customApiKey.startsWith("csk-")
       ? "cerebras"
       : customApiKey.startsWith("AIza")
       ? "gemini"
+      : process.env.GROQ_API_KEY
+      ? "groq"
       : process.env.CEREBRAS_API_KEY
       ? "cerebras"
       : "gemini";
 
     const effectiveApiKey =
       customApiKey ||
-      (detectedProvider === "cerebras"
+      (detectedProvider === "groq"
+        ? process.env.GROQ_API_KEY || ""
+        : detectedProvider === "cerebras"
         ? process.env.CEREBRAS_API_KEY || ""
         : process.env.GOOGLE_GENERATIVE_AI_API_KEY || "");
 
@@ -393,12 +405,49 @@ export async function POST(request: Request) {
           {
             valid: false,
             error:
-              detectedProvider === "cerebras"
+              detectedProvider === "groq"
+                ? "Please enter a valid Groq Cloud API key (starts with gsk_...)."
+                : detectedProvider === "cerebras"
                 ? "Please enter a valid Cerebras Cloud API key (starts with csk-...)."
                 : "Please enter a complete Google AI Studio API key (starts with AIza...).",
           },
           { status: 400 }
         );
+      }
+
+      if (detectedProvider === "groq") {
+        try {
+          const groq = createOpenAI({
+            baseURL: "https://api.groq.com/openai/v1",
+            apiKey: effectiveApiKey,
+          });
+
+          await Promise.race([
+            generateText({
+              model: groq("llama-3.1-8b-instant"),
+              prompt: "Reply with OK",
+              maxTokens: 5,
+            }),
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () => reject(new Error("Timeout verifying Groq API key")),
+                5000
+              )
+            ),
+          ]);
+
+          return NextResponse.json({
+            valid: true,
+            provider: "groq",
+            model: "llama-3.1-8b-instant",
+          });
+        } catch (err) {
+          const info = extractCleanErrorMessage(err, "groq");
+          return NextResponse.json(
+            { valid: false, error: info.message },
+            { status: info.status }
+          );
+        }
       }
 
       if (detectedProvider === "cerebras") {
@@ -707,7 +756,9 @@ ${taskLines}`;
         {
           error: "MISSING_API_KEY",
           reply:
-            detectedProvider === "cerebras"
+            detectedProvider === "groq"
+              ? "Please add your Groq Cloud API key in Preferences to use this feature."
+              : detectedProvider === "cerebras"
               ? "Please add your Cerebras Cloud API key in Preferences to use this feature."
               : "Please add your Google AI API key to use this feature.",
         },
@@ -2723,7 +2774,72 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
     let succeeded = false;
     const tStart = Date.now();
 
-    if (detectedProvider === "cerebras") {
+    if (detectedProvider === "groq") {
+      // Execute with Groq Cloud (300-800+ tokens/sec, ultra-low latency, free forever)
+      const groq = createOpenAI({
+        baseURL: "https://api.groq.com/openai/v1",
+        apiKey: effectiveApiKey,
+      });
+
+      const groqModels = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
+      usedModel = groqModels[0];
+
+      for (const candidate of groqModels) {
+        const candStart = Date.now();
+        try {
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error(`Timeout on Groq model ${candidate}`)),
+              qaSubmission ? 12000 : 8000
+            )
+          );
+
+          const result = await Promise.race([
+            generateText({
+              model: groq(candidate),
+              system: systemPrompt,
+              messages: conversationMessages,
+              tools,
+              maxSteps: qaSubmission ? 5 : 4,
+              maxTokens: 1200,
+            }),
+            timeoutPromise,
+          ]);
+
+          usedModel = `groq/${candidate}`;
+          replyText = (result.text || "").trim();
+          succeeded = true;
+          console.log(
+            `[Groq Chat] Model "${candidate}" generated response in ${
+              Date.now() - candStart
+            }ms`
+          );
+          break;
+        } catch (err) {
+          lastError = err;
+          console.warn(
+            `[Groq Chat] Candidate "${candidate}" attempt failed in ${
+              Date.now() - candStart
+            }ms:`,
+            err
+          );
+          const info = extractCleanErrorMessage(err, "groq");
+          if (info.isKeyError || executedActions.length > 0 || qaState.prompt) {
+            if (executedActions.length > 0 || qaState.prompt) {
+              succeeded = true;
+              break;
+            }
+            return NextResponse.json(
+              {
+                error: "INVALID_API_KEY",
+                reply: info.message,
+              },
+              { status: 401 }
+            );
+          }
+        }
+      }
+    } else if (detectedProvider === "cerebras") {
       // Execute with Cerebras Cloud (~450 to 2,000+ tokens/sec, ultra-low latency)
       const cerebras = createOpenAI({
         baseURL: "https://api.cerebras.ai/v1",
@@ -2937,6 +3053,9 @@ function workspaceConfigUpdatesAssign(
 ) {
   if (working.aiProvider === undefined && incoming.aiProvider) {
     working.aiProvider = incoming.aiProvider;
+  }
+  if (working.groqApiKey === undefined && incoming.groqApiKey) {
+    working.groqApiKey = incoming.groqApiKey;
   }
   if (working.cerebrasApiKey === undefined && incoming.cerebrasApiKey) {
     working.cerebrasApiKey = incoming.cerebrasApiKey;

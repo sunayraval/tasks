@@ -18,8 +18,8 @@ import {
 interface GeminiSetupModalProps {
   isOpen: boolean;
   initialKey?: string;
-  initialProvider?: "cerebras" | "gemini";
-  onSaveApiKey: (apiKey: string, provider?: "cerebras" | "gemini") => void;
+  initialProvider?: "groq" | "cerebras" | "gemini";
+  onSaveApiKey: (apiKey: string, provider?: "groq" | "cerebras" | "gemini") => void;
   onOptOutTemporary: () => void;
   onClose: () => void;
 }
@@ -27,12 +27,12 @@ interface GeminiSetupModalProps {
 export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
   isOpen,
   initialKey = "",
-  initialProvider = "cerebras",
+  initialProvider = "groq",
   onSaveApiKey,
   onOptOutTemporary,
   onClose,
 }) => {
-  const [provider, setProvider] = useState<"cerebras" | "gemini">(initialProvider);
+  const [provider, setProvider] = useState<"groq" | "cerebras" | "gemini">(initialProvider);
   const [keyDraft, setKeyDraft] = useState(initialKey);
   const [showKey, setShowKey] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -42,7 +42,9 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setKeyDraft(initialKey || "");
-      if (initialKey.startsWith("AIza")) {
+      if (initialKey.startsWith("gsk_")) {
+        setProvider("groq");
+      } else if (initialKey.startsWith("AIza")) {
         setProvider("gemini");
       } else if (initialKey.startsWith("csk-")) {
         setProvider("cerebras");
@@ -72,7 +74,9 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
     const trimmed = keyDraft.trim();
     if (!trimmed) {
       setErrorMsg(
-        provider === "cerebras"
+        provider === "groq"
+          ? "Please paste your Groq API key first."
+          : provider === "cerebras"
           ? "Please paste your Cerebras API key first."
           : "Please paste your Google AI API key first."
       );
@@ -96,7 +100,9 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
       if (!res.ok || !data.valid) {
         setErrorMsg(
           data.error ||
-            (provider === "cerebras"
+            (provider === "groq"
+              ? "Could not verify this Groq API key (starts with gsk_...)."
+              : provider === "cerebras"
               ? "Could not verify this Cerebras API key (starts with csk-...)."
               : "Could not verify this Google Gemini API key (starts with AIza...).")
         );
@@ -162,43 +168,43 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
               Choose Your AI Provider
             </h2>
             <p className="text-xs sm:text-sm text-white/65 leading-relaxed">
-              Connect Cerebras Cloud or Google Gemini to power your interactive workspace
-              agent—fast scheduling, task management, live telemetry, and Q&amp;A day planning.
+              Connect Groq Cloud (free forever, no credit card required) or Google Gemini to power your interactive workspace
+              agent—instant scheduling, task management, live telemetry, and Q&amp;A day planning.
             </p>
           </div>
 
           {/* Provider Selection Tabs */}
-          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white/[0.04] p-1.5 border border-white/10">
+          <div className="grid grid-cols-3 gap-2 rounded-2xl bg-white/[0.04] p-1.5 border border-white/10">
             <button
               type="button"
               onClick={() => {
-                setProvider("cerebras");
+                setProvider("groq");
                 setErrorMsg(null);
               }}
-              className={`flex flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left transition-all ${
-                provider === "cerebras"
+              className={`flex flex-col items-start gap-0.5 rounded-xl px-2.5 py-2 text-left transition-all ${
+                provider === "groq"
                   ? "bg-primary text-black font-semibold shadow-neon"
                   : "text-white/70 hover:text-white hover:bg-white/5"
               }`}
             >
-              <div className="flex items-center gap-1.5 text-xs font-bold">
-                <span>Cerebras Cloud</span>
+              <div className="flex items-center gap-1 text-xs font-bold">
+                <span>Groq</span>
                 <span
-                  className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold uppercase tracking-wider ${
-                    provider === "cerebras"
+                  className={`text-[8px] px-1 py-0.2 rounded-full font-bold uppercase tracking-wider ${
+                    provider === "groq"
                       ? "bg-black/20 text-black"
                       : "bg-emerald-500/20 text-emerald-300"
                   }`}
                 >
-                  2,000 tok/s
+                  Free Forever
                 </span>
               </div>
               <span
                 className={`text-[10px] ${
-                  provider === "cerebras" ? "text-black/80" : "text-white/45"
+                  provider === "groq" ? "text-black/80" : "text-white/45"
                 }`}
               >
-                Ultra-fast • Free Forever
+                No card • ~500 tok/s
               </span>
             </button>
 
@@ -208,31 +214,112 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
                 setProvider("gemini");
                 setErrorMsg(null);
               }}
-              className={`flex flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left transition-all ${
+              className={`flex flex-col items-start gap-0.5 rounded-xl px-2.5 py-2 text-left transition-all ${
                 provider === "gemini"
                   ? "bg-primary text-black font-semibold shadow-neon"
                   : "text-white/70 hover:text-white hover:bg-white/5"
               }`}
             >
-              <div className="flex items-center gap-1.5 text-xs font-bold">
-                <span>Google Gemini</span>
+              <div className="flex items-center gap-1 text-xs font-bold">
+                <span>Gemini</span>
               </div>
               <span
                 className={`text-[10px] ${
                   provider === "gemini" ? "text-black/80" : "text-white/45"
                 }`}
               >
-                Google AI Studio Flash
+                AI Studio Flash
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setProvider("cerebras");
+                setErrorMsg(null);
+              }}
+              className={`flex flex-col items-start gap-0.5 rounded-xl px-2.5 py-2 text-left transition-all ${
+                provider === "cerebras"
+                  ? "bg-primary text-black font-semibold shadow-neon"
+                  : "text-white/70 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <div className="flex items-center gap-1 text-xs font-bold">
+                <span>Cerebras</span>
+              </div>
+              <span
+                className={`text-[10px] ${
+                  provider === "cerebras" ? "text-black/80" : "text-white/45"
+                }`}
+              >
+                Trial / Paid
               </span>
             </button>
           </div>
 
           {/* Step Guide for Selected Provider */}
-          {provider === "cerebras" ? (
+          {provider === "groq" ? (
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
-                  Quick 30-Second Cerebras Setup (Free Forever)
+                  Quick 20-Second Groq Setup (100% Free Forever • No Card)
+                </span>
+                <a
+                  href="https://console.groq.com"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 px-3 py-1 text-xs font-semibold text-highlight transition-all"
+                >
+                  <span>Open Groq Console</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <ol className="space-y-2 text-xs text-white/75">
+                <li className="flex items-start gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-highlight">
+                    1
+                  </span>
+                  <span>
+                    Open{" "}
+                    <a
+                      href="https://console.groq.com"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary underline underline-offset-2 hover:brightness-125"
+                    >
+                      console.groq.com
+                    </a>{" "}
+                    and sign in with Google or GitHub (no credit card or billing required).
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-highlight">
+                    2
+                  </span>
+                  <span>
+                    Click <strong className="text-white">&ldquo;API Keys&rdquo;</strong> in the left menu and click <strong className="text-white">&ldquo;Create API Key&rdquo;</strong>.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-highlight">
+                    3
+                  </span>
+                  <span>
+                    Copy the key (starts with{" "}
+                    <code className="rounded bg-black/60 px-1.5 py-0.5 font-mono text-[11px] text-white/90">
+                      gsk_...
+                    </code>
+                    ) and paste it below.
+                  </span>
+                </li>
+              </ol>
+            </div>
+          ) : provider === "cerebras" ? (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
+                  Cerebras Cloud Setup
                 </span>
                 <a
                   href="https://cloud.cerebras.ai"
@@ -260,7 +347,7 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
                     >
                       cloud.cerebras.ai
                     </a>{" "}
-                    and sign in (free account, no credit card needed).
+                    and sign in.
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
@@ -268,7 +355,7 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
                     2
                   </span>
                   <span>
-                    Go to <strong className="text-white">&ldquo;API Keys&rdquo;</strong> in the left sidebar and click <strong className="text-white">&ldquo;Create API Key&rdquo;</strong>.
+                    Go to <strong className="text-white">&ldquo;API Keys&rdquo;</strong> and click <strong className="text-white">&ldquo;Create API Key&rdquo;</strong>.
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
@@ -276,11 +363,7 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
                     3
                   </span>
                   <span>
-                    Copy the key (starts with{" "}
-                    <code className="rounded bg-black/60 px-1.5 py-0.5 font-mono text-[11px] text-white/90">
-                      csk-...
-                    </code>
-                    ) and paste it below.
+                    Copy the key (starts with <code className="rounded bg-black/60 px-1.5 py-0.5 font-mono text-[11px] text-white/90">csk-...</code>) and paste below.
                   </span>
                 </li>
               </ol>
@@ -352,7 +435,11 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
                 htmlFor="gemini-api-key-input"
                 className="block text-xs font-semibold text-white/85 mb-1.5"
               >
-                {provider === "cerebras" ? "Cerebras Cloud API Key" : "Google Gemini API Key"}
+                {provider === "groq"
+                  ? "Groq Cloud API Key"
+                  : provider === "cerebras"
+                  ? "Cerebras Cloud API Key"
+                  : "Google Gemini API Key"}
               </label>
               <div className="relative flex items-center">
                 <KeyRound className="w-4 h-4 text-white/40 absolute left-3.5 pointer-events-none" />
@@ -364,8 +451,9 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
                   onChange={(e) => {
                     const val = e.target.value;
                     setKeyDraft(val);
-                    if (val.startsWith("csk-")) setProvider("cerebras");
-                    if (val.startsWith("AIza")) setProvider("gemini");
+                    if (val.startsWith("gsk_")) setProvider("groq");
+                    else if (val.startsWith("csk-")) setProvider("cerebras");
+                    else if (val.startsWith("AIza")) setProvider("gemini");
                     if (errorMsg) setErrorMsg(null);
                   }}
                   onKeyDown={(e) => {
@@ -377,7 +465,9 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
                     }
                   }}
                   placeholder={
-                    provider === "cerebras"
+                    provider === "groq"
+                      ? "Paste Groq key (gsk_...)"
+                      : provider === "cerebras"
                       ? "Paste Cerebras key (csk-...)"
                       : "Paste Gemini key (AIzaSy...)"
                   }
@@ -409,7 +499,7 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
               <div className="flex items-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-3.5 py-2.5 text-xs font-medium text-emerald-300">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>
-                  Connected to {provider === "cerebras" ? "Cerebras Cloud" : "Google Gemini"}! Launching workspace...
+                  Connected to {provider === "groq" ? "Groq Cloud" : provider === "cerebras" ? "Cerebras Cloud" : "Google Gemini"}! Launching workspace...
                 </span>
               </div>
             )}

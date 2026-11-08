@@ -65,7 +65,10 @@ interface SettingsModalProps {
   aiTemporarilyDisabled: boolean;
   effectiveApiKey: string;
   onSetAiTemporarilyDisabled: (disabled: boolean) => void;
-  onSaveApiKey: (key: string | null, provider?: "cerebras" | "gemini") => void;
+  onSaveApiKey: (
+    key: string | null,
+    provider?: "groq" | "cerebras" | "gemini"
+  ) => void;
   onUpdateProfile: (updates: Partial<UserProfile>) => void;
   onUpdateWorkspaceConfig: (updates: Partial<WorkspaceConfig>) => void;
   onCustomVideoUploaded: () => void;
@@ -253,8 +256,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [gcalMessage, setGcalMessage] = useState<string>("");
   const [copiedIcs, setCopiedIcs] = useState(false);
   const [newSectionTitle, setNewSectionTitle] = useState("");
-  const [aiProvider, setAiProvider] = useState<"cerebras" | "gemini">(
-    workspaceConfig.aiProvider || (effectiveApiKey.startsWith("csk-") ? "cerebras" : "cerebras")
+  const [aiProvider, setAiProvider] = useState<"groq" | "cerebras" | "gemini">(
+    workspaceConfig.aiProvider ||
+      (effectiveApiKey.startsWith("gsk_")
+        ? "groq"
+        : effectiveApiKey.startsWith("csk-")
+        ? "cerebras"
+        : "groq")
   );
   const [apiKeyDraft, setApiKeyDraft] = useState<string>(effectiveApiKey || "");
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
@@ -273,10 +281,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setApiKeyDraft(effectiveApiKey || "");
-      if (effectiveApiKey.startsWith("AIza")) {
-        setAiProvider("gemini");
+      if (effectiveApiKey.startsWith("gsk_")) {
+        setAiProvider("groq");
       } else if (effectiveApiKey.startsWith("csk-")) {
         setAiProvider("cerebras");
+      } else if (effectiveApiKey.startsWith("AIza")) {
+        setAiProvider("gemini");
       } else if (workspaceConfig.aiProvider) {
         setAiProvider(workspaceConfig.aiProvider);
       }
@@ -295,7 +305,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setApiKeyStatus({
         type: "error",
         text:
-          aiProvider === "cerebras"
+          aiProvider === "groq"
+            ? "Please paste your Groq Cloud API key first."
+            : aiProvider === "cerebras"
             ? "Please paste your Cerebras Cloud API key first."
             : "Please paste your Google AI API key first.",
       });
@@ -320,7 +332,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           type: "error",
           text:
             data.error ||
-            (aiProvider === "cerebras"
+            (aiProvider === "groq"
+              ? "Groq Cloud rejected this API key (starts with gsk_...)."
+              : aiProvider === "cerebras"
               ? "Cerebras Cloud rejected this API key (starts with csk-...)."
               : "Google AI rejected this API key (starts with AIza...)."),
         });
@@ -332,7 +346,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setApiKeyStatus({
         type: "success",
         text: `Verified & connected! Your ${
-          aiProvider === "cerebras" ? "Cerebras Cloud" : "Google Gemini"
+          aiProvider === "groq"
+            ? "Groq Cloud (Llama 3.3 70B)"
+            : aiProvider === "cerebras"
+            ? "Cerebras Cloud"
+            : "Google Gemini"
         } Agent is active.`,
       });
     } catch {
@@ -1165,14 +1183,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       AI Provider &amp; API Key Setup
                     </h4>
                     <p className="text-[11px] text-white/55 mt-0.5">
-                      Choose your preferred AI provider. Cerebras Cloud delivers ultra-low latency (~2,000 tok/s) and never times out.
+                      Choose your preferred AI provider. Groq Cloud is 100% free forever with no credit card required and delivers ~500 tok/s.
                     </p>
                   </div>
 
                   {hasSavedKey ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1 text-[10px] font-semibold text-emerald-300">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      Connected ({aiProvider === "cerebras" ? "Cerebras" : "Gemini"} • {effectiveApiKey.slice(0, 5)}••••
+                      Connected (
+                      {aiProvider === "groq"
+                        ? "Groq"
+                        : aiProvider === "cerebras"
+                        ? "Cerebras"
+                        : "Gemini"}{" "}
+                      • {effectiveApiKey.slice(0, 5)}••••
                       {effectiveApiKey.slice(-4)})
                     </span>
                   ) : (
@@ -1184,28 +1208,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* Provider Selector Tabs */}
-                <div className="grid grid-cols-2 gap-2 rounded-xl bg-white/[0.04] p-1 border border-white/10">
+                <div className="grid grid-cols-3 gap-2 rounded-xl bg-white/[0.04] p-1 border border-white/10">
                   <button
                     type="button"
                     onClick={() => {
-                      setAiProvider("cerebras");
+                      setAiProvider("groq");
                       if (apiKeyStatus) setApiKeyStatus(null);
                     }}
-                    className={`flex items-center justify-center gap-1.5 rounded-lg py-2 px-3 text-xs font-bold transition-all ${
-                      aiProvider === "cerebras"
+                    className={`flex items-center justify-center gap-1.5 rounded-lg py-2 px-2 text-xs font-bold transition-all ${
+                      aiProvider === "groq"
                         ? "bg-primary text-black shadow-neon"
                         : "text-white/70 hover:text-white hover:bg-white/5"
                     }`}
                   >
-                    <span>Cerebras Cloud</span>
+                    <span>Groq Cloud</span>
                     <span
                       className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold uppercase tracking-wider ${
-                        aiProvider === "cerebras"
+                        aiProvider === "groq"
                           ? "bg-black/20 text-black"
                           : "bg-emerald-500/20 text-emerald-300"
                       }`}
                     >
-                      Fastest
+                      Free Forever
                     </span>
                   </button>
 
@@ -1215,7 +1239,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       setAiProvider("gemini");
                       if (apiKeyStatus) setApiKeyStatus(null);
                     }}
-                    className={`flex items-center justify-center gap-1.5 rounded-lg py-2 px-3 text-xs font-bold transition-all ${
+                    className={`flex items-center justify-center gap-1.5 rounded-lg py-2 px-2 text-xs font-bold transition-all ${
                       aiProvider === "gemini"
                         ? "bg-primary text-black shadow-neon"
                         : "text-white/70 hover:text-white hover:bg-white/5"
@@ -1223,13 +1247,56 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   >
                     <span>Google Gemini</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiProvider("cerebras");
+                      if (apiKeyStatus) setApiKeyStatus(null);
+                    }}
+                    className={`flex items-center justify-center gap-1.5 rounded-lg py-2 px-2 text-xs font-bold transition-all ${
+                      aiProvider === "cerebras"
+                        ? "bg-primary text-black shadow-neon"
+                        : "text-white/70 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    <span>Cerebras Cloud</span>
+                  </button>
                 </div>
 
                 {/* Dynamic 3-Step Instructions */}
-                {aiProvider === "cerebras" ? (
+                {aiProvider === "groq" ? (
                   <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3.5 space-y-2 text-[11px] text-white/75">
                     <div className="font-semibold text-white/90">
-                      How to get a free Cerebras Cloud API key (~30 seconds):
+                      How to get a free Groq Cloud API key (~20 seconds, no credit card):
+                    </div>
+                    <ol className="list-decimal pl-4 space-y-1 text-white/65">
+                      <li>
+                        Open{" "}
+                        <a
+                          href="https://console.groq.com"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-highlight underline underline-offset-2 hover:brightness-110 font-medium"
+                        >
+                          console.groq.com
+                          <ExternalLink className="w-3 h-3" />
+                        </a>{" "}
+                        and sign in with GitHub, Google, or email.
+                      </li>
+                      <li>
+                        Click <strong className="text-white/90">&ldquo;API Keys&rdquo;</strong> in the left sidebar and click <strong className="text-white/90">&ldquo;Create API Key&rdquo;</strong>.
+                      </li>
+                      <li>
+                        Copy the key (starts with <code className="text-highlight">gsk_...</code>),
+                        paste it below, and click <strong className="text-white/90">Verify &amp; Save Key</strong>.
+                      </li>
+                    </ol>
+                  </div>
+                ) : aiProvider === "cerebras" ? (
+                  <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3.5 space-y-2 text-[11px] text-white/75">
+                    <div className="font-semibold text-white/90">
+                      How to get a Cerebras Cloud API key:
                     </div>
                     <ol className="list-decimal pl-4 space-y-1 text-white/65">
                       <li>
@@ -1243,10 +1310,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           cloud.cerebras.ai
                           <ExternalLink className="w-3 h-3" />
                         </a>{" "}
-                        and sign in (free account, no credit card required).
+                        and sign in.
                       </li>
                       <li>
-                        Navigate to <strong className="text-white/90">&ldquo;API Keys&rdquo;</strong> in the left sidebar and click <strong className="text-white/90">&ldquo;Create API Key&rdquo;</strong>.
+                        Navigate to <strong className="text-white/90">&ldquo;API Keys&rdquo;</strong> and click <strong className="text-white/90">&ldquo;Create API Key&rdquo;</strong>.
                       </li>
                       <li>
                         Copy the key (starts with <code className="text-highlight">csk-...</code>),
@@ -1302,12 +1369,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         onChange={(e) => {
                           const val = e.target.value;
                           setApiKeyDraft(val);
+                          if (val.startsWith("gsk_")) setAiProvider("groq");
                           if (val.startsWith("csk-")) setAiProvider("cerebras");
                           if (val.startsWith("AIza")) setAiProvider("gemini");
                           if (apiKeyStatus) setApiKeyStatus(null);
                         }}
                         placeholder={
-                          aiProvider === "cerebras"
+                          aiProvider === "groq"
+                            ? "Paste Groq API key (gsk_...)"
+                            : aiProvider === "cerebras"
                             ? "Paste Cerebras API key (csk-...)"
                             : "Paste Google AI API key (AIzaSy...)"
                         }

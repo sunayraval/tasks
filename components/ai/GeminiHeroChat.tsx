@@ -62,7 +62,10 @@ interface GeminiHeroChatProps {
   queuedPrompt?: { nonce: number; text: string } | null;
   onConsumeQueuedPrompt?: () => void;
   onSelectTab: (tab: WorkspaceTab) => void;
-  onSaveApiKey: (key: string) => void;
+  onSaveApiKey: (
+    key: string,
+    provider?: "groq" | "cerebras" | "gemini"
+  ) => void;
   onOpenApiKeySetup: () => void;
   onOptOutTemporary: () => void;
   onChangeTone: (tone: AITone) => void;
@@ -749,6 +752,12 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
     setInlineVerifying(true);
     setInlineKeyError(null);
 
+    const detectedProvider = trimmed.startsWith("gsk_")
+      ? "groq"
+      : trimmed.startsWith("csk-")
+      ? "cerebras"
+      : "gemini";
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -756,18 +765,19 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
         body: JSON.stringify({
           mode: "verify",
           customApiKey: trimmed,
+          aiProvider: detectedProvider,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.valid) {
         setInlineKeyError(
           data.error ||
-            "Invalid API key. Copy a valid key from Google AI Studio (starts with AIza...)."
+            "Invalid API key. Please check your key from Groq Cloud or Google AI Studio."
         );
         return;
       }
       setInlineKeyDraft("");
-      onSaveApiKey(trimmed);
+      onSaveApiKey(trimmed, detectedProvider);
     } catch {
       setInlineKeyError("Could not verify key right now. Please try again.");
     } finally {
@@ -850,12 +860,10 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
 
           <div className="space-y-2">
             <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">
-              Please add your Google AI API key to use this feature
+              Please add your AI API key to use this feature
             </h1>
             <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-              The Gemini Workspace Agent uses your personal Google AI Studio key
-              to manage tasks, organize sections, switch themes, and plan your
-              schedule.
+              Kite uses your free Groq Cloud API key (free forever, no credit card required) or Google AI Studio key to manage tasks, plan your day, and customize your workspace.
             </p>
           </div>
 
@@ -868,7 +876,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                   setInlineKeyDraft(e.target.value);
                   if (inlineKeyError) setInlineKeyError(null);
                 }}
-                placeholder="Paste AIzaSy... key here"
+                placeholder="Paste Groq (gsk_...) or Google AI key here"
                 className="flex-1 rounded-2xl border border-white/15 bg-black/60 px-4 py-2.5 text-xs sm:text-sm font-mono text-white placeholder-white/30 focus:border-primary focus:outline-none"
               />
               <button
@@ -899,12 +907,12 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
               <span>View Step-by-Step Setup Instructions</span>
             </button>
             <a
-              href="https://aistudio.google.com/app/apikey"
+              href="https://console.groq.com"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] px-3.5 py-2 text-white/75 hover:text-white transition-colors"
             >
-              <span>Get Free Key</span>
+              <span>Get Free Groq Key (No Card)</span>
               <ExternalLink className="w-3 h-3" />
             </a>
             <button
@@ -1489,7 +1497,9 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           <span className="hidden sm:inline-flex items-center gap-1.5">
             <KiteLogoMark className="w-3.5 h-3.5 text-primary" />
             <span>
-              {workspaceConfig.aiProvider === "cerebras"
+              {workspaceConfig.aiProvider === "groq"
+                ? "Groq Llama 3.3 70B"
+                : workspaceConfig.aiProvider === "cerebras"
                 ? "Cerebras Llama 3.3 70B"
                 : `Gemini ${modelChoice === "pro" ? "3.8 Pro" : "3.8 Flash"}`}{" "}
               • {activeTaskCount} active task{activeTaskCount === 1 ? "" : "s"}
