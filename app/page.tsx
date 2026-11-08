@@ -158,18 +158,34 @@ export default function KiteWorkspacePage() {
   const supabaseEnabled = isSupabaseConfigured();
   const canAccessWorkspace = isAuthenticated || !supabaseEnabled;
 
-  const effectiveApiKey = useMemo(
-    () =>
-      (
-        profile.custom_ai_api_key ||
-        workspaceConfig.geminiApiKey ||
-        localApiKey ||
-        ""
-      ).trim(),
-    [profile.custom_ai_api_key, workspaceConfig.geminiApiKey, localApiKey]
-  );
+  const effectiveApiKey = useMemo(() => {
+    const provider = workspaceConfig.aiProvider || "cerebras";
+    const key =
+      provider === "cerebras"
+        ? workspaceConfig.cerebrasApiKey ||
+          (profile.custom_ai_api_key?.startsWith("csk-")
+            ? profile.custom_ai_api_key
+            : null) ||
+          (localApiKey?.startsWith("csk-") ? localApiKey : null) ||
+          workspaceConfig.geminiApiKey ||
+          profile.custom_ai_api_key ||
+          localApiKey ||
+          ""
+        : workspaceConfig.geminiApiKey ||
+          workspaceConfig.cerebrasApiKey ||
+          profile.custom_ai_api_key ||
+          localApiKey ||
+          "";
+    return key.trim();
+  }, [
+    workspaceConfig.aiProvider,
+    workspaceConfig.cerebrasApiKey,
+    workspaceConfig.geminiApiKey,
+    profile.custom_ai_api_key,
+    localApiKey,
+  ]);
 
-  const hasGeminiApiKey = effectiveApiKey.length >= 20;
+  const hasGeminiApiKey = effectiveApiKey.length >= 15;
 
   const activeTaskCount = useMemo(
     () =>
@@ -966,9 +982,9 @@ export default function KiteWorkspacePage() {
     [showToast]
   );
 
-  // 11b. Save or clear Google AI (Gemini) API key across localStorage, profile, and workspaceConfig
+  // 11b. Save or clear AI API key across localStorage, profile, and workspaceConfig
   const handleSaveApiKey = useCallback(
-    (key: string | null) => {
+    (key: string | null, provider?: "cerebras" | "gemini") => {
       const cleaned = key ? key.trim() : null;
       setLocalApiKey(cleaned || "");
 
@@ -982,8 +998,19 @@ export default function KiteWorkspacePage() {
         } catch {}
       }
 
+      const isCerebras = provider
+        ? provider === "cerebras"
+        : cleaned
+        ? cleaned.startsWith("csk-")
+        : (workspaceConfig.aiProvider || "cerebras") === "cerebras";
+
       handleUpdateProfile({ custom_ai_api_key: cleaned });
-      handleUpdateWorkspaceConfig({ geminiApiKey: cleaned });
+      handleUpdateWorkspaceConfig({
+        aiProvider: isCerebras ? "cerebras" : "gemini",
+        ...(isCerebras
+          ? { cerebrasApiKey: cleaned }
+          : { geminiApiKey: cleaned }),
+      });
 
       if (cleaned) {
         setAiTemporarilyDisabled(false);
@@ -994,12 +1021,16 @@ export default function KiteWorkspacePage() {
         }
         setIsGeminiSetupOpen(false);
         setActiveTab("chat");
-        showToast("Google Gemini AI connected!");
+        showToast(
+          isCerebras
+            ? "Cerebras Cloud connected (~2,000 tok/s)!"
+            : "Google Gemini connected!"
+        );
       } else {
-        showToast("Removed Google AI API key.");
+        showToast("Removed saved AI API key.");
       }
     },
-    [handleUpdateProfile, handleUpdateWorkspaceConfig, showToast]
+    [handleUpdateProfile, handleUpdateWorkspaceConfig, showToast, workspaceConfig.aiProvider]
   );
 
   // 11c. Apply live mutations executed by the Gemini Workspace Agent & persist to Supabase
@@ -1493,7 +1524,8 @@ export default function KiteWorkspacePage() {
         <GeminiSetupModal
           isOpen={isGeminiSetupOpen}
           initialKey={effectiveApiKey}
-          onSaveApiKey={(key) => handleSaveApiKey(key)}
+          initialProvider={workspaceConfig.aiProvider || "cerebras"}
+          onSaveApiKey={(key, provider) => handleSaveApiKey(key, provider)}
           onOptOutTemporary={() => handleSetAiTemporarilyDisabled(true)}
           onClose={() => setIsGeminiSetupOpen(false)}
         />

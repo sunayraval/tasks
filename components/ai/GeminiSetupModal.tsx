@@ -18,7 +18,8 @@ import {
 interface GeminiSetupModalProps {
   isOpen: boolean;
   initialKey?: string;
-  onSaveApiKey: (apiKey: string) => void;
+  initialProvider?: "cerebras" | "gemini";
+  onSaveApiKey: (apiKey: string, provider?: "cerebras" | "gemini") => void;
   onOptOutTemporary: () => void;
   onClose: () => void;
 }
@@ -26,10 +27,12 @@ interface GeminiSetupModalProps {
 export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
   isOpen,
   initialKey = "",
+  initialProvider = "cerebras",
   onSaveApiKey,
   onOptOutTemporary,
   onClose,
 }) => {
+  const [provider, setProvider] = useState<"cerebras" | "gemini">(initialProvider);
   const [keyDraft, setKeyDraft] = useState(initialKey);
   const [showKey, setShowKey] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -39,10 +42,17 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setKeyDraft(initialKey || "");
+      if (initialKey.startsWith("AIza")) {
+        setProvider("gemini");
+      } else if (initialKey.startsWith("csk-")) {
+        setProvider("cerebras");
+      } else {
+        setProvider(initialProvider);
+      }
       setErrorMsg(null);
       setVerifiedSuccess(false);
     }
-  }, [isOpen, initialKey]);
+  }, [isOpen, initialKey, initialProvider]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -61,7 +71,11 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
     e.preventDefault();
     const trimmed = keyDraft.trim();
     if (!trimmed) {
-      setErrorMsg("Please paste your Google AI API key first.");
+      setErrorMsg(
+        provider === "cerebras"
+          ? "Please paste your Cerebras API key first."
+          : "Please paste your Google AI API key first."
+      );
       return;
     }
 
@@ -75,13 +89,16 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
         body: JSON.stringify({
           mode: "verify",
           customApiKey: trimmed,
+          aiProvider: provider,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.valid) {
         setErrorMsg(
           data.error ||
-            "Could not verify this API key. Make sure you copied the full key starting with AIza..."
+            (provider === "cerebras"
+              ? "Could not verify this Cerebras API key (starts with csk-...)."
+              : "Could not verify this Google Gemini API key (starts with AIza...).")
         );
         setVerifying(false);
         return;
@@ -89,7 +106,7 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
 
       setVerifiedSuccess(true);
       setTimeout(() => {
-        onSaveApiKey(trimmed);
+        onSaveApiKey(trimmed, provider);
       }, 350);
     } catch {
       setErrorMsg("Network error while verifying key. Please try again.");
@@ -136,79 +153,197 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
           <div className="space-y-2 pr-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/35 bg-primary/15 px-3 py-1 text-[11px] font-semibold text-highlight">
               <Sparkles className="w-3.5 h-3.5 text-primary" />
-              <span>Gemini Workspace Agent Setup</span>
+              <span>AI Workspace Agent Setup</span>
             </div>
             <h2
               id="gemini-setup-title"
               className="text-xl sm:text-2xl font-bold tracking-tight text-white"
             >
-              Set up your Google AI API Key
+              Choose Your AI Provider
             </h2>
             <p className="text-xs sm:text-sm text-white/65 leading-relaxed">
-              Connect Google Gemini to unlock the full conversational homepage
-              agent—capable of adding, editing, organizing, and deleting tasks,
-              switching themes, and syncing Canvas automatically.
+              Connect Cerebras Cloud or Google Gemini to power your interactive workspace
+              agent—fast scheduling, task management, live telemetry, and Q&amp;A day planning.
             </p>
           </div>
 
-          {/* 3-Step Quick Guide */}
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
-                Quick 30-Second Setup (Free Tier)
-              </span>
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 px-3 py-1 text-xs font-semibold text-highlight transition-all"
+          {/* Provider Selection Tabs */}
+          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white/[0.04] p-1.5 border border-white/10">
+            <button
+              type="button"
+              onClick={() => {
+                setProvider("cerebras");
+                setErrorMsg(null);
+              }}
+              className={`flex flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left transition-all ${
+                provider === "cerebras"
+                  ? "bg-primary text-black font-semibold shadow-neon"
+                  : "text-white/70 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <div className="flex items-center gap-1.5 text-xs font-bold">
+                <span>Cerebras Cloud</span>
+                <span
+                  className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold uppercase tracking-wider ${
+                    provider === "cerebras"
+                      ? "bg-black/20 text-black"
+                      : "bg-emerald-500/20 text-emerald-300"
+                  }`}
+                >
+                  2,000 tok/s
+                </span>
+              </div>
+              <span
+                className={`text-[10px] ${
+                  provider === "cerebras" ? "text-black/80" : "text-white/45"
+                }`}
               >
-                <span>Open Google AI Studio</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
+                Ultra-fast • Free Forever
+              </span>
+            </button>
 
-            <ol className="space-y-2 text-xs text-white/75">
-              <li className="flex items-start gap-2.5">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-highlight">
-                  1
-                </span>
-                <span>
-                  Go to{" "}
-                  <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-primary underline underline-offset-2 hover:brightness-125"
-                  >
-                    aistudio.google.com/app/apikey
-                  </a>{" "}
-                  and sign in with your Google account.
-                </span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-highlight">
-                  2
-                </span>
-                <span>
-                  Click <strong className="text-white">&ldquo;Create API key&rdquo;</strong>{" "}
-                  (free tier includes Gemini 3.8 Flash with no billing required).
-                </span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-highlight">
-                  3
-                </span>
-                <span>
-                  Copy the generated key (starts with{" "}
-                  <code className="rounded bg-black/60 px-1.5 py-0.5 font-mono text-[11px] text-white/90">
-                    AIza...
-                  </code>
-                  ) and paste it below.
-                </span>
-              </li>
-            </ol>
+            <button
+              type="button"
+              onClick={() => {
+                setProvider("gemini");
+                setErrorMsg(null);
+              }}
+              className={`flex flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left transition-all ${
+                provider === "gemini"
+                  ? "bg-primary text-black font-semibold shadow-neon"
+                  : "text-white/70 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <div className="flex items-center gap-1.5 text-xs font-bold">
+                <span>Google Gemini</span>
+              </div>
+              <span
+                className={`text-[10px] ${
+                  provider === "gemini" ? "text-black/80" : "text-white/45"
+                }`}
+              >
+                Google AI Studio Flash
+              </span>
+            </button>
           </div>
+
+          {/* Step Guide for Selected Provider */}
+          {provider === "cerebras" ? (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
+                  Quick 30-Second Cerebras Setup (Free Forever)
+                </span>
+                <a
+                  href="https://cloud.cerebras.ai"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 px-3 py-1 text-xs font-semibold text-highlight transition-all"
+                >
+                  <span>Open Cerebras Cloud</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <ol className="space-y-2 text-xs text-white/75">
+                <li className="flex items-start gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-highlight">
+                    1
+                  </span>
+                  <span>
+                    Open{" "}
+                    <a
+                      href="https://cloud.cerebras.ai"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary underline underline-offset-2 hover:brightness-125"
+                    >
+                      cloud.cerebras.ai
+                    </a>{" "}
+                    and sign in (free account, no credit card needed).
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-highlight">
+                    2
+                  </span>
+                  <span>
+                    Go to <strong className="text-white">&ldquo;API Keys&rdquo;</strong> in the left sidebar and click <strong className="text-white">&ldquo;Create API Key&rdquo;</strong>.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-highlight">
+                    3
+                  </span>
+                  <span>
+                    Copy the key (starts with{" "}
+                    <code className="rounded bg-black/60 px-1.5 py-0.5 font-mono text-[11px] text-white/90">
+                      csk-...
+                    </code>
+                    ) and paste it below.
+                  </span>
+                </li>
+              </ol>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
+                  Quick 30-Second Google AI Setup (Free Tier)
+                </span>
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 px-3 py-1 text-xs font-semibold text-highlight transition-all"
+                >
+                  <span>Open Google AI Studio</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <ol className="space-y-2 text-xs text-white/75">
+                <li className="flex items-start gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-highlight">
+                    1
+                  </span>
+                  <span>
+                    Go to{" "}
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary underline underline-offset-2 hover:brightness-125"
+                    >
+                      aistudio.google.com/app/apikey
+                    </a>{" "}
+                    and sign in with your Google account.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-highlight">
+                    2
+                  </span>
+                  <span>
+                    Click <strong className="text-white">&ldquo;Create API key&rdquo;</strong>{" "}
+                    (free tier includes Gemini 3.8 Flash).
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-highlight">
+                    3
+                  </span>
+                  <span>
+                    Copy the key (starts with{" "}
+                    <code className="rounded bg-black/60 px-1.5 py-0.5 font-mono text-[11px] text-white/90">
+                      AIza...
+                    </code>
+                    ) and paste it below.
+                  </span>
+                </li>
+              </ol>
+            </div>
+          )}
 
           {/* API Key Input Form */}
           <form onSubmit={handleVerifyAndSave} className="space-y-3">
@@ -217,7 +352,7 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
                 htmlFor="gemini-api-key-input"
                 className="block text-xs font-semibold text-white/85 mb-1.5"
               >
-                Google Gemini API Key
+                {provider === "cerebras" ? "Cerebras Cloud API Key" : "Google Gemini API Key"}
               </label>
               <div className="relative flex items-center">
                 <KeyRound className="w-4 h-4 text-white/40 absolute left-3.5 pointer-events-none" />
@@ -227,7 +362,10 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
                   autoFocus
                   value={keyDraft}
                   onChange={(e) => {
-                    setKeyDraft(e.target.value);
+                    const val = e.target.value;
+                    setKeyDraft(val);
+                    if (val.startsWith("csk-")) setProvider("cerebras");
+                    if (val.startsWith("AIza")) setProvider("gemini");
                     if (errorMsg) setErrorMsg(null);
                   }}
                   onKeyDown={(e) => {
@@ -238,7 +376,11 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
                       e.preventDefault();
                     }
                   }}
-                  placeholder="AIzaSy..."
+                  placeholder={
+                    provider === "cerebras"
+                      ? "Paste Cerebras key (csk-...)"
+                      : "Paste Gemini key (AIzaSy...)"
+                  }
                   className="w-full rounded-2xl border border-white/15 bg-black/60 pl-10 pr-11 py-3 text-xs sm:text-sm font-mono text-white placeholder-white/30 focus:border-primary focus:outline-none transition-colors"
                 />
                 <button
@@ -266,7 +408,9 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
             {verifiedSuccess && (
               <div className="flex items-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-3.5 py-2.5 text-xs font-medium text-emerald-300">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Connected to Google Gemini! Launching workspace...</span>
+                <span>
+                  Connected to {provider === "cerebras" ? "Cerebras Cloud" : "Google Gemini"}! Launching workspace...
+                </span>
               </div>
             )}
 

@@ -65,7 +65,7 @@ interface SettingsModalProps {
   aiTemporarilyDisabled: boolean;
   effectiveApiKey: string;
   onSetAiTemporarilyDisabled: (disabled: boolean) => void;
-  onSaveApiKey: (key: string | null) => void;
+  onSaveApiKey: (key: string | null, provider?: "cerebras" | "gemini") => void;
   onUpdateProfile: (updates: Partial<UserProfile>) => void;
   onUpdateWorkspaceConfig: (updates: Partial<WorkspaceConfig>) => void;
   onCustomVideoUploaded: () => void;
@@ -253,6 +253,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [gcalMessage, setGcalMessage] = useState<string>("");
   const [copiedIcs, setCopiedIcs] = useState(false);
   const [newSectionTitle, setNewSectionTitle] = useState("");
+  const [aiProvider, setAiProvider] = useState<"cerebras" | "gemini">(
+    workspaceConfig.aiProvider || (effectiveApiKey.startsWith("csk-") ? "cerebras" : "cerebras")
+  );
   const [apiKeyDraft, setApiKeyDraft] = useState<string>(effectiveApiKey || "");
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
   const [verifyingApiKey, setVerifyingApiKey] = useState<boolean>(false);
@@ -270,13 +273,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setApiKeyDraft(effectiveApiKey || "");
+      if (effectiveApiKey.startsWith("AIza")) {
+        setAiProvider("gemini");
+      } else if (effectiveApiKey.startsWith("csk-")) {
+        setAiProvider("cerebras");
+      } else if (workspaceConfig.aiProvider) {
+        setAiProvider(workspaceConfig.aiProvider);
+      }
       setApiKeyStatus(null);
     }
-  }, [isOpen, effectiveApiKey]);
+  }, [isOpen, effectiveApiKey, workspaceConfig.aiProvider]);
 
   if (!isOpen) return null;
 
-  const hasSavedKey = effectiveApiKey.trim().length >= 20;
+  const hasSavedKey = effectiveApiKey.trim().length >= 15;
 
   const handleVerifyAndSaveKey = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -284,7 +294,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (!trimmed) {
       setApiKeyStatus({
         type: "error",
-        text: "Please paste your Google AI API key first.",
+        text:
+          aiProvider === "cerebras"
+            ? "Please paste your Cerebras Cloud API key first."
+            : "Please paste your Google AI API key first.",
       });
       return;
     }
@@ -298,6 +311,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         body: JSON.stringify({
           mode: "verify",
           customApiKey: trimmed,
+          aiProvider,
         }),
       });
       const data = await res.json();
@@ -306,16 +320,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           type: "error",
           text:
             data.error ||
-            "Google AI rejected this API key. Make sure you copied a valid Gemini key (AIza...).",
+            (aiProvider === "cerebras"
+              ? "Cerebras Cloud rejected this API key (starts with csk-...)."
+              : "Google AI rejected this API key (starts with AIza...)."),
         });
         return;
       }
 
-      onSaveApiKey(trimmed);
+      onSaveApiKey(trimmed, aiProvider);
       onSetAiTemporarilyDisabled(false);
       setApiKeyStatus({
         type: "success",
-        text: "Verified & connected! Your Gemini Workspace Agent is active.",
+        text: `Verified & connected! Your ${
+          aiProvider === "cerebras" ? "Cerebras Cloud" : "Google Gemini"
+        } Agent is active.`,
       });
     } catch {
       setApiKeyStatus({
@@ -1138,23 +1156,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
-              {/* 2. Google AI API Key Setup & Instructions */}
+              {/* 2. AI Provider & API Key Setup */}
               <div className="rounded-xl border border-white/15 bg-black/35 p-4 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
                       <KeyRound className="w-4 h-4 text-primary" />
-                      Google AI (Gemini) API Key Setup
+                      AI Provider &amp; API Key Setup
                     </h4>
                     <p className="text-[11px] text-white/55 mt-0.5">
-                      Required for the Gemini Workspace Agent. Stored privately in your workspace preferences.
+                      Choose your preferred AI provider. Cerebras Cloud delivers ultra-low latency (~2,000 tok/s) and never times out.
                     </p>
                   </div>
 
                   {hasSavedKey ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1 text-[10px] font-semibold text-emerald-300">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      Connected ({effectiveApiKey.slice(0, 6)}••••
+                      Connected ({aiProvider === "cerebras" ? "Cerebras" : "Gemini"} • {effectiveApiKey.slice(0, 5)}••••
                       {effectiveApiKey.slice(-4)})
                     </span>
                   ) : (
@@ -1165,35 +1183,107 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   )}
                 </div>
 
-                {/* Quick 3-Step Instructions */}
-                <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3.5 space-y-2 text-[11px] text-white/75">
-                  <div className="font-semibold text-white/90">
-                    How to get a free Google Gemini API key (~30 seconds):
-                  </div>
-                  <ol className="list-decimal pl-4 space-y-1 text-white/65">
-                    <li>
-                      Open{" "}
-                      <a
-                        href="https://aistudio.google.com/app/apikey"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-highlight underline underline-offset-2 hover:brightness-110 font-medium"
-                      >
-                        Google AI Studio (aistudio.google.com/app/apikey)
-                        <ExternalLink className="w-3 h-3" />
-                      </a>{" "}
-                      and sign in with your Google account.
-                    </li>
-                    <li>
-                      Click <strong className="text-white/90">&ldquo;Create API key&rdquo;</strong>{" "}
-                      (free tier includes generous Gemini 3.8 Flash &amp; Pro usage).
-                    </li>
-                    <li>
-                      Copy the key (starts with <code className="text-highlight">AIzaSy...</code>),
-                      paste it below, and click <strong className="text-white/90">Verify &amp; Save Key</strong>.
-                    </li>
-                  </ol>
+                {/* Provider Selector Tabs */}
+                <div className="grid grid-cols-2 gap-2 rounded-xl bg-white/[0.04] p-1 border border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiProvider("cerebras");
+                      if (apiKeyStatus) setApiKeyStatus(null);
+                    }}
+                    className={`flex items-center justify-center gap-1.5 rounded-lg py-2 px-3 text-xs font-bold transition-all ${
+                      aiProvider === "cerebras"
+                        ? "bg-primary text-black shadow-neon"
+                        : "text-white/70 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    <span>Cerebras Cloud</span>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold uppercase tracking-wider ${
+                        aiProvider === "cerebras"
+                          ? "bg-black/20 text-black"
+                          : "bg-emerald-500/20 text-emerald-300"
+                      }`}
+                    >
+                      Fastest
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiProvider("gemini");
+                      if (apiKeyStatus) setApiKeyStatus(null);
+                    }}
+                    className={`flex items-center justify-center gap-1.5 rounded-lg py-2 px-3 text-xs font-bold transition-all ${
+                      aiProvider === "gemini"
+                        ? "bg-primary text-black shadow-neon"
+                        : "text-white/70 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    <span>Google Gemini</span>
+                  </button>
                 </div>
+
+                {/* Dynamic 3-Step Instructions */}
+                {aiProvider === "cerebras" ? (
+                  <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3.5 space-y-2 text-[11px] text-white/75">
+                    <div className="font-semibold text-white/90">
+                      How to get a free Cerebras Cloud API key (~30 seconds):
+                    </div>
+                    <ol className="list-decimal pl-4 space-y-1 text-white/65">
+                      <li>
+                        Open{" "}
+                        <a
+                          href="https://cloud.cerebras.ai"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-highlight underline underline-offset-2 hover:brightness-110 font-medium"
+                        >
+                          cloud.cerebras.ai
+                          <ExternalLink className="w-3 h-3" />
+                        </a>{" "}
+                        and sign in (free account, no credit card required).
+                      </li>
+                      <li>
+                        Navigate to <strong className="text-white/90">&ldquo;API Keys&rdquo;</strong> in the left sidebar and click <strong className="text-white/90">&ldquo;Create API Key&rdquo;</strong>.
+                      </li>
+                      <li>
+                        Copy the key (starts with <code className="text-highlight">csk-...</code>),
+                        paste it below, and click <strong className="text-white/90">Verify &amp; Save Key</strong>.
+                      </li>
+                    </ol>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3.5 space-y-2 text-[11px] text-white/75">
+                    <div className="font-semibold text-white/90">
+                      How to get a free Google Gemini API key (~30 seconds):
+                    </div>
+                    <ol className="list-decimal pl-4 space-y-1 text-white/65">
+                      <li>
+                        Open{" "}
+                        <a
+                          href="https://aistudio.google.com/app/apikey"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-highlight underline underline-offset-2 hover:brightness-110 font-medium"
+                        >
+                          Google AI Studio (aistudio.google.com/app/apikey)
+                          <ExternalLink className="w-3 h-3" />
+                        </a>{" "}
+                        and sign in with your Google account.
+                      </li>
+                      <li>
+                        Click <strong className="text-white/90">&ldquo;Create API key&rdquo;</strong>{" "}
+                        (free tier includes generous Gemini 3.8 Flash &amp; Pro usage).
+                      </li>
+                      <li>
+                        Copy the key (starts with <code className="text-highlight">AIzaSy...</code>),
+                        paste it below, and click <strong className="text-white/90">Verify &amp; Save Key</strong>.
+                      </li>
+                    </ol>
+                  </div>
+                )}
 
                 {/* API Key Input & Verify Form */}
                 <form onSubmit={handleVerifyAndSaveKey} className="space-y-2.5">
@@ -1201,7 +1291,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     htmlFor="settings-gemini-api-key"
                     className="sr-only"
                   >
-                    Google AI API Key
+                    AI API Key
                   </label>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <div className="relative flex-1">
@@ -1210,10 +1300,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         type={showApiKey ? "text" : "password"}
                         value={apiKeyDraft}
                         onChange={(e) => {
-                          setApiKeyDraft(e.target.value);
+                          const val = e.target.value;
+                          setApiKeyDraft(val);
+                          if (val.startsWith("csk-")) setAiProvider("cerebras");
+                          if (val.startsWith("AIza")) setAiProvider("gemini");
                           if (apiKeyStatus) setApiKeyStatus(null);
                         }}
-                        placeholder="Paste Google AI API key (AIzaSy...)"
+                        placeholder={
+                          aiProvider === "cerebras"
+                            ? "Paste Cerebras API key (csk-...)"
+                            : "Paste Google AI API key (AIzaSy...)"
+                        }
                         autoComplete="off"
                         spellCheck={false}
                         className="w-full rounded-xl border border-white/15 bg-black/60 pl-3.5 pr-10 py-2.5 text-xs text-white placeholder-white/30 focus:border-primary focus:outline-none font-mono"

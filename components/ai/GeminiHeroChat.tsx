@@ -668,7 +668,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           content:
             data.reply ||
             data.error ||
-            "Something went wrong while communicating with Google Gemini.",
+            "Something went wrong while communicating with the AI agent.",
           timestamp: nowLabel,
           isError: true,
         };
@@ -716,8 +716,8 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           id: `err-${Date.now()}`,
           role: "assistant",
           content: isTimeout
-            ? "The Gemini model took longer than 20s to respond. Please try again or switch to Flash mode."
-            : "Network hiccup while reaching the Gemini agent endpoint. Please try again.",
+            ? "The AI model took longer than 20s to respond. Please try again."
+            : "Network hiccup while reaching the AI agent endpoint. Please try again.",
           timestamp: nowLabel,
           isError: true,
         },
@@ -1489,8 +1489,10 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           <span className="hidden sm:inline-flex items-center gap-1.5">
             <KiteLogoMark className="w-3.5 h-3.5 text-primary" />
             <span>
-              Gemini {modelChoice === "pro" ? "3.8 Pro" : "3.8 Flash"} •{" "}
-              {activeTaskCount} active task{activeTaskCount === 1 ? "" : "s"}
+              {workspaceConfig.aiProvider === "cerebras"
+                ? "Cerebras Llama 3.3 70B"
+                : `Gemini ${modelChoice === "pro" ? "3.8 Pro" : "3.8 Flash"}`}{" "}
+              • {activeTaskCount} active task{activeTaskCount === 1 ? "" : "s"}
             </span>
           </span>
         </div>

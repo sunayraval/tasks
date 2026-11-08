@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { generateObject, generateText, tool, CoreMessage } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 import {
   AgentExecutedAction,
   AgentQAPrompt,
   AgentWorkspaceMutationPayload,
   AIModelChoice,
+  AIProvider,
   AITone,
   BADGE_COLOR_KEYS,
   BadgeColorKey,
@@ -307,38 +309,53 @@ function parseFlexibleDueDate(
   return null;
 }
 
-function extractCleanErrorMessage(err: unknown): {
+function extractCleanErrorMessage(
+  err: unknown,
+  provider: AIProvider = "cerebras"
+): {
   status: number;
   message: string;
   isKeyError: boolean;
 } {
   const raw = err instanceof Error ? err.message : String(err || "");
   const lower = raw.toLowerCase();
+  const providerLabel =
+    provider === "cerebras" ? "Cerebras Cloud" : "Google Gemini";
+  const keyFormat =
+    provider === "cerebras"
+      ? "keys start with csk-..."
+      : "keys start with AIza...";
+
   if (
     lower.includes("api_key_invalid") ||
     lower.includes("api key not valid") ||
     lower.includes("invalid api key") ||
+    lower.includes("invalid_api_key") ||
+    lower.includes("incorrect api key") ||
     lower.includes("permission_denied") ||
-    lower.includes("unauthenticated")
+    lower.includes("unauthenticated") ||
+    lower.includes("401")
   ) {
     return {
       status: 401,
-      message:
-        "Your Google AI API key was rejected by Google Gemini. Please verify your key in Settings → AI (keys start with AIza...).",
+      message: `Your API key was rejected by ${providerLabel}. Please verify your key in Settings → AI (${keyFormat}).`,
       isKeyError: true,
     };
   }
-  if (lower.includes("quota") || lower.includes("rate limit") || lower.includes("429")) {
+  if (
+    lower.includes("quota") ||
+    lower.includes("rate limit") ||
+    lower.includes("429")
+  ) {
     return {
       status: 429,
-      message:
-        "Google Gemini rate limit reached for this API key. Wait a few seconds or switch to Flash mode and try again.",
+      message: `${providerLabel} rate limit reached. Please wait a few seconds and try again.`,
       isKeyError: false,
     };
   }
   return {
     status: 500,
-    message: raw || "Failed to reach Google Gemini API.",
+    message: raw || `Failed to reach ${providerLabel} API.`,
     isKeyError: false,
   };
 }
@@ -348,23 +365,78 @@ export async function POST(request: Request) {
     const body = await request.json();
     const mode: string = body.mode || "chat";
     const customApiKey: string = (body.customApiKey || "").trim();
+    const explicitProvider: AIProvider | undefined =
+      body.aiProvider || body.workspaceConfig?.aiProvider;
+
+    const detectedProvider: AIProvider = explicitProvider
+      ? explicitProvider
+      : customApiKey.startsWith("csk-")
+      ? "cerebras"
+      : customApiKey.startsWith("AIza")
+      ? "gemini"
+      : process.env.CEREBRAS_API_KEY
+      ? "cerebras"
+      : "gemini";
+
+    const effectiveApiKey =
+      customApiKey ||
+      (detectedProvider === "cerebras"
+        ? process.env.CEREBRAS_API_KEY || ""
+        : process.env.GOOGLE_GENERATIVE_AI_API_KEY || "");
 
     // -------------------------------------------------------------------------
     // MODE 1: Live API Key Verification
     // -------------------------------------------------------------------------
     if (mode === "verify") {
-      if (!customApiKey || customApiKey.length < 20) {
+      if (!effectiveApiKey || effectiveApiKey.length < 15) {
         return NextResponse.json(
           {
             valid: false,
             error:
-              "Please enter a complete Google AI Studio API key (usually ~39 characters starting with AIza...).",
+              detectedProvider === "cerebras"
+                ? "Please enter a valid Cerebras Cloud API key (starts with csk-...)."
+                : "Please enter a complete Google AI Studio API key (starts with AIza...).",
           },
           { status: 400 }
         );
       }
 
-      const google = createGoogleGenerativeAI({ apiKey: customApiKey });
+      if (detectedProvider === "cerebras") {
+        try {
+          const cerebras = createOpenAI({
+            baseURL: "https://api.cerebras.ai/v1",
+            apiKey: effectiveApiKey,
+          });
+
+          await Promise.race([
+            generateText({
+              model: cerebras("llama3.1-8b"),
+              prompt: "Reply with OK",
+              maxTokens: 5,
+            }),
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () => reject(new Error("Timeout verifying Cerebras API key")),
+                6000
+              )
+            ),
+          ]);
+
+          return NextResponse.json({
+            valid: true,
+            provider: "cerebras",
+            model: "llama3.1-8b",
+          });
+        } catch (err) {
+          const info = extractCleanErrorMessage(err, "cerebras");
+          return NextResponse.json(
+            { valid: false, error: info.message },
+            { status: info.status }
+          );
+        }
+      }
+
+      const google = createGoogleGenerativeAI({ apiKey: effectiveApiKey });
       const verifyCandidates = [
         "gemini-3.8-flash",
         "gemini-1.5-flash",
@@ -392,11 +464,12 @@ export async function POST(request: Request) {
 
           return NextResponse.json({
             valid: true,
+            provider: "gemini",
             model: candidateModel,
           });
         } catch (err) {
           lastErr = err;
-          const info = extractCleanErrorMessage(err);
+          const info = extractCleanErrorMessage(err, "gemini");
           if (info.isKeyError) {
             return NextResponse.json(
               { valid: false, error: info.message },
@@ -406,7 +479,7 @@ export async function POST(request: Request) {
         }
       }
 
-      const finalErr = extractCleanErrorMessage(lastErr);
+      const finalErr = extractCleanErrorMessage(lastErr, "gemini");
       return NextResponse.json(
         { valid: false, error: finalErr.message },
         { status: finalErr.status }
@@ -432,7 +505,7 @@ export async function POST(request: Request) {
         });
       }
 
-      if (!customApiKey || customApiKey.length < 20) {
+      if (!effectiveApiKey || effectiveApiKey.length < 15) {
         const fallback = smartHeuristicArrange({
           tasks: selectedTasks,
           startTime,
@@ -629,11 +702,14 @@ ${taskLines}`;
     // -------------------------------------------------------------------------
     // MODE 2: Full Workspace Agent Chat
     // -------------------------------------------------------------------------
-    if (!customApiKey || customApiKey.length < 20) {
+    if (!effectiveApiKey || effectiveApiKey.length < 15) {
       return NextResponse.json(
         {
           error: "MISSING_API_KEY",
-          reply: "Please add your Google AI API key to use this feature.",
+          reply:
+            detectedProvider === "cerebras"
+              ? "Please add your Cerebras Cloud API key in Preferences to use this feature."
+              : "Please add your Google AI API key to use this feature.",
         },
         { status: 401 }
       );
@@ -2641,73 +2717,142 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
           }),
     };
 
-    // Execute Gemini with smart model fallback and latency optimization
-    const google = createGoogleGenerativeAI({ apiKey: customApiKey });
-    const modelChain =
-      modelChoice === "pro"
-        ? ["gemini-3.8-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
-        : ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-2.5-flash"];
-
     let replyText = "";
-    let usedModel = modelChain[0];
+    let usedModel = "";
     let lastError: unknown = null;
     let succeeded = false;
     const tStart = Date.now();
-    const candidateTimeoutMs = qaSubmission ? 12000 : 5500;
 
-    for (const candidate of modelChain) {
-      const candStart = Date.now();
-      try {
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error(`Timeout on model ${candidate}`)),
-            candidateTimeoutMs
-          )
-        );
+    if (detectedProvider === "cerebras") {
+      // Execute with Cerebras Cloud (~450 to 2,000+ tokens/sec, ultra-low latency)
+      const cerebras = createOpenAI({
+        baseURL: "https://api.cerebras.ai/v1",
+        apiKey: effectiveApiKey,
+      });
 
-        const result = await Promise.race([
-          generateText({
-            model: google(candidate),
-            system: systemPrompt,
-            messages: conversationMessages,
-            tools,
-            maxSteps: qaSubmission ? 5 : 4,
-            maxTokens: 1200,
-          }),
-          timeoutPromise,
-        ]);
+      const cerebrasModels = ["llama-3.3-70b", "llama3.1-8b"];
+      usedModel = cerebrasModels[0];
 
-        usedModel = candidate;
-        replyText = (result.text || "").trim();
-        succeeded = true;
-        console.log(
-          `[Gemini Chat] Model "${candidate}" generated response in ${
-            Date.now() - candStart
-          }ms`
-        );
-        break;
-      } catch (err) {
-        lastError = err;
-        console.warn(
-          `[Gemini Chat] Candidate "${candidate}" attempt failed in ${
-            Date.now() - candStart
-          }ms:`,
-          err
-        );
-        const info = extractCleanErrorMessage(err);
-        // Do not retry other models if the API key itself is invalid OR if tools already mutated state
-        if (info.isKeyError || executedActions.length > 0 || qaState.prompt) {
-          if (executedActions.length > 0 || qaState.prompt) {
-            succeeded = true;
-            break;
-          }
-          return NextResponse.json(
-            {
-              error: "INVALID_API_KEY",
-              reply: info.message,
-            },
-            { status: 401 }
+      for (const candidate of cerebrasModels) {
+        const candStart = Date.now();
+        try {
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error(`Timeout on Cerebras model ${candidate}`)),
+              qaSubmission ? 12000 : 8000
+            )
           );
+
+          const result = await Promise.race([
+            generateText({
+              model: cerebras(candidate),
+              system: systemPrompt,
+              messages: conversationMessages,
+              tools,
+              maxSteps: qaSubmission ? 5 : 4,
+              maxTokens: 1200,
+            }),
+            timeoutPromise,
+          ]);
+
+          usedModel = `cerebras/${candidate}`;
+          replyText = (result.text || "").trim();
+          succeeded = true;
+          console.log(
+            `[Cerebras Chat] Model "${candidate}" generated response in ${
+              Date.now() - candStart
+            }ms`
+          );
+          break;
+        } catch (err) {
+          lastError = err;
+          console.warn(
+            `[Cerebras Chat] Candidate "${candidate}" attempt failed in ${
+              Date.now() - candStart
+            }ms:`,
+            err
+          );
+          const info = extractCleanErrorMessage(err, "cerebras");
+          if (info.isKeyError || executedActions.length > 0 || qaState.prompt) {
+            if (executedActions.length > 0 || qaState.prompt) {
+              succeeded = true;
+              break;
+            }
+            return NextResponse.json(
+              {
+                error: "INVALID_API_KEY",
+                reply: info.message,
+              },
+              { status: 401 }
+            );
+          }
+        }
+      }
+    } else {
+      // Execute Gemini with smart model fallback and latency optimization
+      const google = createGoogleGenerativeAI({ apiKey: effectiveApiKey });
+      const modelChain =
+        modelChoice === "pro"
+          ? ["gemini-3.8-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
+          : ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-2.5-flash"];
+
+      usedModel = modelChain[0];
+      const candidateTimeoutMs = qaSubmission ? 12000 : 5500;
+
+      for (const candidate of modelChain) {
+        const candStart = Date.now();
+        try {
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error(`Timeout on model ${candidate}`)),
+              candidateTimeoutMs
+            )
+          );
+
+          const result = await Promise.race([
+            generateText({
+              model: google(candidate),
+              system: systemPrompt,
+              messages: conversationMessages,
+              tools,
+              maxSteps: qaSubmission ? 5 : 4,
+              maxTokens: 1200,
+            }),
+            timeoutPromise,
+          ]);
+
+          usedModel = candidate;
+          replyText = (result.text || "").trim();
+          succeeded = true;
+          console.log(
+            `[Gemini Chat] Model "${candidate}" generated response in ${
+              Date.now() - candStart
+            }ms`
+          );
+          break;
+        } catch (err) {
+          lastError = err;
+          console.warn(
+            `[Gemini Chat] Candidate "${candidate}" attempt failed in ${
+              Date.now() - candStart
+            }ms:`,
+            err
+          );
+          const info = extractCleanErrorMessage(err, "gemini");
+          // Do not retry other models if the API key itself is invalid OR if tools already mutated state
+          if (info.isKeyError || executedActions.length > 0 || qaState.prompt) {
+            if (executedActions.length > 0 || qaState.prompt) {
+              succeeded = true;
+              break;
+            }
+            return NextResponse.json(
+              {
+                error: "INVALID_API_KEY",
+                reply: info.message,
+              },
+              { status: 401 }
+            );
+          }
         }
       }
     }
@@ -2717,7 +2862,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
     }
 
     if (!succeeded) {
-      const info = extractCleanErrorMessage(lastError);
+      const info = extractCleanErrorMessage(lastError, detectedProvider);
       return NextResponse.json(
         {
           error: "AI_EXECUTION_ERROR",
@@ -2790,6 +2935,12 @@ function workspaceConfigUpdatesAssign(
   working: WorkspaceConfig,
   incoming: WorkspaceConfig
 ) {
+  if (working.aiProvider === undefined && incoming.aiProvider) {
+    working.aiProvider = incoming.aiProvider;
+  }
+  if (working.cerebrasApiKey === undefined && incoming.cerebrasApiKey) {
+    working.cerebrasApiKey = incoming.cerebrasApiKey;
+  }
   if (working.geminiApiKey === undefined && incoming.geminiApiKey) {
     working.geminiApiKey = incoming.geminiApiKey;
   }
