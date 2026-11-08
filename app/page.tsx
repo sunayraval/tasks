@@ -1049,7 +1049,7 @@ export default function KiteWorkspacePage() {
         setActiveTab("chat");
         showToast(
           detectedProvider === "groq"
-            ? "Groq Cloud connected (Llama 3.3 70B • Free Forever)!"
+            ? "Groq Cloud connected (Fast LPU • Free Forever)!"
             : detectedProvider === "cerebras"
             ? "Cerebras Cloud connected (~2,000 tok/s)!"
             : "Google Gemini connected!"

@@ -347,7 +347,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         type: "success",
         text: `Verified & connected! Your ${
           aiProvider === "groq"
-            ? "Groq Cloud (Llama 3.3 70B)"
+            ? "Groq Cloud"
             : aiProvider === "cerebras"
             ? "Cerebras Cloud"
             : "Google Gemini"

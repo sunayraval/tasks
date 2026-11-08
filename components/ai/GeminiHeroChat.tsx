@@ -1498,7 +1498,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
             <KiteLogoMark className="w-3.5 h-3.5 text-primary" />
             <span>
               {workspaceConfig.aiProvider === "groq"
-                ? "Groq Llama 3.3 70B"
+                ? "Groq Cloud (LPU Fast)"
                 : workspaceConfig.aiProvider === "cerebras"
                 ? "Cerebras Llama 3.3 70B"
                 : `Gemini ${modelChoice === "pro" ? "3.8 Pro" : "3.8 Flash"}`}{" "}

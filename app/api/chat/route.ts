@@ -417,29 +417,43 @@ export async function POST(request: Request) {
 
       if (detectedProvider === "groq") {
         try {
-          const groq = createOpenAI({
-            baseURL: "https://api.groq.com/openai/v1",
-            apiKey: effectiveApiKey,
+          const res = await fetch("https://api.groq.com/openai/v1/models", {
+            headers: {
+              Authorization: `Bearer ${effectiveApiKey}`,
+            },
           });
 
-          await Promise.race([
-            generateText({
-              model: groq("llama-3.1-8b-instant"),
-              prompt: "Reply with OK",
-              maxTokens: 5,
-            }),
-            new Promise<never>((_, reject) =>
-              setTimeout(
-                () => reject(new Error("Timeout verifying Groq API key")),
-                5000
-              )
-            ),
-          ]);
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            const errMsg =
+              errData.error?.message ||
+              "Groq Cloud rejected this API key. Please verify your key at console.groq.com.";
+            return NextResponse.json(
+              { valid: false, error: errMsg },
+              { status: res.status }
+            );
+          }
+
+          const data = await res.json();
+          const rawModels: { id: string }[] = data.data || [];
+          const modelIds = rawModels.map((m) => m.id);
+
+          const preferred = [
+            "openai/gpt-oss-120b",
+            "openai/gpt-oss-20b",
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant",
+            "qwen/qwen3.8-27b",
+          ];
+          const matchedModel =
+            preferred.find((p) => modelIds.includes(p)) ||
+            modelIds.find((id) => !id.includes("whisper") && !id.includes("guard")) ||
+            "openai/gpt-oss-120b";
 
           return NextResponse.json({
             valid: true,
             provider: "groq",
-            model: "llama-3.1-8b-instant",
+            model: matchedModel,
           });
         } catch (err) {
           const info = extractCleanErrorMessage(err, "groq");
@@ -2781,7 +2795,40 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
         apiKey: effectiveApiKey,
       });
 
-      const groqModels = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
+      // Preferred models in priority order: production models followed by legacy
+      let groqModels = [
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b",
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "qwen/qwen3.8-27b",
+      ];
+
+      try {
+        const mRes = await fetch("https://api.groq.com/openai/v1/models", {
+          headers: { Authorization: `Bearer ${effectiveApiKey}` },
+        });
+        if (mRes.ok) {
+          const mData = await mRes.json();
+          const remoteIds: string[] = (mData.data || []).map(
+            (m: { id: string }) => m.id
+          );
+          if (remoteIds.length > 0) {
+            const valid = groqModels.filter((id) => remoteIds.includes(id));
+            if (valid.length > 0) {
+              groqModels = valid;
+            } else {
+              const otherChat = remoteIds.filter(
+                (id) => !id.includes("whisper") && !id.includes("guard")
+              );
+              if (otherChat.length > 0) {
+                groqModels = otherChat;
+              }
+            }
+          }
+        }
+      } catch {}
+
       usedModel = groqModels[0];
 
       for (const candidate of groqModels) {
@@ -2823,6 +2870,17 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
             }ms:`,
             err
           );
+          const rawErr = err instanceof Error ? err.message : String(err || "");
+          // If model does not exist or account lacks access, smoothly try next candidate
+          if (
+            rawErr.includes("does not exist") ||
+            rawErr.includes("not have access") ||
+            rawErr.includes("model_not_found") ||
+            rawErr.includes("decommissioned")
+          ) {
+            continue;
+          }
+
           const info = extractCleanErrorMessage(err, "groq");
           if (info.isKeyError || executedActions.length > 0 || qaState.prompt) {
             if (executedActions.length > 0 || qaState.prompt) {
