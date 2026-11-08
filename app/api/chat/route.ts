@@ -181,12 +181,61 @@ function buildEmptyBoardDayQAPrompt(
   };
 }
 
-function parseFallbackTaskTitles(rawAnswer: string): string[] {
-  return rawAnswer
-    .split(/[\n;,]+/)
+function parseBraindumpTasks(raw: string): string[] {
+  if (!raw || typeof raw !== "string") return [];
+  const trimmed = raw.trim();
+  if (!trimmed) return [];
+
+  // If there are explicit newlines, split on newlines
+  const lines = trimmed
+    .split(/\r?\n+/)
+    .map((l) => l.replace(/^[-*•\d.)\s]+/, "").trim())
+    .filter((l) => l.length >= 2);
+
+  if (lines.length > 1) {
+    return lines.slice(0, 15);
+  }
+
+  // If it is a single line, check if it has multiple numbered items: e.g. "1. Calc homework 2. Physics lab 3. Gym"
+  const numberedMatch = trimmed
+    .split(/(?:^|\s+)\d+[\.)]\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 2);
+  if (numberedMatch.length > 1) {
+    return numberedMatch.slice(0, 15);
+  }
+
+  // Check if it has semicolons: e.g. "Math set; History essay; Laundry"
+  if (trimmed.includes(";")) {
+    return trimmed
+      .split(/;+/)
+      .map((s) => s.replace(/^[-*•\d.)\s]+/, "").trim())
+      .filter((s) => s.length >= 2)
+      .slice(0, 15);
+  }
+
+  // If the line contains commas, check if it looks like a single assignment (e.g. "3.2 #5, 8, 11" or "Section 4.1, 4.2 exercises")
+  // vs multiple distinct tasks (e.g. "finish math homework, write english essay, go to the gym")
+  const isHomeworkProblemSet =
+    /(?:#\s*\d|\bsec(?:tion)?\.?\s*\d|\bch(?:apter)?\.?\s*\d|\bex(?:ercise)?s?\.?\s*\d|\d+\s*[-–]\s*\d+|\bpages?\s*\d+)/i.test(
+      trimmed
+    );
+  if (isHomeworkProblemSet) {
+    return [trimmed.replace(/^[-*•\s]+/, "").trim()];
+  }
+
+  const commaParts = trimmed
+    .split(/,+(?![^()]*\))/)
     .map((s) => s.replace(/^[-*•\d.)\s]+/, "").trim())
-    .filter((s) => s.length >= 2)
-    .slice(0, 12);
+    .filter((s) => s.length >= 2);
+  if (
+    commaParts.length > 1 &&
+    commaParts.every((p) => p.length >= 4 && !/^\d+$/.test(p))
+  ) {
+    return commaParts.slice(0, 15);
+  }
+
+  return [trimmed.replace(/^[-*•\s]+/, "").trim()];
 }
 
 function formatHeaderTitle(raw: string): string {
@@ -843,6 +892,174 @@ ${taskLines}`;
       }
     };
 
+    // =========================================================================
+    // DETERMINISTIC MATERIALIZATION FOR GUIDED Q&A DAY PLANNING
+    // Guarantee that Q&A answers IMMEDIATELY populate BOTH Tasks list AND my day schedule!
+    // =========================================================================
+    let qaDayPlanGeneratedSummary = "";
+    if (qaSubmission && qaSubmission.purpose === "plan_day") {
+      const braindumpAnswer =
+        qaSubmission.answers.find((a) => a.questionId === "tasks_braindump")?.answer ||
+        qaSubmission.answers[0]?.answer ||
+        "";
+
+      const parsedTitles = parseBraindumpTasks(braindumpAnswer);
+      const combinedAnswersLower = qaSubmission.answers
+        .map((a) => a.answer.toLowerCase())
+        .join(" ");
+
+      const defaultEst =
+        combinedAnswersLower.includes("pomodoro") || combinedAnswersLower.includes("30m")
+          ? 30
+          : combinedAnswersLower.includes("90m")
+          ? 90
+          : combinedAnswersLower.includes("60m")
+          ? 60
+          : 45;
+
+      const nowISO = new Date().toISOString();
+      const newlyCreatedList: TaskItem[] = [];
+
+      for (let i = 0; i < parsedTitles.length; i++) {
+        const title = parsedTitles[i];
+        // Check if an active task with this exact title already exists
+        const existing = workingTasks.find(
+          (t) => !isHeaderRow(t) && t.title.trim().toLowerCase() === title.toLowerCase()
+        );
+        if (existing) {
+          continue;
+        }
+
+        const newId = makeUuid();
+        const lowerTitle = title.toLowerCase();
+        let inferredType = workingConfig.types[0]?.label || "General";
+        if (
+          /(?:#|calc|math|chem|bio|phys|history|essay|assignment|homework|exam|study|quiz|lab|reading|lecture|section|\d+\.\d+|problem)/i.test(
+            lowerTitle
+          )
+        ) {
+          const schoolType = workingConfig.types.find((tp) =>
+            /school|college|academics|study/i.test(tp.label)
+          );
+          if (schoolType) inferredType = schoolType.label;
+        } else if (
+          /(?:workout|gym|run|walk|exercise|health|meditat)/i.test(lowerTitle)
+        ) {
+          const healthType = workingConfig.types.find((tp) =>
+            /health|personal|wellness/i.test(tp.label)
+          );
+          if (healthType) inferredType = healthType.label;
+        } else if (
+          /(?:meeting|call|client|work|sync|interview|demo)/i.test(lowerTitle)
+        ) {
+          const workType = workingConfig.types.find((tp) =>
+            /work|project/i.test(tp.label)
+          );
+          if (workType) inferredType = workType.label;
+        }
+
+        const newTask: TaskItem = {
+          id: newId,
+          user_id: userId,
+          title,
+          content: "",
+          status: workingConfig.statuses[0]?.label || "To Do",
+          type: inferredType,
+          priority: i === 0 ? "High" : "Medium",
+          due_date: parseFlexibleDueDate("today", clientNowMs, tzOffsetMinutes),
+          estimated_minutes: defaultEst,
+          tags: ["#Today"],
+          notes: "",
+          is_canvas_assignment: false,
+          canvas_course_code: null,
+          custom_properties: {},
+          section_group: "TODAY",
+          order_index: workingTasks.length,
+          completed_at: null,
+          created_at: nowISO,
+          updated_at: nowISO,
+        };
+
+        let insertIdx = findInsertIndexUnderHeader("TODAY");
+        if (insertIdx === -1) {
+          const firstHeaderIdx = workingTasks.findIndex((t) => isHeaderRow(t));
+          insertIdx = firstHeaderIdx === 0 ? 1 : workingTasks.length;
+        }
+
+        workingTasks.splice(insertIdx, 0, newTask);
+        addedTasksMap.set(newId, newTask);
+        newlyCreatedList.push(newTask);
+      }
+
+      if (newlyCreatedList.length > 0) {
+        tasksTouched = true;
+        reordered = true;
+        reindexWorkingTasks();
+        recordAction(
+          "create",
+          newlyCreatedList.length === 1
+            ? `Added task "${newlyCreatedList[0].title}" to Tasks list`
+            : `Added ${newlyCreatedList.length} tasks to Tasks list`,
+          newlyCreatedList.map((t) => t.title).join(" • ")
+        );
+      }
+
+      // Build or update the my day schedule with all active tasks
+      const activePool = workingTasks.filter(
+        (t) => !isHeaderRow(t) && !isDoneStatus(t.status)
+      );
+
+      if (activePool.length > 0) {
+        const sTime = normalizeTimeString(
+          qaSubmission.startTime,
+          defaultStartHHMM
+        );
+        const eTime = normalizeTimeString(
+          qaSubmission.endTime,
+          addMinutesToTime(sTime, 240)
+        );
+        const includeBreaks = !combinedAnswersLower.includes("no breaks");
+        const arranged = smartHeuristicArrange({
+          tasks: activePool,
+          startTime: sTime,
+          endTime: eTime,
+          includeBreaks,
+        });
+
+        workingConfig.myDaySchedule = {
+          date: clientLocalDateYMD,
+          dayStartTime: sTime,
+          dayEndTime: eTime,
+          blocks: arranged.blocks,
+          autoCascadeTimes: true,
+          aiSummary: arranged.summary,
+          updatedAt: new Date().toISOString(),
+        };
+        configTouched = true;
+        showMyDayCard = true;
+        scheduleMutatedInTurn = true;
+        recordAction(
+          "schedule",
+          `Built my day schedule (${arranged.blocks.length} slots, ${formatTime12h(
+            sTime
+          )} – ${formatTime12h(eTime)})`,
+          arranged.summary
+        );
+
+        qaDayPlanGeneratedSummary = `I've populated your **Tasks** list under **TODAY** with **${
+          newlyCreatedList.length > 0
+            ? newlyCreatedList.map((t) => t.title).join("**, **")
+            : activePool.map((t) => t.title).join("**, **")
+        }** and arranged your **my day** schedule from **${formatTime12h(
+          sTime
+        )}** to **${formatTime12h(
+          eTime
+        )}** (${arranged.blocks.length} slot${
+          arranged.blocks.length === 1 ? "" : "s"
+        }). Check out your live status bar above—let's make today count!`;
+      }
+    }
+
     // Build compact, single-line board snapshot for system prompt (drastically reduces input tokens and latency)
     const serializedBoard = workingTasks
       .map((t, index) => {
@@ -887,30 +1104,18 @@ ${taskLines}`;
     const qaSubmissionDirective = qaSubmission
       ? `
 ===========================================================================
-GUIDED Q&A ANSWERS SUBMITTED BY USER (Original Request: "${qaSubmission.originalRequest}" • Purpose: "${qaSubmission.purpose}"):
+Q&A SUBMISSION CONTEXT:
+The user submitted their day-planning answers:
 ${qaSubmission.answers
   .map((a, idx) => `${idx + 1}. Q: ${a.question}\n   A: ${a.answer}`)
   .join("\n")}
-${
-  qaSubmission.startTime && qaSubmission.endTime
-    ? `Requested Schedule Timeframe: ${qaSubmission.startTime} to ${qaSubmission.endTime}`
-    : ""
-}
 
-MANDATORY EXECUTION FOR THIS Q&A SUBMISSION:
-1. Extract every task, assignment, errand, or goal described in the user's answers (breaking broad goals into concrete, actionable tasks if helpful). Assign smart priorities, categories (${workingConfig.types
-          .map((t) => t.label)
-          .join(", ")}), tags, due_date ('today' for today's tasks), and realistic \`estimated_minutes\` matching their pacing answer, and call \`add_tasks\` NOW to populate their Tasks list (under 'TODAY' if headers exist).
-2. ${
-          qaSubmission.purpose === "plan_day" || qaSubmission.startTime
-            ? `Immediately call \`manage_my_day_schedule\` (using \`action: "auto_arrange"\` with \`day_start_time: "${
-                qaSubmission.startTime || defaultStartHHMM
-              }"\`, \`day_end_time: "${
-                qaSubmission.endTime || defaultEndHHMM
-              }"\`, \`include_all_active: true\`, and \`include_breaks\` matching their pacing answer) so those newly added tasks are ALSO populated directly into their \`my day\` schedule and the live \`my day\` status bar UI is shown!`
-            : `If their request or answers also involve scheduling today's plan, call \`manage_my_day_schedule\` as well.`
-        }
-3. Respond warmly and concisely summarizing the tasks you added to their list and how you structured their \`my day\` plan!
+KITE HAS ALREADY EXECUTED THE WORKSPACE CHANGES:
+1. All tasks have already been added to their Tasks list under "TODAY"!
+2. Their "my day" interactive schedule has already been built and the live status bar is active!
+DO NOT invoke add_tasks or manage_my_day_schedule again.
+YOUR TASK NOW:
+Write a warm, concise, high-energy briefing walking through their schedule, highlighting what to tackle first, and cheering them on. Keep your message complete and encouraging.
 ===========================================================================`
       : "";
 
@@ -2448,7 +2653,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
     let lastError: unknown = null;
     let succeeded = false;
     const tStart = Date.now();
-    const candidateTimeoutMs = qaSubmission ? 10500 : 5500;
+    const candidateTimeoutMs = qaSubmission ? 12000 : 5500;
 
     for (const candidate of modelChain) {
       const candStart = Date.now();
@@ -2507,110 +2712,8 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
       }
     }
 
-    // Deterministic Safety Net for Guided Q&A Day Planning Submissions:
-    // Guarantee that answers always populate BOTH the Tasks list AND the my day schedule!
-    if (qaSubmission && qaSubmission.purpose === "plan_day") {
-      const combinedAnswersLower = qaSubmission.answers
-        .map((a) => a.answer.toLowerCase())
-        .join(" ");
-
-      const currentActiveOnBoard = workingTasks.filter(
-        (t) => !isHeaderRow(t) && !isDoneStatus(t.status)
-      );
-
-      if (currentActiveOnBoard.length === 0 && qaSubmission.answers.length > 0) {
-        const rawBraindump = qaSubmission.answers[0]?.answer || "";
-        const parsedTitles = parseFallbackTaskTitles(rawBraindump);
-        const nowISO = new Date().toISOString();
-        const defaultEst = combinedAnswersLower.includes("90m")
-          ? 75
-          : combinedAnswersLower.includes("30m")
-          ? 30
-          : 45;
-
-        for (let i = 0; i < parsedTitles.length; i++) {
-          const newId = makeUuid();
-          const newTask: TaskItem = {
-            id: newId,
-            user_id: userId,
-            title: parsedTitles[i],
-            content: "",
-            status: workingConfig.statuses[0]?.label || "To Do",
-            type: workingConfig.types[0]?.label || "General",
-            priority: i === 0 ? "High" : "Medium",
-            due_date: parseFlexibleDueDate("today", clientNowMs, tzOffsetMinutes),
-            estimated_minutes: defaultEst,
-            tags: ["#Today"],
-            notes: "",
-            is_canvas_assignment: false,
-            canvas_course_code: null,
-            custom_properties: {},
-            section_group: "TODAY",
-            order_index: workingTasks.length,
-            completed_at: null,
-            created_at: nowISO,
-            updated_at: nowISO,
-          };
-          workingTasks.push(newTask);
-          addedTasksMap.set(newId, newTask);
-        }
-
-        if (parsedTitles.length > 0) {
-          reindexWorkingTasks();
-          tasksTouched = true;
-          succeeded = true;
-          recordAction(
-            "create",
-            `Added ${parsedTitles.length} task${
-              parsedTitles.length === 1 ? "" : "s"
-            } to Tasks list`,
-            parsedTitles.join(" • ")
-          );
-        }
-      }
-
-      const refreshedActivePool = workingTasks.filter(
-        (t) => !isHeaderRow(t) && !isDoneStatus(t.status)
-      );
-
-      if (!scheduleMutatedInTurn && refreshedActivePool.length > 0) {
-        const sTime = normalizeTimeString(
-          qaSubmission.startTime,
-          defaultStartHHMM
-        );
-        const eTime = normalizeTimeString(
-          qaSubmission.endTime,
-          addMinutesToTime(sTime, 240)
-        );
-        const includeBreaks = !combinedAnswersLower.includes("no breaks");
-        const arranged = smartHeuristicArrange({
-          tasks: refreshedActivePool,
-          startTime: sTime,
-          endTime: eTime,
-          includeBreaks,
-        });
-
-        workingConfig.myDaySchedule = {
-          date: clientLocalDateYMD,
-          dayStartTime: sTime,
-          dayEndTime: eTime,
-          blocks: arranged.blocks,
-          autoCascadeTimes: true,
-          aiSummary: arranged.summary,
-          updatedAt: new Date().toISOString(),
-        };
-        configTouched = true;
-        showMyDayCard = true;
-        scheduleMutatedInTurn = true;
-        succeeded = true;
-        recordAction(
-          "schedule",
-          `Built my day schedule (${arranged.blocks.length} slots, ${formatTime12h(
-            sTime
-          )} – ${formatTime12h(eTime)})`,
-          arranged.summary
-        );
-      }
+    if (!succeeded && executedActions.length > 0) {
+      succeeded = true;
     }
 
     if (!succeeded) {
@@ -2624,7 +2727,17 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
       );
     }
 
-    if (!replyText && qaState.prompt) {
+    const isTruncated =
+      !replyText ||
+      (qaSubmission &&
+        qaSubmission.purpose === "plan_day" &&
+        (!/[.!?*>`)\]"]$/.test(replyText.trim()) ||
+          replyText.trim().endsWith("existing") ||
+          replyText.trim().length < 35));
+
+    if (isTruncated && qaDayPlanGeneratedSummary) {
+      replyText = qaDayPlanGeneratedSummary;
+    } else if (!replyText && qaState.prompt) {
       replyText = qaState.prompt.consentSubtitle;
     } else if (!replyText && executedActions.length > 0) {
       replyText = `Done! Here is what I updated across your workspace:\n${executedActions
