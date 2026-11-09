@@ -56,6 +56,10 @@ const TONE_PROMPTS: Record<AITone, string> = {
     "Tone: HYPER DRIVE — energetic, fast-paced, momentum-oriented coach. Celebrate wins and drive rapid progress.",
   executive:
     "Tone: EXECUTIVE — strategic, structured, analytical chief-of-staff. Emphasize leverage, time blocks, and clarity.",
+  killer_bee:
+    "Tone: KILLER BEE (The Eight-Tails Jinchūriki from Kumogakure) — You MUST strictly and fully embody Killer Bee from Naruto in EVERY response. You speak with high-energy hip-hop swagger, throw rhythmic rhymes, bars, and couplets, use ad-libs ('Wheee!', 'Yeah!', 'Yo!'), and constantly drop references to the Eight-Tails (Gyūki), Kumogakure, your seven swords, or your rap notebook. CRITICAL MANDATE: You MUST end your sentences, punchlines, and paragraphs with 'Bakayaro! Konoyaro!' (or 'Konoyaro! Bakayaro!'). Even when executing serious workspace tools, formatting schedule tables, or listing tasks, keep all your commentary, greetings, and explanations 100% in Killer Bee's rap style: 'A fool, ya fool! Float like a butterfly, sting like a Bee! Bakayaro! Konoyaro!'",
+  naruto:
+    "Tone: NARUTO UZUMAKI (7th Hokage of the Hidden Leaf) — You ARE Naruto Uzumaki. You are loud, energetic, hyperactive, determined, and full of heart. Your ninja way is to never go back on your word and finish every task on your plate! Say 'Believe it!' and 'Dattebayo!' often. Motivate the user like a comrade on an epic shinobi mission, compare multitasking to Shadow Clones, recommend quick Ichiraku Ramen breaks, and tackle deep work with fiery Rasengan focus! Dattebayo!",
 };
 
 function makeUuid(): string {
@@ -799,10 +803,14 @@ ${taskLines}`;
       ? body.tasks
       : [];
     const userId: string = body.userId || "user-default";
-    const tone: AITone = body.tone || "locked_in";
     const modelChoice: AIModelChoice =
       body.modelChoice === "pro" ? "pro" : "flash";
     const currentTheme: ThemeName = body.theme || "cyber_ocean";
+    const requestedTone: AITone = body.tone || "locked_in";
+    const tone: AITone =
+      currentTheme === "sharingan" && requestedTone !== "naruto"
+        ? "killer_bee"
+        : requestedTone;
     const videoPreset: VideoPresetName = normalizeVideoPreset(body.videoPreset);
     const videoDim: number =
       typeof body.videoDim === "number" ? body.videoDim : 0.45;
@@ -2047,8 +2055,15 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               workingConfig.customThemeColors = null;
               configTouched = true;
             }
+            if (theme === "sharingan") {
+              profileUpdates.ai_tone = "killer_bee";
+            }
             const meta = THEME_OPTIONS.find((t) => t.id === theme);
-            changes.push(`Switched theme to ${meta ? meta.name : theme}`);
+            changes.push(
+              theme === "sharingan"
+                ? `Switched theme to ${meta ? meta.name : theme} & awakened Killer Bee rap flow (Bakayaro! Konoyaro!)`
+                : `Switched theme to ${meta ? meta.name : theme}`
+            );
           }
 
           if (video_bg_preset) {
@@ -2999,12 +3014,30 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
         .map((a) => `• **${a.summary}**${a.detail ? ` — ${a.detail}` : ""}`)
         .join("\n")}`;
     } else if (!replyText) {
-      if (scheduleMutatedInTurn || (workingConfig.myDaySchedule?.blocks && workingConfig.myDaySchedule.blocks.length > 0)) {
-        replyText = "I've organized and updated your **my day** schedule with your planned blocks.";
-      } else if (tasksTouched || addedTasksMap.size > 0) {
-        replyText = `I've updated your workspace with ${addedTasksMap.size > 0 ? `${addedTasksMap.size} new tasks` : "your task changes"}.`;
+      if (tone === "killer_bee") {
+        if (scheduleMutatedInTurn || (workingConfig.myDaySchedule?.blocks && workingConfig.myDaySchedule.blocks.length > 0)) {
+          replyText = "Yo! The schedule is locked and the Eight-Tails has spoken, your daily grind won't be broken! Bakayaro! Konoyaro!";
+        } else if (tasksTouched || addedTasksMap.size > 0) {
+          replyText = `Yeah! Dropped ${addedTasksMap.size > 0 ? `${addedTasksMap.size} tasks` : "your tasks"} onto your board, sharp like my seven swords! Bakayaro! Konoyaro!`;
+        } else {
+          replyText = "Wheee! Eight-Tails is ready to rhyme and grind, tell me what tasks are on your mind! Bakayaro! Konoyaro!";
+        }
+      } else if (tone === "naruto") {
+        if (scheduleMutatedInTurn || (workingConfig.myDaySchedule?.blocks && workingConfig.myDaySchedule.blocks.length > 0)) {
+          replyText = "All right! Your daily schedule is set up and ready to go! Let's crush these tasks like a Rasengan, Dattebayo!";
+        } else if (tasksTouched || addedTasksMap.size > 0) {
+          replyText = `Believe it! Added ${addedTasksMap.size > 0 ? `${addedTasksMap.size} tasks` : "your tasks"} to your board! Let's knock them out one by one, Dattebayo!`;
+        } else {
+          replyText = "I'm ready to roll! Tell me what missions or homework we're tackling today, Dattebayo!";
+        }
       } else {
-        replyText = "I've reviewed your request. Let me know if you'd like me to add these tasks or build a time-blocked schedule for your day.";
+        if (scheduleMutatedInTurn || (workingConfig.myDaySchedule?.blocks && workingConfig.myDaySchedule.blocks.length > 0)) {
+          replyText = "I've organized and updated your **my day** schedule with your planned blocks.";
+        } else if (tasksTouched || addedTasksMap.size > 0) {
+          replyText = `I've updated your workspace with ${addedTasksMap.size > 0 ? `${addedTasksMap.size} new tasks` : "your task changes"}.`;
+        } else {
+          replyText = "I've reviewed your request. Let me know if you'd like me to add these tasks or build a time-blocked schedule for your day.";
+        }
       }
     }
 

@@ -782,7 +782,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         type="button"
                         onClick={() => {
                           onUpdateWorkspaceConfig({ customThemeColors: null });
-                          onUpdateProfile({ theme: t.id as ThemeName });
+                          onUpdateProfile({
+                            theme: t.id as ThemeName,
+                            ...(t.id === "sharingan" ? { ai_tone: "killer_bee" } : {}),
+                          });
                         }}
                         className={`flex items-center justify-between rounded-xl border p-3.5 text-left transition-all ${
                           selected
@@ -1544,6 +1547,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         id: "executive",
                         name: "📊 Executive",
                         desc: "Analytical, strategic, prioritizing high-ROI deliverables.",
+                      },
+                      {
+                        id: "killer_bee",
+                        name: "🎤 Killer Bee",
+                        desc: "Eight-Tails rap flow & rhymes. Bakayaro! Konoyaro!",
+                      },
+                      {
+                        id: "naruto",
+                        name: "🍥 Naruto Uzumaki",
+                        desc: "Believe it! Dattebayo! Relentless Hokage spirit & fiery focus.",
                       },
                     ] as Array<{ id: AITone; name: string; desc: string }>
                   ).map((t) => {

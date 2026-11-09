@@ -45,6 +45,8 @@ const TONE_LABELS: Record<AITone, { label: string; badge: string }> = {
   chill_coach: { label: "Chill Coach", badge: "🌿 Mindful & Steady" },
   hyper_drive: { label: "Hyper Drive", badge: "⚡ High-Octane Sprint" },
   executive: { label: "Executive", badge: "📊 High-ROI Strategic" },
+  killer_bee: { label: "Killer Bee", badge: "🎤 Bakayaro! Konoyaro!" },
+  naruto: { label: "Naruto Uzumaki", badge: "🍥 Believe it! Dattebayo!" },
 };
 
 export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({

@@ -29,7 +29,13 @@ export function normalizeVideoPreset(raw: unknown): VideoPresetName {
   return "aurora";
 }
 
-export type AITone = "locked_in" | "chill_coach" | "hyper_drive" | "executive";
+export type AITone =
+  | "locked_in"
+  | "chill_coach"
+  | "hyper_drive"
+  | "executive"
+  | "killer_bee"
+  | "naruto";
 
 export type ViewMode = "slide_drawer" | "center_modal" | "inline";
 

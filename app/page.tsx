@@ -510,19 +510,28 @@ export default function KiteWorkspacePage() {
   // 3. Update Profile
   const handleUpdateProfile = useCallback(
     async (updates: Partial<UserProfile>) => {
-      setProfile((prev) => ({ ...prev, ...updates }));
+      const finalUpdates: Partial<UserProfile> = { ...updates };
+      if (finalUpdates.theme === "sharingan" && !finalUpdates.ai_tone) {
+        finalUpdates.ai_tone = "killer_bee";
+      }
+
+      setProfile((prev) => ({ ...prev, ...finalUpdates }));
 
       if (isSupabaseConfigured() && isAuthenticated) {
         try {
           const supabase = createClient();
           await supabase
             .from("profiles")
-            .update(updates)
+            .update(finalUpdates)
             .eq("id", profile.id);
         } catch {}
       }
+
+      if (updates.theme === "sharingan") {
+        showToast("Switched to Sharingan Eye — Killer Bee has entered the chat! Bakayaro! Konoyaro!");
+      }
     },
-    [isAuthenticated, profile.id]
+    [isAuthenticated, profile.id, showToast]
   );
 
   // 4. Update Workspace Customization Config (persisted in custom_theme_json & localStorage)

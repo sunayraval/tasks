@@ -98,6 +98,8 @@ const TONE_META: Record<AITone, { label: string; desc: string }> = {
   chill_coach: { label: "Chill Coach", desc: "Calm & sustainable" },
   hyper_drive: { label: "Hyper Drive", desc: "Fast deadline blitz" },
   executive: { label: "Executive", desc: "Strategic & analytical" },
+  killer_bee: { label: "Killer Bee", desc: "Bakayaro! Konoyaro!" },
+  naruto: { label: "Naruto Uzumaki", desc: "Believe it! Dattebayo!" },
 };
 
 // Safe inline markdown formatter (**bold**, *italic*, `code`)

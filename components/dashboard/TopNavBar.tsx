@@ -252,7 +252,10 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                       key={t.id}
                       type="button"
                       onClick={() => {
-                        onUpdateProfile({ theme: t.id as ThemeName });
+                        onUpdateProfile({
+                          theme: t.id as ThemeName,
+                          ...(isSharingan ? { ai_tone: "killer_bee" } : {}),
+                        });
                         setThemeDropdownOpen(false);
                       }}
                       className={`w-full flex items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs transition-colors ${
