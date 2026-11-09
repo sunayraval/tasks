@@ -2817,7 +2817,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
           : "deepseek-ai/deepseek-v4.1-flash";
 
       const candidates = [primaryModel, backupModel];
-      const candidateTimeoutMs = qaSubmission ? 25000 : 20000;
+      const candidateTimeoutMs = qaSubmission ? 38000 : 34000;
 
       for (const candidate of candidates) {
         const candStart = Date.now();
@@ -2835,14 +2835,18 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               system: systemPrompt,
               messages: conversationMessages,
               tools: effectiveTools,
-              maxSteps: isGreeting ? 1 : qaSubmission ? 5 : 4,
-              maxTokens: 1200,
+              maxSteps: isGreeting ? 1 : qaSubmission ? 6 : 5,
+              maxTokens: 3500,
             }),
             timeoutPromise,
           ]);
 
           usedModel = candidate;
-          replyText = (result.text || "").trim();
+          const stepTexts = (result.steps || [])
+            .map((s) => (s.text || "").trim())
+            .filter(Boolean);
+          replyText =
+            (result.text || "").trim() || stepTexts.join("\n\n").trim();
           succeeded = true;
           console.log(
             `[NVIDIA NIM] Model "${candidate}" generated response in ${
@@ -2880,7 +2884,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
           : ["gemini-2.0-flash", "gemini-1.5-flash"];
 
       usedModel = modelChain[0];
-      const candidateTimeoutMs = qaSubmission ? 25000 : 20000;
+      const candidateTimeoutMs = qaSubmission ? 38000 : 34000;
 
       for (const candidate of modelChain) {
         const candStart = Date.now();
@@ -2898,14 +2902,18 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               system: systemPrompt,
               messages: conversationMessages,
               tools: effectiveTools,
-              maxSteps: isGreeting ? 1 : qaSubmission ? 5 : 4,
-              maxTokens: 1200,
+              maxSteps: isGreeting ? 1 : qaSubmission ? 6 : 5,
+              maxTokens: 3500,
             }),
             timeoutPromise,
           ]);
 
           usedModel = candidate;
-          replyText = (result.text || "").trim();
+          const stepTexts = (result.steps || [])
+            .map((s) => (s.text || "").trim())
+            .filter(Boolean);
+          replyText =
+            (result.text || "").trim() || stepTexts.join("\n\n").trim();
           succeeded = true;
           console.log(
             `[Gemini Chat] Model "${candidate}" generated response in ${
@@ -2990,7 +2998,13 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
         .map((a) => `• **${a.summary}**${a.detail ? ` — ${a.detail}` : ""}`)
         .join("\n")}`;
     } else if (!replyText) {
-      replyText = "I'm ready—let me know what you'd like to tackle next.";
+      if (scheduleMutatedInTurn || (workingConfig.myDaySchedule?.blocks && workingConfig.myDaySchedule.blocks.length > 0)) {
+        replyText = "I've organized and updated your **my day** schedule with your planned blocks.";
+      } else if (tasksTouched || addedTasksMap.size > 0) {
+        replyText = `I've updated your workspace with ${addedTasksMap.size > 0 ? `${addedTasksMap.size} new tasks` : "your task changes"}.`;
+      } else {
+        replyText = "I've reviewed your request. Let me know if you'd like me to add these tasks or build a time-blocked schedule for your day.";
+      }
     }
 
     if (configTouched) {
