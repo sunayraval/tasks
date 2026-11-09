@@ -50,6 +50,7 @@ import {
 import { MyDayStatusBanner } from "@/components/myday/MyDayStatusBanner";
 import { EnrichedMyDayBlock } from "@/utils/myDayUtils";
 import { KiteFlyingLoader, KiteLogoMark } from "@/components/ui/KiteBrand";
+import { SharinganIcon } from "@/components/ui/SharinganIcon";
 import { AgentQACard } from "@/components/ai/AgentQACard";
 
 interface GeminiHeroChatProps {
@@ -1527,10 +1528,27 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
         />
 
         <div className="relative z-10 w-full max-w-[760px] flex flex-col items-center">
-          {/* Minimalist Kite Crest */}
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/[0.09] bg-white/[0.03] px-3 py-1 text-[11px] font-medium text-white/60 backdrop-blur-md select-none">
-            <KiteLogoMark className="w-3.5 h-3.5 text-primary" />
-            <span>kite workspace</span>
+          {/* Minimalist Kite Crest / Sharingan Crest */}
+          <div
+            className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-medium backdrop-blur-md select-none transition-all ${
+              profile.theme === "sharingan"
+                ? "border-red-500/40 bg-red-950/30 text-red-300 shadow-[0_0_16px_rgba(255,31,56,0.35)]"
+                : "border-white/[0.09] bg-white/[0.03] text-white/60"
+            }`}
+          >
+            {profile.theme === "sharingan" ? (
+              <>
+                <SharinganIcon size={16} animate speed="normal" glow interactive />
+                <span className="font-semibold tracking-wider text-red-200">
+                  UCHIHA CLAN DOMAIN
+                </span>
+              </>
+            ) : (
+              <>
+                <KiteLogoMark className="w-3.5 h-3.5 text-primary" />
+                <span>kite workspace</span>
+              </>
+            )}
           </div>
 
           {/* Hero Prompt Headline */}

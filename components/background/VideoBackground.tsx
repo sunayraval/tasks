@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { get, set, del } from "idb-keyval";
 import { normalizeVideoPreset, VideoPresetName } from "@/types/taskit";
 import { BatteryCharging, PauseCircle } from "lucide-react";
+import { SharinganIcon } from "@/components/ui/SharinganIcon";
 
 export const IDB_VIDEO_KEY = "custom_video_bg";
 
@@ -336,6 +337,11 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
         ref={canvasRef}
         className="absolute inset-0 w-full h-full object-cover opacity-95"
       />
+
+      {/* Ambient Sharingan Ocular Domain Seal (Visually enabled under [data-theme="sharingan"]) */}
+      <div className="sharingan-ambient-seal pointer-events-none absolute right-[-100px] bottom-[-100px] sm:right-[-80px] sm:bottom-[-80px] w-[340px] h-[340px] sm:w-[560px] sm:h-[560px] opacity-0 transition-opacity duration-1000 z-0 select-none">
+        <SharinganIcon size="100%" animate speed="slow" glow={false} interactive={false} />
+      </div>
 
       {/* Fullscreen fixed HTML5 Video element for IndexedDB custom uploads */}
       {videoSrc && (

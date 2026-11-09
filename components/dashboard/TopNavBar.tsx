@@ -21,6 +21,7 @@ import {
   Table2,
 } from "lucide-react";
 import { KiteLogoMark } from "@/components/ui/KiteBrand";
+import { SharinganIcon } from "@/components/ui/SharinganIcon";
 
 interface TopNavBarProps {
   profile: UserProfile;
@@ -71,21 +72,37 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
       <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
         {/* Left: Brand Identity matching user screenshot, strictly non-editable */}
         <div className="flex items-center gap-2.5 shrink-0 select-none">
-          <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-[0_0_24px_rgba(250,204,21,0.55)] transition-transform"
-            style={{
-              backgroundColor: "#facc15",
-              color: "#09090b",
-            }}
-          >
-            <KiteLogoMark className="w-5 h-5 text-black" strokeWidth={2.4} />
-          </div>
+          {profile.theme === "sharingan" ? (
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#140305] border border-red-500/50 shadow-[0_0_24px_rgba(255,31,56,0.65)] transition-all cursor-pointer"
+              title="Uchiha Clan Sharingan Eye (Spinning 3-Tomoe)"
+            >
+              <SharinganIcon size={24} animate speed="normal" glow interactive />
+            </div>
+          ) : (
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-[0_0_24px_rgba(250,204,21,0.55)] transition-transform"
+              style={{
+                backgroundColor: "#facc15",
+                color: "#09090b",
+              }}
+            >
+              <KiteLogoMark className="w-5 h-5 text-black" strokeWidth={2.4} />
+            </div>
+          )}
           <span className="text-xl font-extrabold tracking-tight text-white leading-none">
             kite
           </span>
-          <span className="inline-flex items-center rounded-full border border-white px-2.5 py-0.5 text-xs font-mono font-medium text-yellow-300 leading-none">
-            2.0
-          </span>
+          {profile.theme === "sharingan" ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/60 bg-red-950/40 px-2.5 py-0.5 text-xs font-mono font-bold text-red-400 shadow-[0_0_12px_rgba(255,31,56,0.45)] leading-none">
+              <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping" />
+              UCHIHA 2.0
+            </span>
+          ) : (
+            <span className="inline-flex items-center rounded-full border border-white px-2.5 py-0.5 text-xs font-mono font-medium text-yellow-300 leading-none">
+              2.0
+            </span>
+          )}
         </div>
 
         {/* Center: Workspace Mode Switcher (Chat hidden when user opts out of AI; Tasks & my day always available) */}
@@ -194,10 +211,18 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             <button
               type="button"
               onClick={() => setThemeDropdownOpen((v) => !v)}
-              className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-white/90 hover:text-white hover:border-primary/50 transition-all"
+              className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition-all ${
+                profile.theme === "sharingan"
+                  ? "border-red-500/50 bg-red-950/30 text-red-200 hover:border-red-400 shadow-[0_0_12px_rgba(255,31,56,0.3)]"
+                  : "border-white/15 bg-white/5 text-white/90 hover:text-white hover:border-primary/50"
+              }`}
               title="Switch theme"
             >
-              <Palette className="w-3.5 h-3.5 text-primary" />
+              {profile.theme === "sharingan" ? (
+                <SharinganIcon size={16} animate speed="fast" glow={false} />
+              ) : (
+                <Palette className="w-3.5 h-3.5 text-primary" />
+              )}
               <span className="hidden xl:inline font-medium">
                 {profile.theme === "custom" ? "Custom Theme" : activeThemeMeta.name}
               </span>
@@ -221,6 +246,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               >
                 {THEME_OPTIONS.map((t) => {
                   const isSelected = profile.theme === t.id;
+                  const isSharingan = t.id === "sharingan";
                   return (
                     <button
                       key={t.id}
@@ -231,26 +257,39 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                       }}
                       className={`w-full flex items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs transition-colors ${
                         isSelected
-                          ? "bg-primary/20 text-highlight font-semibold border border-primary/40"
+                          ? "bg-primary/20 text-highlight font-semibold border border-primary/40 shadow-sm"
+                          : isSharingan
+                          ? "text-red-300 hover:text-white hover:bg-red-500/15"
                           : "text-white/75 hover:text-white hover:bg-white/10"
                       }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <div className="flex -space-x-1">
-                          <span
-                            className="h-3.5 w-3.5 rounded-full border border-black/60"
-                            style={{ backgroundColor: t.colors.bgBase }}
-                          />
-                          <span
-                            className="h-3.5 w-3.5 rounded-full border border-black/60"
-                            style={{ backgroundColor: t.colors.surface }}
-                          />
-                          <span
-                            className="h-3.5 w-3.5 rounded-full border border-black/60"
-                            style={{ backgroundColor: t.colors.primary }}
-                          />
-                        </div>
-                        <span>{t.name}</span>
+                      <div className="flex items-center gap-2.5">
+                        {isSharingan ? (
+                          <SharinganIcon size={18} animate speed="normal" glow={false} />
+                        ) : (
+                          <div className="flex -space-x-1">
+                            <span
+                              className="h-3.5 w-3.5 rounded-full border border-black/60"
+                              style={{ backgroundColor: t.colors.bgBase }}
+                            />
+                            <span
+                              className="h-3.5 w-3.5 rounded-full border border-black/60"
+                              style={{ backgroundColor: t.colors.surface }}
+                            />
+                            <span
+                              className="h-3.5 w-3.5 rounded-full border border-black/60"
+                              style={{ backgroundColor: t.colors.primary }}
+                            />
+                          </div>
+                        )}
+                        <span className="flex items-center gap-1.5">
+                          {t.name}
+                          {isSharingan && (
+                            <span className="rounded bg-red-500/25 border border-red-500/40 px-1.5 py-0.2 text-[9px] font-bold text-red-300 uppercase tracking-wider">
+                              Special
+                            </span>
+                          )}
+                        </span>
                       </div>
                       {isSelected && <Check className="w-3.5 h-3.5 text-primary" />}
                     </button>

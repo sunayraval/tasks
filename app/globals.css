@@ -94,6 +94,19 @@
   --panel-border: rgba(244, 63, 94, 0.28);
 }
 
+/* 7. Sharingan Eye (Uchiha Clan Crimson & Obsidian) */
+[data-theme="sharingan"] {
+  color-scheme: dark;
+  --bg-base: #090304;
+  --surface: #180608;
+  --accent: #4a080f;
+  --primary: #ff1f38;
+  --highlight: #ff8c9b;
+  --panel-bg: rgba(22, 5, 8, 0.88);
+  --panel-header: rgba(36, 8, 12, 0.94);
+  --panel-border: rgba(255, 31, 56, 0.32);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -462,6 +475,74 @@ progress.taskit-progress::-moz-progress-bar {
   animation: kiteCtaShine 3.8s ease-in-out infinite;
 }
 
+/* Sharingan Eye Animations & Genjutsu Aura */
+@keyframes sharinganSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sharinganPulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 6px rgba(255, 31, 56, 0.75)) drop-shadow(0 0 14px rgba(220, 20, 45, 0.4));
+  }
+  50% {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 11px rgba(255, 31, 56, 0.95)) drop-shadow(0 0 24px rgba(255, 0, 40, 0.7));
+  }
+}
+
+@keyframes sharinganAuraGlow {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.08);
+  }
+}
+
+.animate-sharingan-spin {
+  animation: sharinganSpin 12s linear infinite;
+  transform-origin: center center;
+}
+
+.animate-sharingan-spin-fast {
+  animation: sharinganSpin 3.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  transform-origin: center center;
+}
+
+.animate-sharingan-pulse {
+  animation: sharinganPulse 2.8s ease-in-out infinite;
+}
+
+.animate-sharingan-aura {
+  animation: sharinganAuraGlow 3s ease-in-out infinite;
+}
+
+/* Sharingan theme special atmospheric aura */
+[data-theme="sharingan"] .theme-panel {
+  box-shadow: 0 12px 35px -5px rgba(0, 0, 0, 0.75),
+    0 0 22px -3px rgba(255, 31, 56, 0.16),
+    0 0 0 1px var(--panel-border);
+}
+
+[data-theme="sharingan"] .theme-popover {
+  box-shadow: 0 18px 45px -4px rgba(0, 0, 0, 0.85),
+    0 0 26px -4px rgba(255, 31, 56, 0.24),
+    0 0 0 1px var(--panel-border);
+}
+
+[data-theme="sharingan"] .sharingan-ambient-seal {
+  opacity: 0.08;
+  filter: drop-shadow(0 0 50px rgba(255, 31, 56, 0.6));
+}
+
 @media (prefers-reduced-motion: reduce) {
   .kite-glider,
   .kite-tail-ribbon,
@@ -474,7 +555,11 @@ progress.taskit-progress::-moz-progress-bar {
   .kite-dot-1,
   .kite-dot-2,
   .kite-dot-3,
-  .kite-cta-shine {
+  .kite-cta-shine,
+  .animate-sharingan-spin,
+  .animate-sharingan-spin-fast,
+  .animate-sharingan-pulse,
+  .animate-sharingan-aura {
     animation: none;
   }
 }

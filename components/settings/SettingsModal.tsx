@@ -25,6 +25,7 @@ import {
   saveCustomVideoToIDB,
   clearCustomVideoFromIDB,
 } from "@/components/background/VideoBackground";
+import { SharinganIcon } from "@/components/ui/SharinganIcon";
 import {
   AlertCircle,
   Bot,
@@ -774,6 +775,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     const selected =
                       profile.theme === t.id &&
                       !workspaceConfig.customThemeColors;
+                    const isSharingan = t.id === "sharingan";
                     return (
                       <button
                         key={t.id}
@@ -784,31 +786,51 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         }}
                         className={`flex items-center justify-between rounded-xl border p-3.5 text-left transition-all ${
                           selected
-                            ? "border-primary bg-primary/15 shadow-neon"
+                            ? isSharingan
+                              ? "border-red-500 bg-red-950/25 shadow-[0_0_24px_rgba(255,31,56,0.35)]"
+                              : "border-primary bg-primary/15 shadow-neon"
+                            : isSharingan
+                            ? "border-red-500/30 bg-red-950/10 hover:bg-red-950/20 hover:border-red-500/50"
                             : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]"
                         }`}
                       >
-                        <div>
-                          <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                            {t.name}
+                        <div className="pr-2 min-w-0">
+                          <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
+                            <span>{t.name}</span>
+                            {isSharingan && (
+                              <span className="rounded bg-red-500/25 border border-red-500/40 px-1.5 py-0.2 text-[9px] font-bold text-red-300 uppercase tracking-wider">
+                                Animated
+                              </span>
+                            )}
                             {selected && (
                               <Check className="w-3.5 h-3.5 text-primary" />
                             )}
                           </div>
-                          <div className="text-[11px] text-white/50 mt-0.5">
+                          <div className="text-[11px] text-white/50 mt-0.5 line-clamp-1">
                             {t.subtitle}
                           </div>
                         </div>
 
-                        {/* Swatches */}
-                        <div className="flex items-center -space-x-1.5 shrink-0">
-                          {Object.values(t.colors).map((hex, i) => (
-                            <span
-                              key={i}
-                              className="h-5 w-5 rounded-full border border-black/60"
-                              style={{ backgroundColor: hex }}
+                        {/* Swatches / Sharingan Eye */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isSharingan && (
+                            <SharinganIcon
+                              size={28}
+                              animate
+                              speed="normal"
+                              glow={selected}
+                              interactive
                             />
-                          ))}
+                          )}
+                          <div className="flex items-center -space-x-1.5 shrink-0">
+                            {Object.values(t.colors).map((hex, i) => (
+                              <span
+                                key={i}
+                                className="h-5 w-5 rounded-full border border-black/60"
+                                style={{ backgroundColor: hex }}
+                              />
+                            ))}
+                          </div>
                         </div>
                       </button>
                     );

@@ -6,6 +6,7 @@ export type ThemeName =
   | "alpine_forest"
   | "mint_sunray"
   | "rose_nebula"
+  | "sharingan"
   | "custom";
 
 export type VideoPresetName =
@@ -600,6 +601,18 @@ export const THEME_OPTIONS: Array<{
       accent: "#701d51",
       primary: "#f43f5e",
       highlight: "#fecdd3",
+    },
+  },
+  {
+    id: "sharingan",
+    name: "Sharingan Eye",
+    subtitle: "Crimson genjutsu, obsidian shadows & spinning tomoe aura",
+    colors: {
+      bgBase: "#090304",
+      surface: "#180608",
+      accent: "#4a080f",
+      primary: "#ff1f38",
+      highlight: "#ff8c9b",
     },
   },
   {

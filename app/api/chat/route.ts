@@ -1998,6 +1998,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               "alpine_forest",
               "mint_sunray",
               "rose_nebula",
+              "sharingan",
               "monochrome",
               "custom",
             ])
