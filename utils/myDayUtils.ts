@@ -53,9 +53,9 @@ export function makeBlockId(): string {
  */
 export function parseTimeToMinutes(raw: string | undefined | null): number {
   if (!raw) return 9 * 60;
-  const trimmed = raw.trim();
+  const trimmed = raw.trim().replace(/[.,;]+$/, "");
 
-  // Check 12-hour format e.g. "2:30 PM", "9am", "12:15 am"
+  // Check 12-hour format e.g. "2:30 PM", "9am", "12:15 am", "6pm", "6 pm"
   const ampmMatch = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i.exec(trimmed);
   if (ampmMatch) {
     let hours = parseInt(ampmMatch[1], 10);
@@ -73,6 +73,15 @@ export function parseTimeToMinutes(raw: string | undefined | null): number {
     const mins = parseInt(hhmmMatch[2], 10);
     if (!isNaN(hours) && !isNaN(mins)) {
       return (((hours * 60 + mins) % 1440) + 1440) % 1440;
+    }
+  }
+
+  // Bare number hours (e.g. "18" -> 18:00, or "6" -> 6:00)
+  const bareMatch = /^(\d{1,2})$/.exec(trimmed);
+  if (bareMatch) {
+    const h = parseInt(bareMatch[1], 10);
+    if (!isNaN(h) && h >= 0 && h <= 23) {
+      return (h * 60) % 1440;
     }
   }
 

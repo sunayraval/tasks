@@ -1329,6 +1329,11 @@ GUIDELINES FOR THOUGHTFUL EXECUTION:
   * Whenever the user mentions important events in their life, recurring milestones, classes, exams, ongoing goals, or general life preferences (e.g. "I have a Linear Algebra midterm next Thursday", "I'm applying to colleges for CS", "I prefer studying in the early morning", "My dog is named Buster"):
     -> Call \`manage_user_memory\` (action: "add") to remember it!
     -> Memory notes persist across sessions and help you personalize schedules, advice, and tone without cluttering their actionable tasks list.
+- SCHEDULE RESCHEDULING, CASCADE & VERIFICATION PROTOCOL (STRICT MANDATE):
+  * When the user asks to shift their schedule, start at a specific time, or remove finished tasks and adjust the start time (e.g. "shift schedule to 6 pm", "remove math and break, start schedule at 6 pm", "i finished x, start at 6"):
+    -> ALWAYS pass \`target_start_time\` (e.g. "18:00" or "6:00 PM") to \`manage_my_day_schedule\`! DO NOT attempt mental arithmetic on relative \`shift_minutes\` when the user gave an explicit clock time.
+    -> When removing tasks from the schedule (via \`remove_block\`, \`remove_blocks\`, or \`reschedule\`), pass \`target_start_time\` and let \`cascade: true\` pack the remaining tasks sequentially so there are no dead gaps or accidental start-time drift.
+    -> DOUBLE-CHECK BEFORE REPLYING: Every schedule tool returns \`actualScheduleStart\`, \`firstUpcomingBlock\`, and \`verificationCheck\`. Inspect these fields in the tool result! Verify that \`actualScheduleStart\` matches what the user asked for (e.g. "6:00 PM"). NEVER tell the user "I shifted your start time to 6:00 PM" if the tool result indicates a different start time—if it's off, call \`manage_my_day_schedule\` with \`action: "shift_schedule", target_start_time: "18:00"\` to correct it before providing your final response!
 - If the user mentions a task with @ or by partial name, match it accurately to the board items below.
 - Keep your text response clean, natural, well-structured (use concise Markdown bullets or bold highlights where helpful), and confirm what you just did or answer their question thoughtfully.
 
@@ -2334,7 +2339,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
 
       manage_my_day_schedule: tool({
         description:
-          "Build, auto-arrange, add to, edit, swap, shift, or clear the user's MY DAY schedule, and display the updated live MY DAY status bar UI in chat.",
+          "Build, auto-arrange, reschedule, add to, edit, swap, shift, or clear the user's MY DAY schedule. Always returns verified schedule start/end times and slot breakdowns.",
         parameters: z.object({
           action: z.enum([
             "auto_arrange",
@@ -2344,8 +2349,40 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
             "swap_blocks",
             "shift_schedule",
             "remove_block",
+            "remove_blocks",
+            "reschedule",
             "clear_schedule",
           ]),
+          target_start_time: z
+            .string()
+            .optional()
+            .describe(
+              "CRITICAL: For shift_schedule, reschedule, or remove_block/remove_blocks: absolute target start time for the schedule (e.g. '18:00', '6:00 PM', '2:30 PM'). ALWAYS pass this when the user requests a specific start time (e.g. 'shift schedule to 6 pm', 'start at 6 pm') instead of doing mental math on shift_minutes!"
+            ),
+          block_queries: z
+            .array(z.string())
+            .optional()
+            .describe(
+              "For remove_blocks or reschedule: list of block titles or IDs to remove from the schedule (e.g. ['Linear Algebra', 'Break'])"
+            ),
+          cascade: z
+            .boolean()
+            .optional()
+            .describe(
+              "When true (default), packs remaining schedule blocks sequentially without gaps and cascades times cleanly from the new start time"
+            ),
+          remove_completed_blocks: z
+            .boolean()
+            .optional()
+            .describe(
+              "For reschedule or shift_schedule: if true, strips any already completed tasks from the schedule so only pending work remains"
+            ),
+          mark_tasks_done: z
+            .array(z.string())
+            .optional()
+            .describe(
+              "For reschedule or shift_schedule: task titles or IDs to simultaneously mark as Done in the Tasks table"
+            ),
           day_start_time: z
             .string()
             .optional()
@@ -2390,7 +2427,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
           shift_minutes: z
             .number()
             .optional()
-            .describe("For shift_schedule: minutes to shift (+30 pushes later, -15 earlier)"),
+            .describe("For shift_schedule: relative minutes to shift (+30 pushes later, -15 earlier). Prefer target_start_time when user specified an exact time."),
           align_to_now: z
             .boolean()
             .optional()
@@ -2421,6 +2458,48 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
             );
           };
 
+          const buildInspection = (actionSummary: string) => {
+            const sched = workingConfig.myDaySchedule;
+            const blks = sched?.blocks || [];
+            if (blks.length === 0) {
+              return {
+                success: true,
+                actionApplied: actionSummary,
+                hasSchedule: false,
+                totalBlocks: 0,
+                actualScheduleStart: null,
+                actualScheduleEnd: null,
+                firstUpcomingBlock: null,
+                timelineSummary: [],
+                verificationCheck: "Schedule is currently empty.",
+              };
+            }
+            const first = blks[0];
+            const last = blks[blks.length - 1];
+            const startStr = formatTime12h(first.startTime);
+            const endStr = formatTime12h(last.endTime);
+            const timeline = blks.map(
+              (b, idx) =>
+                `[Slot ${idx + 1}] ${formatTime12h(b.startTime)}–${formatTime12h(b.endTime)} (${b.durationMinutes}m) "${b.title}"${b.completed ? " [COMPLETED]" : ""}`
+            );
+            return {
+              success: true,
+              actionApplied: actionSummary,
+              hasSchedule: true,
+              totalBlocks: blks.length,
+              actualScheduleStart: startStr,
+              actualScheduleEnd: endStr,
+              firstUpcomingBlock: {
+                title: first.title,
+                time: `${startStr} – ${formatTime12h(first.endTime)}`,
+                duration: `${first.durationMinutes}m`,
+                completed: Boolean(first.completed),
+              },
+              timelineSummary: timeline,
+              verificationCheck: `VERIFIED: MY DAY schedule currently starts at ${startStr} and ends at ${endStr} with ${blks.length} slots. First slot is "${first.title}".`,
+            };
+          };
+
           if (args.action === "clear_schedule") {
             workingConfig.myDaySchedule = {
               ...existing,
@@ -2430,7 +2509,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
             };
             configTouched = true;
             recordAction("schedule", "Cleared MY DAY schedule");
-            return { success: true, count: 0 };
+            return buildInspection("Cleared MY DAY schedule");
           }
 
           if (args.action === "auto_arrange") {
@@ -2485,7 +2564,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               arranged.summary
             );
             return {
-              success: true,
+              ...buildInspection(arranged.summary),
               scheduledCount: arranged.blocks.length,
               summary: arranged.summary,
             };
@@ -2531,7 +2610,10 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               "schedule",
               `Arranged ${built.length} blocks in MY DAY schedule`
             );
-            return { success: true, scheduledCount: built.length };
+            return {
+              ...buildInspection(`Arranged ${built.length} blocks in MY DAY schedule`),
+              scheduledCount: built.length,
+            };
           }
 
           if (args.action === "add_block") {
@@ -2581,7 +2663,14 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
                 e
               )})`
             );
-            return { success: true, added: newBlock.title };
+            return {
+              ...buildInspection(
+                `Scheduled "${newBlock.title}" (${formatTime12h(s)} – ${formatTime12h(
+                  e
+                )})`
+              ),
+              added: newBlock.title,
+            };
           }
 
           if (args.action === "update_block") {
@@ -2630,7 +2719,9 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
                 e
               )}`
             );
-            return { success: true };
+            return buildInspection(
+              `Updated "${target.title}" to ${formatTime12h(s)} – ${formatTime12h(e)}`
+            );
           }
 
           if (args.action === "swap_blocks") {
@@ -2658,18 +2749,32 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               "schedule",
               `Swapped "${existing.blocks[idxA].title}" and "${existing.blocks[idxB].title}" in MY DAY`
             );
-            return { success: true };
+            return buildInspection(
+              `Swapped "${existing.blocks[idxA].title}" and "${existing.blocks[idxB].title}" in MY DAY`
+            );
           }
 
           if (args.action === "shift_schedule") {
             if (existing.blocks.length === 0) {
               return { success: false, error: "Schedule is currently empty." };
             }
-            const delta = args.align_to_now
-              ? Math.round(clientLocalMinutesOfDay) -
-                parseTimeToMinutes(existing.blocks[0].startTime)
-              : args.shift_minutes || 0;
-            const shifted = shiftScheduleBlocks(existing.blocks, delta);
+            let delta = 0;
+            if (args.target_start_time) {
+              const targetMins = parseTimeToMinutes(args.target_start_time);
+              const currentFirstMins = parseTimeToMinutes(existing.blocks[0].startTime);
+              delta = targetMins - currentFirstMins;
+            } else if (args.align_to_now) {
+              delta =
+                Math.round(clientLocalMinutesOfDay) -
+                parseTimeToMinutes(existing.blocks[0].startTime);
+            } else {
+              delta = args.shift_minutes || 0;
+            }
+
+            let shifted = shiftScheduleBlocks(existing.blocks, delta);
+            if (args.cascade ?? true) {
+              shifted = cascadeFromBlockIndex(shifted, 0);
+            }
             workingConfig.myDaySchedule = {
               ...existing,
               dayStartTime: shifted[0].startTime,
@@ -2678,33 +2783,204 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               updatedAt: new Date().toISOString(),
             };
             configTouched = true;
-            recordAction(
-              "schedule",
-              args.align_to_now
-                ? "Aligned MY DAY schedule start to current time"
-                : `Shifted MY DAY schedule by ${delta > 0 ? `+${delta}m` : `${delta}m`}`
-            );
-            return { success: true };
+            const summary = args.target_start_time
+              ? `Shifted MY DAY schedule to start at ${formatTime12h(shifted[0].startTime)}`
+              : args.align_to_now
+              ? `Aligned MY DAY schedule to current time (${formatTime12h(shifted[0].startTime)})`
+              : `Shifted MY DAY schedule by ${delta > 0 ? `+${delta}m` : `${delta}m`}`;
+            recordAction("schedule", summary);
+            return buildInspection(summary);
           }
 
-          if (args.action === "remove_block") {
-            const idx = findScheduleBlockIdx(args.block_query);
-            if (idx === -1) {
-              return { success: false, error: "Block not found in schedule." };
+          if (args.action === "remove_block" || args.action === "remove_blocks") {
+            const queries =
+              args.block_queries && args.block_queries.length > 0
+                ? args.block_queries
+                : args.block_query
+                ? [args.block_query]
+                : [];
+            if (queries.length === 0) {
+              return { success: false, error: "No block specified to remove." };
             }
-            const removed = existing.blocks[idx];
-            const nextBlocks = existing.blocks.filter((_, i) => i !== idx);
+
+            const removedTitles: string[] = [];
+            let nextBlocks = [...existing.blocks];
+            for (const q of queries) {
+              const clean = q.trim().toLowerCase();
+              const idx = nextBlocks.findIndex(
+                (b) =>
+                  b.id === q.trim() ||
+                  b.taskId === q.trim() ||
+                  b.title.toLowerCase() === clean ||
+                  b.title.toLowerCase().includes(clean)
+              );
+              if (idx !== -1) {
+                removedTitles.push(nextBlocks[idx].title);
+                nextBlocks.splice(idx, 1);
+              }
+            }
+
+            if (removedTitles.length === 0) {
+              return {
+                success: false,
+                error: `Could not find blocks matching: ${queries.join(", ")}`,
+              };
+            }
+
+            if (nextBlocks.length === 0) {
+              workingConfig.myDaySchedule = {
+                ...existing,
+                blocks: [],
+                updatedAt: new Date().toISOString(),
+              };
+              configTouched = true;
+              const summary = `Removed "${removedTitles.join('", "')}" from MY DAY (schedule now empty)`;
+              recordAction("schedule", summary);
+              return buildInspection(summary);
+            }
+
+            if (args.target_start_time) {
+              const targetMins = parseTimeToMinutes(args.target_start_time);
+              const currentFirstMins = parseTimeToMinutes(nextBlocks[0].startTime);
+              const delta = targetMins - currentFirstMins;
+              nextBlocks = shiftScheduleBlocks(nextBlocks, delta);
+            } else if (args.align_to_now) {
+              const delta =
+                Math.round(clientLocalMinutesOfDay) -
+                parseTimeToMinutes(nextBlocks[0].startTime);
+              nextBlocks = shiftScheduleBlocks(nextBlocks, delta);
+            } else if (args.shift_minutes) {
+              nextBlocks = shiftScheduleBlocks(nextBlocks, args.shift_minutes);
+            }
+
+            if (args.cascade ?? true) {
+              nextBlocks = cascadeFromBlockIndex(nextBlocks, 0);
+            }
+
             workingConfig.myDaySchedule = {
               ...existing,
+              dayStartTime: nextBlocks[0].startTime,
+              dayEndTime: nextBlocks[nextBlocks.length - 1].endTime,
               blocks: nextBlocks,
               updatedAt: new Date().toISOString(),
             };
             configTouched = true;
-            recordAction(
-              "schedule",
-              `Removed "${removed.title}" from MY DAY schedule`
-            );
-            return { success: true };
+            const summary = `Removed "${removedTitles.join('", "')}" from MY DAY schedule${
+              args.target_start_time
+                ? ` & anchored start to ${formatTime12h(nextBlocks[0].startTime)}`
+                : ""
+            }`;
+            recordAction("schedule", summary);
+            return buildInspection(summary);
+          }
+
+          if (args.action === "reschedule") {
+            let nextBlocks = [...existing.blocks];
+            const removedTitles: string[] = [];
+
+            const toRemove = [
+              ...(args.block_queries || []),
+              ...(args.block_query ? [args.block_query] : []),
+            ];
+            for (const q of toRemove) {
+              const clean = q.trim().toLowerCase();
+              const idx = nextBlocks.findIndex(
+                (b) =>
+                  b.id === q.trim() ||
+                  b.taskId === q.trim() ||
+                  b.title.toLowerCase() === clean ||
+                  b.title.toLowerCase().includes(clean)
+              );
+              if (idx !== -1) {
+                removedTitles.push(nextBlocks[idx].title);
+                nextBlocks.splice(idx, 1);
+              }
+            }
+
+            if (args.remove_completed_blocks) {
+              nextBlocks = nextBlocks.filter((b) => {
+                const linkedTask = b.taskId
+                  ? workingTasks.find((t) => t.id === b.taskId)
+                  : undefined;
+                const isDone =
+                  Boolean(b.completed) ||
+                  (linkedTask ? isDoneStatus(linkedTask.status) : false);
+                if (isDone) removedTitles.push(b.title);
+                return !isDone;
+              });
+            }
+
+            if (args.mark_tasks_done && args.mark_tasks_done.length > 0) {
+              for (const tQuery of args.mark_tasks_done) {
+                const matched = findItem(tQuery, { tasksOnly: true });
+                if (matched) {
+                  const idx = workingTasks.findIndex((t) => t.id === matched.id);
+                  if (idx !== -1) {
+                    workingTasks[idx] = {
+                      ...workingTasks[idx],
+                      status: "Done",
+                      completed_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                    };
+                    tasksTouched = true;
+                    modifiedTaskIds.add(matched.id);
+                    recordAction("update", `Marked "${matched.title}" as Done`);
+                  }
+                }
+              }
+            }
+
+            if (nextBlocks.length === 0) {
+              workingConfig.myDaySchedule = {
+                ...existing,
+                blocks: [],
+                updatedAt: new Date().toISOString(),
+              };
+              configTouched = true;
+              const summary = "Rescheduled MY DAY (all blocks cleared/completed)";
+              recordAction("schedule", summary);
+              return buildInspection(summary);
+            }
+
+            const targetTimeStr = args.target_start_time || args.day_start_time;
+            if (targetTimeStr) {
+              const targetMins = parseTimeToMinutes(targetTimeStr);
+              const currentFirstMins = parseTimeToMinutes(nextBlocks[0].startTime);
+              const delta = targetMins - currentFirstMins;
+              nextBlocks = shiftScheduleBlocks(nextBlocks, delta);
+            } else if (args.align_to_now) {
+              const delta =
+                Math.round(clientLocalMinutesOfDay) -
+                parseTimeToMinutes(nextBlocks[0].startTime);
+              nextBlocks = shiftScheduleBlocks(nextBlocks, delta);
+            } else if (args.shift_minutes) {
+              nextBlocks = shiftScheduleBlocks(nextBlocks, args.shift_minutes);
+            }
+
+            if (args.cascade ?? true) {
+              nextBlocks = cascadeFromBlockIndex(nextBlocks, 0);
+            }
+
+            workingConfig.myDaySchedule = {
+              ...existing,
+              dayStartTime: nextBlocks[0].startTime,
+              dayEndTime: nextBlocks[nextBlocks.length - 1].endTime,
+              blocks: nextBlocks,
+              updatedAt: new Date().toISOString(),
+            };
+            configTouched = true;
+
+            const summary = `Rescheduled MY DAY starting at ${formatTime12h(
+              nextBlocks[0].startTime
+            )}${
+              removedTitles.length > 0
+                ? ` (removed ${removedTitles.length} slot${
+                    removedTitles.length === 1 ? "" : "s"
+                  })`
+                : ""
+            }`;
+            recordAction("schedule", summary);
+            return buildInspection(summary);
           }
 
           return { success: false };
@@ -3195,6 +3471,42 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
           replyText = `I've updated your workspace with ${addedTasksMap.size > 0 ? `${addedTasksMap.size} new tasks` : "your task changes"}.`;
         } else {
           replyText = "I've reviewed your request. Let me know if you'd like me to add these tasks or build a time-blocked schedule for your day.";
+        }
+      }
+    }
+
+    // AUTOMATIC TARGET TIME RECONCILIATION GUARD:
+    // If the user's prompt explicitly requested an absolute schedule start time
+    // (e.g. "shift schedule to 6 pm", "start at 6 pm", "push schedule to start at 6 pm", "reschedule to 6:30"),
+    // and a schedule exists, ensure the resulting schedule actually begins at that exact requested time!
+    if (workingConfig.myDaySchedule?.blocks && workingConfig.myDaySchedule.blocks.length > 0) {
+      const explicitStartMatch =
+        /(?:shift|push|start|move|reschedule|set)\s+(?:the\s+)?(?:my\s+day\s+)?(?:schedule\s+)?(?:to\s+(?:start\s+)?(?:at\s+)?|at\s+|from\s+)(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i.exec(
+          userMessage
+        );
+      if (explicitStartMatch) {
+        const requestedTargetMins = parseTimeToMinutes(explicitStartMatch[1]);
+        const currentFirstMins = parseTimeToMinutes(
+          workingConfig.myDaySchedule.blocks[0].startTime
+        );
+        if (currentFirstMins !== requestedTargetMins) {
+          const delta = requestedTargetMins - currentFirstMins;
+          let corrected = shiftScheduleBlocks(workingConfig.myDaySchedule.blocks, delta);
+          corrected = cascadeFromBlockIndex(corrected, 0);
+          workingConfig.myDaySchedule = {
+            ...workingConfig.myDaySchedule,
+            dayStartTime: corrected[0].startTime,
+            dayEndTime: corrected[corrected.length - 1].endTime,
+            blocks: corrected,
+            updatedAt: new Date().toISOString(),
+          };
+          configTouched = true;
+          scheduleMutatedInTurn = true;
+          showMyDayCard = true;
+          recordAction(
+            "schedule",
+            `Reconciled MY DAY schedule start to exactly ${formatTime12h(corrected[0].startTime)}`
+          );
         }
       }
     }
