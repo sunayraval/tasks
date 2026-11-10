@@ -1329,11 +1329,15 @@ GUIDELINES FOR THOUGHTFUL EXECUTION:
   * Whenever the user mentions important events in their life, recurring milestones, classes, exams, ongoing goals, or general life preferences (e.g. "I have a Linear Algebra midterm next Thursday", "I'm applying to colleges for CS", "I prefer studying in the early morning", "My dog is named Buster"):
     -> Call \`manage_user_memory\` (action: "add") to remember it!
     -> Memory notes persist across sessions and help you personalize schedules, advice, and tone without cluttering their actionable tasks list.
+- REAL-TIME AWARENESS & IMPLICIT AM/PM RESOLUTION (STRICT MANDATE):
+  * CURRENT REAL TIME: The user's exact current local time is ${clientLocalDateReadable}, ${formatTime12h(clientLocalTimeHHMM)} (24h: ${clientLocalTimeHHMM}).
+  * If the user specifies a time without AM/PM (e.g. "6:45", "7", "8:15") when current time is in the afternoon or evening (${formatTime12h(clientLocalTimeHHMM)}), "6:45" ALWAYS means PM (e.g. 6:45 PM / 18:45). NEVER interpret an evening request as AM!
+  * If the user says "shift schedule", "shift to now", "start now", "im home now so shift schedule", "im ready now", or does not specify an explicit clock time, PULL DIRECTLY FROM THE REAL TIME: call \`manage_my_day_schedule\` with \`align_to_now: true\` or \`target_start_time: "now"\`. The user never needs to manually explain or type their clock time!
 - SCHEDULE RESCHEDULING, CASCADE & VERIFICATION PROTOCOL (STRICT MANDATE):
-  * When the user asks to shift their schedule, start at a specific time, or remove finished tasks and adjust the start time (e.g. "shift schedule to 6 pm", "remove math and break, start schedule at 6 pm", "i finished x, start at 6"):
-    -> ALWAYS pass \`target_start_time\` (e.g. "18:00" or "6:00 PM") to \`manage_my_day_schedule\`! DO NOT attempt mental arithmetic on relative \`shift_minutes\` when the user gave an explicit clock time.
+  * When the user asks to shift their schedule, start at a specific time, or remove finished tasks and adjust the start time (e.g. "shift schedule to 6 pm", "remove math and break, start schedule at 6 pm", "i finished x, start at 6:45"):
+    -> ALWAYS pass \`target_start_time\` (e.g. "18:45", "6:45 PM", or "now") to \`manage_my_day_schedule\`! DO NOT attempt mental arithmetic on relative \`shift_minutes\` when the user gave an explicit clock time.
     -> When removing tasks from the schedule (via \`remove_block\`, \`remove_blocks\`, or \`reschedule\`), pass \`target_start_time\` and let \`cascade: true\` pack the remaining tasks sequentially so there are no dead gaps or accidental start-time drift.
-    -> DOUBLE-CHECK BEFORE REPLYING: Every schedule tool returns \`actualScheduleStart\`, \`firstUpcomingBlock\`, and \`verificationCheck\`. Inspect these fields in the tool result! Verify that \`actualScheduleStart\` matches what the user asked for (e.g. "6:00 PM"). NEVER tell the user "I shifted your start time to 6:00 PM" if the tool result indicates a different start time—if it's off, call \`manage_my_day_schedule\` with \`action: "shift_schedule", target_start_time: "18:00"\` to correct it before providing your final response!
+    -> DOUBLE-CHECK BEFORE REPLYING: Every schedule tool returns \`actualScheduleStart\`, \`firstUpcomingBlock\`, and \`verificationCheck\`. Inspect these fields in the tool result! Verify that \`actualScheduleStart\` matches what the user asked for (e.g. "6:45 PM"). NEVER tell the user "I shifted your start time to 6:45 PM" if the tool result indicates a different start time—if it's off, call \`manage_my_day_schedule\` with \`action: "shift_schedule", target_start_time: "18:45"\` to correct it before providing your final response!
 - If the user mentions a task with @ or by partial name, match it accurately to the board items below.
 - Keep your text response clean, natural, well-structured (use concise Markdown bullets or bold highlights where helpful), and confirm what you just did or answer their question thoughtfully.
 
@@ -2760,13 +2764,13 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
             }
             let delta = 0;
             if (args.target_start_time) {
-              const targetMins = parseTimeToMinutes(args.target_start_time);
-              const currentFirstMins = parseTimeToMinutes(existing.blocks[0].startTime);
+              const targetMins = parseTimeToMinutes(args.target_start_time, clientLocalMinutesOfDay);
+              const currentFirstMins = parseTimeToMinutes(existing.blocks[0].startTime, clientLocalMinutesOfDay);
               delta = targetMins - currentFirstMins;
-            } else if (args.align_to_now) {
+            } else if (args.align_to_now || !args.shift_minutes) {
               delta =
                 Math.round(clientLocalMinutesOfDay) -
-                parseTimeToMinutes(existing.blocks[0].startTime);
+                parseTimeToMinutes(existing.blocks[0].startTime, clientLocalMinutesOfDay);
             } else {
               delta = args.shift_minutes || 0;
             }
@@ -2840,14 +2844,14 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
             }
 
             if (args.target_start_time) {
-              const targetMins = parseTimeToMinutes(args.target_start_time);
-              const currentFirstMins = parseTimeToMinutes(nextBlocks[0].startTime);
+              const targetMins = parseTimeToMinutes(args.target_start_time, clientLocalMinutesOfDay);
+              const currentFirstMins = parseTimeToMinutes(nextBlocks[0].startTime, clientLocalMinutesOfDay);
               const delta = targetMins - currentFirstMins;
               nextBlocks = shiftScheduleBlocks(nextBlocks, delta);
             } else if (args.align_to_now) {
               const delta =
                 Math.round(clientLocalMinutesOfDay) -
-                parseTimeToMinutes(nextBlocks[0].startTime);
+                parseTimeToMinutes(nextBlocks[0].startTime, clientLocalMinutesOfDay);
               nextBlocks = shiftScheduleBlocks(nextBlocks, delta);
             } else if (args.shift_minutes) {
               nextBlocks = shiftScheduleBlocks(nextBlocks, args.shift_minutes);
@@ -2944,14 +2948,14 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
 
             const targetTimeStr = args.target_start_time || args.day_start_time;
             if (targetTimeStr) {
-              const targetMins = parseTimeToMinutes(targetTimeStr);
-              const currentFirstMins = parseTimeToMinutes(nextBlocks[0].startTime);
+              const targetMins = parseTimeToMinutes(targetTimeStr, clientLocalMinutesOfDay);
+              const currentFirstMins = parseTimeToMinutes(nextBlocks[0].startTime, clientLocalMinutesOfDay);
               const delta = targetMins - currentFirstMins;
               nextBlocks = shiftScheduleBlocks(nextBlocks, delta);
-            } else if (args.align_to_now) {
+            } else if (args.align_to_now || (!args.shift_minutes && !targetTimeStr)) {
               const delta =
                 Math.round(clientLocalMinutesOfDay) -
-                parseTimeToMinutes(nextBlocks[0].startTime);
+                parseTimeToMinutes(nextBlocks[0].startTime, clientLocalMinutesOfDay);
               nextBlocks = shiftScheduleBlocks(nextBlocks, delta);
             } else if (args.shift_minutes) {
               nextBlocks = shiftScheduleBlocks(nextBlocks, args.shift_minutes);
@@ -3475,19 +3479,39 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
       }
     }
 
-    // AUTOMATIC TARGET TIME RECONCILIATION GUARD:
-    // If the user's prompt explicitly requested an absolute schedule start time
-    // (e.g. "shift schedule to 6 pm", "start at 6 pm", "push schedule to start at 6 pm", "reschedule to 6:30"),
-    // and a schedule exists, ensure the resulting schedule actually begins at that exact requested time!
+    // AUTOMATIC REAL-TIME & TARGET TIME RECONCILIATION GUARD:
+    // Pulls from the REAL current time or explicit target time (e.g. "6:45", "6 pm", "now", "im home now")
+    // and ensures that ambiguous times (e.g. "6:45" at 6:40 PM) resolve to PM and not AM.
     if (workingConfig.myDaySchedule?.blocks && workingConfig.myDaySchedule.blocks.length > 0) {
+      let requestedTargetMins: number | null = null;
+      let reason = "";
+
       const explicitStartMatch =
         /(?:shift|push|start|move|reschedule|set)\s+(?:the\s+)?(?:my\s+day\s+)?(?:schedule\s+)?(?:to\s+(?:start\s+)?(?:at\s+)?|at\s+|from\s+)(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i.exec(
           userMessage
         );
+
+      const isShiftToNow =
+        /(?:shift|push|start|align|move|reschedule)\s+(?:the\s+)?(?:my\s+day\s+)?(?:schedule\s+)?(?:to\s+)?(?:right\s+)?now/i.test(userMessage) ||
+        /(?:im|i'm|i\s+am)\s+(?:home|ready|here)\s+now.*?shift/i.test(userMessage) ||
+        /(?:start|push|shift)\s+(?:my\s+day|schedule)\s+(?:now|right\s+now|immediately)/i.test(userMessage) ||
+        /^(?:can\s+u\s+|please\s+)?(?:shift|push|align)\s+(?:the\s+)?(?:my\s+day\s+)?schedule[?.!]*$/i.test(userMessage.trim());
+
       if (explicitStartMatch) {
-        const requestedTargetMins = parseTimeToMinutes(explicitStartMatch[1]);
+        requestedTargetMins = parseTimeToMinutes(
+          explicitStartMatch[1],
+          clientLocalMinutesOfDay
+        );
+        reason = `Requested start time "${explicitStartMatch[1]}"`;
+      } else if (isShiftToNow) {
+        requestedTargetMins = Math.round(clientLocalMinutesOfDay);
+        reason = "Real-time alignment ('now')";
+      }
+
+      if (requestedTargetMins !== null) {
         const currentFirstMins = parseTimeToMinutes(
-          workingConfig.myDaySchedule.blocks[0].startTime
+          workingConfig.myDaySchedule.blocks[0].startTime,
+          clientLocalMinutesOfDay
         );
         if (currentFirstMins !== requestedTargetMins) {
           const delta = requestedTargetMins - currentFirstMins;
@@ -3505,7 +3529,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
           showMyDayCard = true;
           recordAction(
             "schedule",
-            `Reconciled MY DAY schedule start to exactly ${formatTime12h(corrected[0].startTime)}`
+            `Aligned MY DAY schedule start to exactly ${formatTime12h(corrected[0].startTime)} (${reason})`
           );
         }
       }

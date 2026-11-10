@@ -51,11 +51,26 @@ export function makeBlockId(): string {
 /**
  * Parses flexible time strings ("09:30", "14:15", "2:30 PM", "9am") into minutes since midnight (0..1439).
  */
-export function parseTimeToMinutes(raw: string | undefined | null): number {
+export function parseTimeToMinutes(
+  raw: string | undefined | null,
+  contextNowMinutes?: number
+): number {
   if (!raw) return 9 * 60;
   const trimmed = raw.trim().replace(/[.,;]+$/, "");
+  if (!trimmed) return 9 * 60;
 
-  // Check 12-hour format e.g. "2:30 PM", "9am", "12:15 am", "6pm", "6 pm"
+  // Real-time anchor fallback if contextNowMinutes not explicitly provided
+  const nowAnchor =
+    typeof contextNowMinutes === "number" && !isNaN(contextNowMinutes)
+      ? contextNowMinutes
+      : new Date().getHours() * 60 + new Date().getMinutes();
+
+  // 1. Check keywords like "now", "right now", "current", "current time", "immediately"
+  if (/^(now|right\s*now|current|current\s*time|immediately)$/i.test(trimmed)) {
+    return ((Math.round(nowAnchor) % 1440) + 1440) % 1440;
+  }
+
+  // 2. Explicit 12-hour format e.g. "2:30 PM", "9am", "12:15 am", "6pm", "6 pm"
   const ampmMatch = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i.exec(trimmed);
   if (ampmMatch) {
     let hours = parseInt(ampmMatch[1], 10);
@@ -66,22 +81,52 @@ export function parseTimeToMinutes(raw: string | undefined | null): number {
     return (((hours * 60 + mins) % 1440) + 1440) % 1440;
   }
 
-  // Standard 24-hour format "HH:mm"
+  // Helper to pick closest interpretation when AM/PM is absent and hour is ambiguous (1..12)
+  const resolveAmbiguousHour = (hRaw: number, mRaw: number): number => {
+    // If hours is >= 13, it's explicitly 24-hour military time (e.g. 18:45 -> 6:45 PM, 14:00 -> 2:00 PM)
+    if (hRaw >= 13) {
+      return (((hRaw * 60 + mRaw) % 1440) + 1440) % 1440;
+    }
+    // If hours is 0, it's 00:xx (midnight)
+    if (hRaw === 0) {
+      return mRaw % 1440;
+    }
+
+    // Otherwise hRaw is 1..12. Compare AM and PM interpretations against nowAnchor
+    const amHours = hRaw === 12 ? 0 : hRaw;
+    const pmHours = hRaw === 12 ? 12 : hRaw + 12;
+    const amTotal = amHours * 60 + mRaw;
+    const pmTotal = pmHours * 60 + mRaw;
+
+    // Compute circular distance on a 24-hour clock to the real current time
+    const diffAm = Math.abs(amTotal - nowAnchor) % 1440;
+    const distAm = Math.min(diffAm, 1440 - diffAm);
+    const diffPm = Math.abs(pmTotal - nowAnchor) % 1440;
+    const distPm = Math.min(diffPm, 1440 - diffPm);
+
+    // If PM interpretation is closer to real current time, choose PM!
+    if (distPm < distAm) {
+      return pmTotal;
+    }
+    return amTotal;
+  };
+
+  // 3. Format "HH:mm" without explicit AM/PM (e.g. "6:45", "06:45", "18:45")
   const hhmmMatch = /^(\d{1,2}):(\d{2})/.exec(trimmed);
   if (hhmmMatch) {
     const hours = parseInt(hhmmMatch[1], 10);
     const mins = parseInt(hhmmMatch[2], 10);
     if (!isNaN(hours) && !isNaN(mins)) {
-      return (((hours * 60 + mins) % 1440) + 1440) % 1440;
+      return resolveAmbiguousHour(hours, mins);
     }
   }
 
-  // Bare number hours (e.g. "18" -> 18:00, or "6" -> 6:00)
+  // 4. Bare number hours (e.g. "18" -> 18:00, or "6" -> 6:00 / 18:00 based on real time)
   const bareMatch = /^(\d{1,2})$/.exec(trimmed);
   if (bareMatch) {
     const h = parseInt(bareMatch[1], 10);
     if (!isNaN(h) && h >= 0 && h <= 23) {
-      return (h * 60) % 1440;
+      return resolveAmbiguousHour(h, 0);
     }
   }
 
@@ -97,10 +142,11 @@ export function minutesToTimeString(totalMinutes: number): string {
 
 export function normalizeTimeString(
   raw: string | undefined | null,
-  fallback = "09:00"
+  fallback = "09:00",
+  contextNowMinutes?: number
 ): string {
   if (!raw || !raw.trim()) return fallback;
-  return minutesToTimeString(parseTimeToMinutes(raw));
+  return minutesToTimeString(parseTimeToMinutes(raw, contextNowMinutes));
 }
 
 export function formatTime12h(hhmm: string): string {
