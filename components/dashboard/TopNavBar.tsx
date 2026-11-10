@@ -69,9 +69,9 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
   return (
     <header className="sticky top-0 z-30 border-b theme-header-bg backdrop-blur-xl transition-colors duration-300">
-      <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
+      <div className="mx-auto max-w-[1600px] px-2.5 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-1.5 sm:gap-3">
         {/* Left: Brand Identity matching user screenshot, strictly non-editable */}
-        <div className="flex items-center gap-2.5 shrink-0 select-none">
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 select-none">
           {profile.theme === "sharingan" ? (
             <div
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#140305] border border-red-500/50 shadow-[0_0_24px_rgba(255,31,56,0.65)] transition-all cursor-pointer"
@@ -94,12 +94,12 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             kite
           </span>
           {profile.theme === "sharingan" ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/60 bg-red-950/40 px-2.5 py-0.5 text-xs font-mono font-bold text-red-400 shadow-[0_0_12px_rgba(255,31,56,0.45)] leading-none">
+            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-red-500/60 bg-red-950/40 px-2.5 py-0.5 text-xs font-mono font-bold text-red-400 shadow-[0_0_12px_rgba(255,31,56,0.45)] leading-none">
               <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping" />
               UCHIHA 2.0
             </span>
           ) : (
-            <span className="inline-flex items-center rounded-full border border-white px-2.5 py-0.5 text-xs font-mono font-medium text-yellow-300 leading-none">
+            <span className="hidden sm:inline-flex items-center rounded-full border border-white px-2.5 py-0.5 text-xs font-mono font-medium text-yellow-300 leading-none">
               2.0
             </span>
           )}
@@ -110,7 +110,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           <div
             role="tablist"
             aria-label="Workspace View Switcher"
-            className="inline-flex items-center rounded-full border border-white/15 bg-black/45 p-1 backdrop-blur-xl shadow-inner"
+            className="inline-flex items-center rounded-full border border-white/15 bg-black/45 p-1 backdrop-blur-xl shadow-inner shrink-0"
           >
             {!aiTemporarilyDisabled && (
               <button
@@ -121,7 +121,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                   onSelectTab("chat");
                   onResetChatToHero?.();
                 }}
-                className={`relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
+                className={`relative inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-all ${
                   activeTab === "chat"
                     ? "bg-white/15 text-white shadow-sm border border-white/15"
                     : "text-white/60 hover:text-white border border-transparent"
@@ -147,7 +147,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               role="tab"
               aria-selected={activeTab === "tasks"}
               onClick={() => onSelectTab("tasks")}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
+              className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-all ${
                 activeTab === "tasks"
                   ? "bg-white/15 text-white shadow-sm border border-white/15"
                   : "text-white/60 hover:text-white border border-transparent"
@@ -177,7 +177,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               role="tab"
               aria-selected={activeTab === "my_day"}
               onClick={() => onSelectTab("my_day")}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
+              className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-all ${
                 activeTab === "my_day"
                   ? "bg-white/15 text-white shadow-sm border border-white/15"
                   : "text-white/60 hover:text-white border border-transparent"
@@ -205,13 +205,13 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
         )}
 
         {/* Right: Controls */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           {/* Theme Switcher */}
           <div className="relative">
             <button
               type="button"
               onClick={() => setThemeDropdownOpen((v) => !v)}
-              className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition-all ${
+              className={`inline-flex items-center gap-1.5 sm:gap-2 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs transition-all ${
                 profile.theme === "sharingan"
                   ? "border-red-500/50 bg-red-950/30 text-red-200 hover:border-red-400 shadow-[0_0_12px_rgba(255,31,56,0.3)]"
                   : "border-white/15 bg-white/5 text-white/90 hover:text-white hover:border-primary/50"
@@ -308,7 +308,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               type="button"
               disabled={isSyncingCanvas}
               onClick={onQuickSyncCanvas}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-white/85 hover:text-white hover:border-primary/50 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2 sm:px-2.5 py-1.5 text-xs text-white/85 hover:text-white hover:border-primary/50 transition-colors shrink-0"
               title="Sync Canvas Assignments"
             >
               <RefreshCw
@@ -325,7 +325,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             <button
               type="button"
               onClick={onOpenSettings}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-white/85 hover:text-white hover:border-primary/50 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2 sm:px-2.5 py-1.5 text-xs text-white/85 hover:text-white hover:border-primary/50 transition-colors shrink-0"
               title="Customize Tags, Categories, Themes, AI & Settings"
             >
               <Settings className="w-3.5 h-3.5 text-primary" />
@@ -338,7 +338,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             <button
               type="button"
               onClick={onSignOut}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-white/85 hover:text-white hover:border-red-400/50 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2 sm:px-2.5 py-1.5 text-xs text-white/85 hover:text-white hover:border-red-400/50 transition-colors shrink-0"
               title="Sign Out"
             >
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
@@ -351,10 +351,13 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             <button
               type="button"
               onClick={onGoogleSignIn}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-black hover:brightness-110 transition-all shadow-neon"
+              className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg bg-primary px-2.5 sm:px-3 py-1.5 text-xs font-bold text-black hover:brightness-110 transition-all shadow-neon shrink-0"
             >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Sign in with Google</span>
+              <LogIn className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                <span className="inline">Sign in</span>
+                <span className="hidden sm:inline">&nbsp;with Google</span>
+              </span>
             </button>
           )}
         </div>

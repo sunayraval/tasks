@@ -341,7 +341,7 @@ export const MyDayStatusBanner: React.FC<MyDayStatusBannerProps> = ({
   // VARIANT: HERO CENTERPIECE ON "MY DAY" TAB
   // ---------------------------------------------------------------------------
   return (
-    <section className="relative overflow-hidden rounded-3xl border theme-panel p-6 sm:p-8 shadow-2xl backdrop-blur-2xl">
+    <section className="relative overflow-hidden rounded-3xl border theme-panel p-4 sm:p-8 shadow-2xl backdrop-blur-2xl">
       {/* Subtle Ambient Radial Glow Behind Center Clock */}
       <div
         className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-64 w-[520px] rounded-full blur-[110px] opacity-20"
@@ -361,7 +361,7 @@ export const MyDayStatusBanner: React.FC<MyDayStatusBannerProps> = ({
 
         {/* Centerpiece Live Clock */}
         <div className="mt-4 flex items-baseline justify-center gap-2 select-none font-mono">
-          <span className="text-5xl sm:text-7xl font-black tracking-tight text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.5)]">
+          <span className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.5)]">
             {now ? `${hours12}:${minutesStr}` : "--:--"}
           </span>
           <div className="flex flex-col items-start text-left">
@@ -391,7 +391,7 @@ export const MyDayStatusBanner: React.FC<MyDayStatusBannerProps> = ({
         {/* Dual Status Bars Container */}
         <div className="mt-7 w-full max-w-4xl grid grid-cols-1 lg:grid-cols-2 gap-4 text-left">
           {/* STATUS BAR 1: CURRENT TASK PROGRESS */}
-          <div className="rounded-2xl border border-white/15 bg-black/45 p-5 flex flex-col justify-between space-y-3.5 shadow-inner">
+          <div className="rounded-2xl border border-white/15 bg-black/45 p-3.5 sm:p-5 flex flex-col justify-between space-y-3.5 shadow-inner">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-primary">
@@ -539,7 +539,7 @@ export const MyDayStatusBanner: React.FC<MyDayStatusBannerProps> = ({
           </div>
 
           {/* STATUS BAR 2: OVERALL DAY SCHEDULE PROGRESS */}
-          <div className="rounded-2xl border border-white/15 bg-black/45 p-5 flex flex-col justify-between space-y-3.5 shadow-inner">
+          <div className="rounded-2xl border border-white/15 bg-black/45 p-3.5 sm:p-5 flex flex-col justify-between space-y-3.5 shadow-inner">
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-white/65">

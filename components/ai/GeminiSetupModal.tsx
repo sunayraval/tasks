@@ -136,7 +136,7 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2.5 sm:p-4 animate-in fade-in duration-200"
       onClick={() => {
         if (!verifying) onClose();
       }}
@@ -144,7 +144,7 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
       <div
         role="dialog"
         aria-labelledby="gemini-setup-title"
-        className="relative w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-3xl border border-white/15 bg-[#121318]/95 backdrop-blur-2xl shadow-[0_24px_80px_rgba(0,0,0,0.85)] text-white"
+        className="relative w-full max-w-xl max-h-[94vh] sm:max-h-[92vh] overflow-y-auto rounded-3xl border border-white/15 bg-[#121318]/95 backdrop-blur-2xl shadow-[0_24px_80px_rgba(0,0,0,0.85)] text-white"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Ambient Accent Glow */}
@@ -167,7 +167,7 @@ export const GeminiSetupModal: React.FC<GeminiSetupModalProps> = ({
           <X className="w-4 h-4" />
         </button>
 
-        <div className="p-6 sm:p-8 space-y-5">
+        <div className="p-4 sm:p-8 space-y-4 sm:space-y-5">
           {/* Header */}
           <div className="space-y-2 pr-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/35 bg-primary/15 px-3 py-1 text-[11px] font-semibold text-highlight">

@@ -1060,7 +1060,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2.5 flex-1">
             {/* Search Input */}
-            <div className="relative flex-1 min-w-[180px] max-w-xs">
+            <div className="relative flex-1 min-w-[140px] sm:min-w-[180px] max-w-xs">
               <Search className="w-4 h-4 text-white/45 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
@@ -1072,7 +1072,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             </div>
 
             {/* Quick Status Segmented Filter Bar: All/Active | To Do | In Progress | Completed */}
-            <div className="flex items-center gap-1 p-0.5 rounded-lg border border-white/10 bg-black/40 backdrop-blur-md">
+            <div className="flex items-center gap-1 p-0.5 rounded-lg border border-white/10 bg-black/40 backdrop-blur-md overflow-x-auto no-scrollbar max-w-full shrink-0">
               <button
                 type="button"
                 onClick={() => setStatusFilter("ALL")}
@@ -1233,7 +1233,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           </div>
 
         {/* Right: Quick Add Task or Header Buttons */}
-        <div className="flex items-center gap-2 self-end md:self-center">
+        <div className="flex items-center gap-2 self-end md:self-center shrink-0">
           <button
             type="button"
             onClick={() => handleCreateHeaderClick()}

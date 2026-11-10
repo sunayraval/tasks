@@ -79,11 +79,11 @@ export const QuickCreateTaskModal: React.FC<QuickCreateTaskModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-2.5 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-2xl border border-primary/40 bg-[#061217]/95 backdrop-blur-2xl p-6 shadow-neon animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-lg rounded-2xl border border-primary/40 bg-[#061217]/95 backdrop-blur-2xl p-4 sm:p-6 max-h-[94vh] overflow-y-auto shadow-neon animate-in fade-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between pb-4 border-b border-white/10">

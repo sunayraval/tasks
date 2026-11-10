@@ -888,7 +888,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           onSelectTab("chat");
           setShowConversation(false);
         }}
-        className={`rounded-full px-5 py-2 text-[13px] font-medium transition-all ${
+        className={`rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-all ${
           activeTab === "chat"
             ? "bg-[#282a2f]/95 border border-white/[0.14] text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
             : "border border-transparent text-white/60 hover:text-white hover:bg-white/[0.06]"
@@ -901,7 +901,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
         role="tab"
         aria-selected={activeTab === "tasks"}
         onClick={() => onSelectTab("tasks")}
-        className={`inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-[13px] font-medium transition-all ${
+        className={`inline-flex items-center gap-1.5 rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-all ${
           activeTab === "tasks"
             ? "bg-[#282a2f]/95 border border-white/[0.14] text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
             : "border border-transparent text-white/60 hover:text-white hover:bg-white/[0.06]"
@@ -919,7 +919,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
         role="tab"
         aria-selected={activeTab === "my_day"}
         onClick={() => onSelectTab("my_day")}
-        className={`inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-[13px] font-medium transition-all ${
+        className={`inline-flex items-center gap-1.5 rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-all ${
           activeTab === "my_day"
             ? "bg-[#282a2f]/95 border border-white/[0.14] text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
             : "border border-transparent text-white/60 hover:text-white hover:bg-white/[0.06]"
@@ -1034,7 +1034,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
       {mentionQuery !== null && mentionCandidates.length > 0 && (
         <div
           style={{ backgroundColor: "rgba(18, 19, 24, 0.94)" }}
-          className={`absolute left-2 right-2 ${
+          className={`absolute left-1 right-1 sm:left-2 sm:right-2 ${
             isHeroEmpty ? "top-full mt-2" : "bottom-full mb-2"
           } z-50 rounded-2xl border border-white/20 backdrop-blur-xl p-2 shadow-[0_24px_70px_rgba(0,0,0,0.85)] animate-in fade-in duration-150`}
         >
@@ -1097,7 +1097,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           e.preventDefault();
           sendPrompt();
         }}
-        className="relative flex items-end gap-2 rounded-[30px] border border-white/[0.11] bg-[#1c1d21]/95 hover:border-white/[0.18] focus-within:border-white/[0.26] px-3.5 sm:px-4 py-2.5 sm:py-3 shadow-[0_18px_55px_rgba(0,0,0,0.6)] backdrop-blur-2xl transition-all"
+        className="relative flex items-end gap-1.5 sm:gap-2 rounded-[30px] border border-white/[0.11] bg-[#1c1d21]/95 hover:border-white/[0.18] focus-within:border-white/[0.26] px-2.5 sm:px-4 py-2 sm:py-3 shadow-[0_18px_55px_rgba(0,0,0,0.6)] backdrop-blur-2xl transition-all"
       >
         {/* Left + Connector / Quick Skills Button */}
         <div ref={plusMenuRef} className="relative shrink-0 self-center">
@@ -1116,7 +1116,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
               style={{ backgroundColor: "rgba(18, 19, 24, 0.94)" }}
               className={`absolute left-0 ${
                 isHeroEmpty ? "top-full mt-3" : "bottom-full mb-3"
-              } w-64 rounded-2xl border border-white/20 p-2 shadow-[0_24px_70px_rgba(0,0,0,0.85)] backdrop-blur-xl z-50 space-y-1`}
+              } w-[calc(100vw-36px)] max-w-64 rounded-2xl border border-white/20 p-2 shadow-[0_24px_70px_rgba(0,0,0,0.85)] backdrop-blur-xl z-50 space-y-1`}
             >
               <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/40">
                 Workspace Connectors &amp; Skills
@@ -1317,10 +1317,10 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
             <button
               type="button"
               onClick={() => setModelMenuOpen((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs sm:text-[12px] font-medium text-white/85 hover:bg-white/10 hover:text-white transition-colors"
+              className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-[12px] font-medium text-white/85 hover:bg-white/10 hover:text-white transition-colors"
               title="Select AI model (NVIDIA NIM or Google Gemini) & coaching style"
             >
-              <span className="max-w-[140px] sm:max-w-[175px] truncate">
+              <span className="max-w-[85px] xs:max-w-[115px] sm:max-w-[175px] truncate text-[11px] sm:text-xs">
                 {(workspaceConfig.aiProvider || "nvidia") === "nvidia"
                   ? NVIDIA_MODEL_OPTIONS.find(
                       (m) =>
@@ -1331,7 +1331,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                   ? "Gemini 3.8 Pro"
                   : "Gemini 3.8 Flash"}
               </span>
-              <ChevronDown className="w-3.5 h-3.5 text-white/55 shrink-0" />
+              <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white/55 shrink-0" />
             </button>
 
             {modelMenuOpen && (
@@ -1339,7 +1339,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                 style={{ backgroundColor: "rgba(18, 19, 24, 0.94)" }}
                 className={`absolute right-0 ${
                   isHeroEmpty ? "top-full mt-3" : "bottom-full mb-3"
-                } w-80 sm:w-[350px] max-h-[480px] overflow-y-auto rounded-2xl border border-white/20 p-3 shadow-[0_24px_70px_rgba(0,0,0,0.85)] backdrop-blur-xl z-50 space-y-3`}
+                } w-[calc(100vw-28px)] max-w-[340px] sm:w-[350px] max-h-[480px] overflow-y-auto rounded-2xl border border-white/20 p-3 shadow-[0_24px_70px_rgba(0,0,0,0.85)] backdrop-blur-xl z-50 space-y-3`}
               >
                 {/* Section 1: NVIDIA NIM Leading Models */}
                 <div className="space-y-1.5">
@@ -1525,7 +1525,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   // ---------------------------------------------------------------------------
   if (isHeroEmpty) {
     return (
-      <div className="relative flex-1 flex flex-col items-center justify-center min-h-[calc(100vh-6rem)] px-4 py-10">
+      <div className="relative flex-1 flex flex-col items-center justify-center min-h-[calc(100vh-6rem)] px-3 sm:px-4 py-6 sm:py-10">
         {/* Subtle Radial Ambient Glow */}
         <div
           className="pointer-events-none absolute inset-x-0 top-1/4 mx-auto h-72 max-w-2xl rounded-full blur-[120px] opacity-20"
@@ -1557,7 +1557,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           </div>
 
           {/* Hero Prompt Headline */}
-          <h1 className="text-[32px] sm:text-[44px] font-normal tracking-[-0.025em] text-white/95 text-center mb-8 sm:mb-9 select-none">
+          <h1 className="text-2xl sm:text-[32px] md:text-[44px] font-normal tracking-[-0.025em] text-white/95 text-center mb-6 sm:mb-9 select-none">
             What&apos;s on your mind?
           </h1>
 
@@ -1604,7 +1604,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           <div className="mt-6">{ModeSwitcherPill}</div>
 
           {/* Subtle Optional Quick Prompts */}
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-2 max-w-2xl">
+          <div className="mt-6 sm:mt-9 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 max-w-2xl px-2">
             {(activeTaskCount === 0
               ? [
                   {
@@ -1654,7 +1654,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                 key={chip.label}
                 type="button"
                 onClick={() => sendPrompt(chip.prompt)}
-                className="rounded-full border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 px-3.5 py-1.5 text-xs text-white/50 hover:text-white/85 transition-all"
+                className="rounded-full border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs text-white/50 hover:text-white/85 transition-all"
               >
                 {chip.label}
               </button>
@@ -1669,14 +1669,14 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   // STATE C: Active Multi-Turn Agent Conversation Stream
   // ---------------------------------------------------------------------------
   return (
-    <div className="flex-1 flex flex-col max-w-[840px] w-full mx-auto px-4 sm:px-6 pt-3 pb-6 min-h-[calc(100vh-5rem)]">
+    <div className="flex-1 flex flex-col max-w-[840px] w-full mx-auto px-2.5 sm:px-6 pt-2 sm:pt-3 pb-6 min-h-[calc(100vh-5rem)]">
       {/* Top Minimal Session Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-2 border-b border-white/[0.08]">
-        <div className="flex items-center gap-2.5 text-xs text-white/55">
+      <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 pb-3 mb-2 border-b border-white/[0.08]">
+        <div className="flex items-center gap-2 text-xs text-white/55">
           <button
             type="button"
             onClick={() => setShowConversation(false)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.04] hover:bg-white/10 px-3 py-1 text-xs font-medium text-white/80 hover:text-white transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.04] hover:bg-white/10 px-2.5 sm:px-3 py-1 text-xs font-medium text-white/80 hover:text-white transition-colors"
             title="Return to What's on your mind? screen"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-primary" />
@@ -1698,11 +1698,11 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={() => onSelectTab("my_day")}
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 px-3 py-1 text-xs text-white/75 hover:text-white transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 px-2.5 sm:px-3 py-1 text-xs text-white/75 hover:text-white transition-colors"
           >
             <CalendarClock className="w-3.5 h-3.5 text-primary" />
             <span>my day</span>
@@ -1710,7 +1710,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           <button
             type="button"
             onClick={() => onSelectTab("tasks")}
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 px-3 py-1 text-xs text-white/75 hover:text-white transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 px-2.5 sm:px-3 py-1 text-xs text-white/75 hover:text-white transition-colors"
           >
             <Table2 className="w-3.5 h-3.5 text-primary" />
             <span>Open Table</span>
@@ -1721,7 +1721,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
               setMessages([]);
               setShowConversation(false);
             }}
-            className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 px-3 py-1 text-xs text-white/65 hover:text-white transition-colors"
+            className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 px-2.5 sm:px-3 py-1 text-xs text-white/65 hover:text-white transition-colors"
             title="Start a fresh chat"
           >
             <Plus className="w-3.5 h-3.5" />

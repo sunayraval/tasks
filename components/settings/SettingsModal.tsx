@@ -157,7 +157,7 @@ const OptionGroupEditor: React.FC<{
           >
             {/* Preview Badge */}
             <span
-              className={`rounded border px-2 py-0.5 text-[11px] font-medium shrink-0 min-w-[70px] text-center ${getBadgeClasses(
+              className={`rounded border px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[11px] font-medium shrink-0 min-w-[56px] sm:min-w-[70px] text-center ${getBadgeClasses(
                 item.color
               )}`}
             >
@@ -171,7 +171,7 @@ const OptionGroupEditor: React.FC<{
               onChange={(e) =>
                 handleUpdateItem(idx, { label: e.target.value })
               }
-              className="flex-1 rounded border border-white/10 bg-black/50 px-2 py-1 text-xs text-white focus:border-primary focus:outline-none"
+              className="flex-1 min-w-0 rounded border border-white/10 bg-black/50 px-2 py-1 text-xs text-white focus:border-primary focus:outline-none"
             />
 
             {/* Color Selector */}
@@ -182,7 +182,7 @@ const OptionGroupEditor: React.FC<{
                   color: e.target.value as BadgeColorKey,
                 })
               }
-              className="rounded border border-white/15 bg-black/70 px-2 py-1 text-xs text-white focus:border-primary focus:outline-none"
+              className="rounded border border-white/15 bg-black/70 px-1.5 sm:px-2 py-1 text-[11px] sm:text-xs text-white focus:border-primary focus:outline-none shrink-0 w-20 sm:w-auto"
             >
               {BADGE_COLOR_KEYS.map((ck) => (
                 <option key={ck} value={ck} className="bg-zinc-900 text-white">
@@ -196,7 +196,7 @@ const OptionGroupEditor: React.FC<{
               type="button"
               disabled={items.length <= 1}
               onClick={() => handleDeleteItem(idx)}
-              className="p-1 rounded text-white/40 hover:text-red-400 disabled:opacity-20 transition-colors"
+              className="p-1 rounded text-white/40 hover:text-red-400 disabled:opacity-20 transition-colors shrink-0"
               title="Delete option"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -217,12 +217,12 @@ const OptionGroupEditor: React.FC<{
           placeholder={
             prefixHash ? "Add new #tag..." : "Add new option..."
           }
-          className="flex-1 min-w-[140px] rounded-lg border border-white/15 bg-black/60 px-2.5 py-1.5 text-xs text-white placeholder-white/35 focus:border-primary focus:outline-none"
+          className="flex-1 min-w-[120px] rounded-lg border border-white/15 bg-black/60 px-2.5 py-1.5 text-xs text-white placeholder-white/35 focus:border-primary focus:outline-none"
         />
         <select
           value={newColor}
           onChange={(e) => setNewColor(e.target.value as BadgeColorKey)}
-          className="rounded-lg border border-white/15 bg-black/70 px-2.5 py-1.5 text-xs text-white focus:border-primary focus:outline-none"
+          className="rounded-lg border border-white/15 bg-black/70 px-2.5 py-1.5 text-xs text-white focus:border-primary focus:outline-none shrink-0"
         >
           {BADGE_COLOR_KEYS.map((ck) => (
             <option key={ck} value={ck} className="bg-zinc-900 text-white">
@@ -232,7 +232,7 @@ const OptionGroupEditor: React.FC<{
         </select>
         <button
           type="submit"
-          className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-black hover:brightness-110 transition-all"
+          className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-black hover:brightness-110 transition-all shrink-0"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>Add</span>
@@ -507,22 +507,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-2 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-4xl max-h-[90vh] rounded-2xl border theme-panel backdrop-blur-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-full max-w-4xl max-h-[94vh] sm:max-h-[90vh] rounded-2xl border theme-panel backdrop-blur-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 theme-header-bg">
+        <div className="flex items-center justify-between border-b border-white/10 px-4 sm:px-6 py-3 sm:py-4 theme-header-bg shrink-0">
           <div className="flex items-center gap-2.5">
-            <Sliders className="w-5 h-5 text-primary" />
+            <Sliders className="w-5 h-5 text-primary shrink-0" />
             <div>
-              <h2 className="text-base font-bold text-white">
+              <h2 className="text-sm sm:text-base font-bold text-white">
                 Workspace Customization &amp; Settings
               </h2>
-              <p className="text-xs text-white/60">
+              <p className="text-[11px] sm:text-xs text-white/60 line-clamp-1 sm:line-clamp-none">
                 Customize tags, statuses, categories, table headers, themes &amp;
                 integrations
               </p>
@@ -531,14 +531,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+            className="rounded-lg p-1.5 text-white/60 hover:bg-white/10 hover:text-white transition-colors shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex border-b border-white/10 bg-black/30 px-6 gap-2 overflow-x-auto">
+        {/* Navigation Tabs - Spacious Tactile Pill Buttons with Generous Click Targets & Margins */}
+        <div className="flex items-center border-b border-white/10 bg-black/40 px-3 sm:px-6 py-2.5 gap-2 sm:gap-2.5 overflow-x-auto scroll-smooth no-scrollbar scroll-px-3 shrink-0">
           {[
             {
               id: "customize",
@@ -566,21 +566,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id as SettingsTabId)}
-                className={`flex items-center gap-2 border-b-2 py-3 px-2.5 text-xs font-semibold whitespace-nowrap transition-colors ${
+                className={`flex items-center gap-2 py-2.5 px-3.5 sm:px-4 text-xs font-semibold whitespace-nowrap rounded-xl transition-all shrink-0 cursor-pointer touch-manipulation select-none active:scale-[0.98] ${
                   isActive
-                    ? "border-primary text-highlight"
-                    : "border-transparent text-white/55 hover:text-white"
+                    ? "bg-primary/20 text-highlight border border-primary/50 shadow-neon font-bold"
+                    : "bg-white/[0.04] text-white/70 hover:text-white hover:bg-white/[0.08] border border-white/10"
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                {tab.label}
+                <Icon
+                  className={`w-4 h-4 shrink-0 ${
+                    isActive ? "text-primary" : "text-white/60"
+                  }`}
+                />
+                <span>{tab.label}</span>
               </button>
             );
           })}
         </div>
 
         {/* Tab Content Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 text-white">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6 text-white">
           {/* TAB 1: TAGS, TYPES, STATUSES, PRIORITIES & HEADERS */}
           {activeTab === "customize" && (
             <div className="space-y-6">
