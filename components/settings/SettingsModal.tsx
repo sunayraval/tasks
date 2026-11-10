@@ -20,6 +20,8 @@ import {
   ViewMode,
   TaskItem,
   WorkspaceConfig,
+  UserMemoryNote,
+  MemoryNoteCategory,
 } from "@/types/taskit";
 import {
   saveCustomVideoToIDB,
@@ -29,6 +31,7 @@ import { SharinganIcon } from "@/components/ui/SharinganIcon";
 import {
   AlertCircle,
   Bot,
+  Brain,
   Calendar,
   Check,
   Copy,
@@ -45,6 +48,7 @@ import {
   Tags,
   Trash2,
   Upload,
+  User,
   Video,
   X,
   ExternalLink,
@@ -57,6 +61,7 @@ export type SettingsTabId =
   | "appearance"
   | "view"
   | "ai"
+  | "memory"
   | "integrations";
 
 interface SettingsModalProps {
@@ -273,6 +278,65 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     text: string;
   } | null>(null);
 
+  const [newMemoryContent, setNewMemoryContent] = useState("");
+  const [newMemoryCategory, setNewMemoryCategory] =
+    useState<MemoryNoteCategory>("life_event");
+  const [editingMemoryId, setEditingMemoryId] = useState<string | null>(null);
+  const [editingMemoryContent, setEditingMemoryContent] = useState("");
+
+  const handleAddMemoryNote = (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = newMemoryContent.trim();
+    if (!text) return;
+    const currentNotes = workspaceConfig.memoryNotes || [];
+    const newNote: UserMemoryNote = {
+      id:
+        "mem_" +
+        Date.now().toString(36) +
+        Math.random().toString(36).slice(2, 6),
+      category: newMemoryCategory,
+      content: text,
+      createdAt: new Date().toISOString(),
+      source: "user",
+    };
+    onUpdateWorkspaceConfig({
+      memoryNotes: [newNote, ...currentNotes],
+    });
+    setNewMemoryContent("");
+  };
+
+  const handleDeleteMemoryNote = (id: string) => {
+    const currentNotes = workspaceConfig.memoryNotes || [];
+    onUpdateWorkspaceConfig({
+      memoryNotes: currentNotes.filter((n) => n.id !== id),
+    });
+  };
+
+  const handleUpdateMemoryNote = (id: string) => {
+    const text = editingMemoryContent.trim();
+    if (!text) return;
+    const currentNotes = workspaceConfig.memoryNotes || [];
+    onUpdateWorkspaceConfig({
+      memoryNotes: currentNotes.map((n) =>
+        n.id === id
+          ? { ...n, content: text, updatedAt: new Date().toISOString() }
+          : n
+      ),
+    });
+    setEditingMemoryId(null);
+    setEditingMemoryContent("");
+  };
+
+  const handleClearAllMemory = () => {
+    if (
+      confirm(
+        "Clear all AI memory notes? The agent will forget previously recorded life context."
+      )
+    ) {
+      onUpdateWorkspaceConfig({ memoryNotes: [] });
+    }
+  };
+
   useEffect(() => {
     if (isOpen && initialTab) {
       setActiveTab(initialTab);
@@ -488,9 +552,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             },
             { id: "view", label: "3. Task View Mode", icon: LayoutPanelLeft },
             { id: "ai", label: "4. AI Agent & API Key", icon: Bot },
+            { id: "memory", label: "5. Life Context & Memory", icon: Brain },
             {
               id: "integrations",
-              label: "5. Canvas & Calendars",
+              label: "6. Canvas & Calendars",
               icon: Calendar,
             },
           ].map((tab) => {
@@ -1587,7 +1652,250 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 5: INTEGRATIONS */}
+          {/* TAB 5: LIFE CONTEXT & MEMORY */}
+          {activeTab === "memory" && (
+            <div className="space-y-6">
+              {/* Header card */}
+              <div className="rounded-xl border border-white/15 bg-white/[0.03] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Brain className="w-4 h-4 text-primary" />
+                    <h3 className="text-sm font-bold text-white">
+                      Life Context &amp; Agent Memory
+                    </h3>
+                    <span className="rounded-full bg-primary/20 border border-primary/40 px-2 py-0.5 text-[10px] font-bold text-primary">
+                      {(workspaceConfig.memoryNotes || []).length} Saved
+                    </span>
+                  </div>
+                  <p className="text-xs text-white/60">
+                    Important milestones, recurring exams, commitments, and personal preferences remembered by your AI assistant across sessions. The agent automatically learns these from conversation or you can manually manage them below.
+                  </p>
+                </div>
+                {(workspaceConfig.memoryNotes || []).length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearAllMemory}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/20 transition-all shrink-0 self-start sm:self-auto"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Clear All</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Add New Memory Note Form */}
+              <form
+                onSubmit={handleAddMemoryNote}
+                className="rounded-xl border border-white/15 bg-white/[0.03] p-4 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Plus className="w-3.5 h-3.5 text-primary" />
+                    <span>Add New Context Note</span>
+                  </span>
+                  <span className="text-[11px] text-white/40">
+                    Helps the agent plan your schedule realistically
+                  </span>
+                </div>
+
+                <textarea
+                  value={newMemoryContent}
+                  onChange={(e) => setNewMemoryContent(e.target.value)}
+                  placeholder="e.g. Taking Linear Algebra and FBLA this semester; prefer high-focus math blocks in the early afternoon; exams on Nov 18..."
+                  rows={2}
+                  className="w-full rounded-xl border border-white/15 bg-black/60 px-3.5 py-2.5 text-xs text-white placeholder-white/30 focus:border-primary focus:outline-none resize-none"
+                />
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-white/50 shrink-0">Category:</span>
+                    <select
+                      value={newMemoryCategory}
+                      onChange={(e) =>
+                        setNewMemoryCategory(e.target.value as MemoryNoteCategory)
+                      }
+                      className="rounded-lg border border-white/15 bg-black/70 px-2.5 py-1.5 text-xs text-white focus:border-primary focus:outline-none"
+                    >
+                      <option value="life_event" className="bg-zinc-900 text-white">
+                        🗓️ Life Event / Milestone
+                      </option>
+                      <option value="academics" className="bg-zinc-900 text-white">
+                        📚 Academics &amp; Classes
+                      </option>
+                      <option value="ongoing_goal" className="bg-zinc-900 text-white">
+                        🎯 Ongoing Goal / Project
+                      </option>
+                      <option value="preference" className="bg-zinc-900 text-white">
+                        ⚡ Preference &amp; Habit
+                      </option>
+                      <option value="general" className="bg-zinc-900 text-white">
+                        💡 General Context
+                      </option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={!newMemoryContent.trim()}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-bold text-black hover:brightness-110 disabled:opacity-40 transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Save Note</span>
+                  </button>
+                </div>
+              </form>
+
+              {/* Notes List */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs font-semibold text-white/70">
+                    Active Context Memory Notes ({(workspaceConfig.memoryNotes || []).length})
+                  </span>
+                  <span className="text-[10px] text-white/40">
+                    Auto-injected into AI conversation context
+                  </span>
+                </div>
+
+                {(workspaceConfig.memoryNotes || []).length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-white/15 bg-white/[0.02] p-8 text-center space-y-2">
+                    <Brain className="w-8 h-8 text-white/20 mx-auto" />
+                    <p className="text-xs font-semibold text-white/60">
+                      No memory notes recorded yet
+                    </p>
+                    <p className="text-[11px] text-white/40 max-w-md mx-auto">
+                      As you chat, the agent will automatically remember milestones, course schedules, and life context. You can also add notes above anytime!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                    {(workspaceConfig.memoryNotes || []).map((note) => {
+                      const isEditing = editingMemoryId === note.id;
+                      const categoryBadgeColor =
+                        note.category === "life_event"
+                          ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                          : note.category === "academics"
+                          ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
+                          : note.category === "ongoing_goal"
+                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                          : note.category === "preference"
+                          ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                          : "bg-zinc-500/20 text-zinc-300 border-zinc-500/30";
+
+                      const categoryLabel =
+                        note.category === "life_event"
+                          ? "Life Event"
+                          : note.category === "academics"
+                          ? "Academics"
+                          : note.category === "ongoing_goal"
+                          ? "Goal"
+                          : note.category === "preference"
+                          ? "Preference"
+                          : "General";
+
+                      return (
+                        <div
+                          key={note.id}
+                          className="rounded-xl border border-white/10 bg-white/[0.03] p-3 hover:border-white/20 transition-all space-y-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span
+                                className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold ${categoryBadgeColor}`}
+                              >
+                                {categoryLabel}
+                              </span>
+                              <span className="flex items-center gap-1 text-[10px] text-white/40">
+                                {note.source === "agent" ? (
+                                  <>
+                                    <Bot className="w-3 h-3 text-primary" />
+                                    <span>Agent Memory</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <User className="w-3 h-3 text-white/60" />
+                                    <span>You</span>
+                                  </>
+                                )}
+                              </span>
+                              {note.createdAt && (
+                                <span className="text-[10px] text-white/30">
+                                  {new Date(note.createdAt).toLocaleDateString(undefined, {
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              {!isEditing ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingMemoryId(note.id);
+                                      setEditingMemoryContent(note.content);
+                                    }}
+                                    className="p-1 rounded text-white/40 hover:text-white transition-colors"
+                                    title="Edit note"
+                                  >
+                                    <Sliders className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteMemoryNote(note.id)}
+                                    className="p-1 rounded text-white/40 hover:text-red-400 transition-colors"
+                                    title="Delete note"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingMemoryId(null)}
+                                  className="text-[11px] text-white/50 hover:text-white px-2 py-0.5"
+                                >
+                                  Cancel
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {isEditing ? (
+                            <div className="space-y-2 pt-1">
+                              <textarea
+                                value={editingMemoryContent}
+                                onChange={(e) => setEditingMemoryContent(e.target.value)}
+                                rows={2}
+                                className="w-full rounded-lg border border-white/20 bg-black/60 px-2.5 py-1.5 text-xs text-white focus:border-primary focus:outline-none resize-none"
+                              />
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateMemoryNote(note.id)}
+                                  className="inline-flex items-center gap-1 rounded bg-primary px-3 py-1 text-xs font-bold text-black hover:brightness-110"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  <span>Save</span>
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-white/85 leading-relaxed select-text">
+                              {note.content}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: INTEGRATIONS */}
           {activeTab === "integrations" && (
             <div className="space-y-6">
               {/* 1. HCPSS Canvas iCal Feed */}

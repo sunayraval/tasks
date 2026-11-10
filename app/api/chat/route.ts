@@ -26,6 +26,8 @@ import {
   ViewMode,
   WorkspaceConfig,
   WorkspaceTab,
+  UserMemoryNote,
+  MemoryNoteCategory,
 } from "@/types/taskit";
 import {
   addMinutesToTime,
@@ -44,7 +46,7 @@ import {
   swapScheduleBlocks,
 } from "@/utils/myDayUtils";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 export const dynamic = "force-dynamic";
 
 const TONE_PROMPTS: Record<AITone, string> = {
@@ -878,6 +880,9 @@ ${taskLines}`;
       types: [...incomingConfig.types],
       priorities: [...incomingConfig.priorities],
       tags: [...incomingConfig.tags],
+      memoryNotes: Array.isArray(incomingConfig.memoryNotes)
+        ? incomingConfig.memoryNotes.map((m) => ({ ...m }))
+        : [],
       myDaySchedule: incomingConfig.myDaySchedule
         ? {
             ...incomingConfig.myDaySchedule,
@@ -1257,6 +1262,17 @@ ${taskLines}`;
           .join("\n")
       : "(No MY DAY schedule built yet)";
 
+    const memoryNotes = workingConfig.memoryNotes || [];
+    const serializedMemory =
+      memoryNotes.length > 0
+        ? memoryNotes
+            .map(
+              (m, idx) =>
+                `${idx + 1}. [${m.category.toUpperCase().replace("_", " ")}] ${m.content} (Source: ${m.source || "user"}, Saved: ${m.createdAt ? m.createdAt.slice(0, 10) : "earlier"}) [id: ${m.id}]`
+            )
+            .join("\n")
+        : "(No memory notes recorded yet)";
+
     const qaSubmissionDirective = qaSubmission
       ? `
 ===========================================================================
@@ -1298,11 +1314,21 @@ You have direct, live read/write control over the user's entire workspace via yo
 7. Interactive Guided Q&A (\`prompt_user_qa\`):
    - Use \`prompt_user_qa\` at moments when gauging user input via a structured Q&A UI will produce a dramatically better plan—specifically: (a) when the user asks to plan/organize their day or routine and has 0 active tasks on their board without naming tasks, (b) when the user asks to break down a broad goal, exam study plan, or multi-step project without enough context, or (c) when the user asks you to ask them questions / interview them to figure out their tasks or schedule.
    - \`prompt_user_qa\` renders a consent card first ("Can I ask a few questions to fulfill your request?") and then collects structured answers so you can populate their Tasks list and \`my day\` schedule. Do NOT use \`prompt_user_qa\` for direct, clear commands where you already have enough info to act immediately.
+8. Life Context & Memory Notes (\`manage_user_memory\`):
+   - Save, update, or remove persistent memory notes of events, exams, classes, personal milestones, ongoing goals, and preferences so you remember them across sessions without cluttering their actionable task list.
 
 GUIDELINES FOR THOUGHTFUL EXECUTION:
 - MANDATORY WORKSPACE PERSISTENCE RULE: When the user asks you to plan their day, organize their schedule, allocate time blocks, or auto-arrange tasks (e.g. "plan my day", "schedule my tasks from 2:30 to 6pm", "organize my day"), you MUST invoke \`manage_my_day_schedule\` (with action: "auto_arrange" or "set_blocks"). DO NOT merely print an unpersisted Markdown table or text list of times! Invoking \`manage_my_day_schedule\` commits the blocks to their real workspace and automatically renders the interactive live status banner & schedule widget directly inside the chat UI.
 - Execute clear user requests directly using the appropriate tools—do NOT ask for permission first unless using \`prompt_user_qa\` for underspecified planning/empty-list day discovery. You can chain multiple tools in one turn!
-- When adding tasks, choose smart, helpful defaults for priority, category (${workingConfig.types.map((t) => t.label).join(", ")}), estimated_minutes, and tags (${workingConfig.tags.map((t) => t.label).join(", ")}), and place them under the most fitting section header (e.g. TODAY, TOMORROW, SOON, COLLEGE) if headers exist on the board.
+- TASK ADDITION & TIME WINDOW CLARIFICATION RULE:
+  * When the user asks you to add a task (e.g. "add physics homework", "put in math review", "add essay") and HAS NOT specified an estimated duration / time window, due date, or important details:
+    -> DO NOT guess random numbers and insert it silently without asking!
+    -> Instead, ask the user quickly for it (e.g. "Got it! How much time do you expect this task to take, and when is it due or scheduled for?"). Keep your clarification prompt quick and direct.
+  * If the user ALREADY provided a duration or timeframe (e.g. "add 30m physics hw due tomorrow", "schedule study bio from 3 to 4pm", "add 15 min quick review"), immediately call \`add_tasks\` and confirm without asking!
+- AUTOMATIC LIFE CONTEXT LEARNING RULE:
+  * Whenever the user mentions important events in their life, recurring milestones, classes, exams, ongoing goals, or general life preferences (e.g. "I have a Linear Algebra midterm next Thursday", "I'm applying to colleges for CS", "I prefer studying in the early morning", "My dog is named Buster"):
+    -> Call \`manage_user_memory\` (action: "add") to remember it!
+    -> Memory notes persist across sessions and help you personalize schedules, advice, and tone without cluttering their actionable tasks list.
 - If the user mentions a task with @ or by partial name, match it accurately to the board items below.
 - Keep your text response clean, natural, well-structured (use concise Markdown bullets or bold highlights where helpful), and confirm what you just did or answer their question thoughtfully.
 
@@ -1321,6 +1347,9 @@ CURRENT MY DAY SCHEDULE (${
         : "Empty"
     }):
 ${serializedMyDay}
+
+ACTIVE USER LIFE CONTEXT & MEMORY NOTES:
+${serializedMemory}
 
 CURRENT BOARD (${workingTasks.length} rows in exact top-to-bottom table order):
 ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective}`;
@@ -2712,6 +2741,135 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
           };
         },
       }),
+
+      manage_user_memory: tool({
+        description:
+          "Save, update, or remove persistent life context memory notes (such as upcoming exams, course schedules, life events, ongoing goals, habits, and preferences) so you remember them across sessions without cluttering the user's task list.",
+        parameters: z.object({
+          action: z
+            .enum(["add", "update", "delete", "clear"])
+            .describe("Action to perform on memory notes"),
+          category: z
+            .enum([
+              "life_event",
+              "academics",
+              "ongoing_goal",
+              "preference",
+              "general",
+            ])
+            .optional()
+            .describe("Category of the memory note (recommended for 'add')"),
+          content: z
+            .string()
+            .optional()
+            .describe(
+              "The text content of the life context or fact to remember"
+            ),
+          note_id: z
+            .string()
+            .optional()
+            .describe(
+              "The ID of the note to update or delete (from ACTIVE USER LIFE CONTEXT & MEMORY NOTES)"
+            ),
+        }),
+        execute: async ({ action, category, content, note_id }) => {
+          const currentNotes = workingConfig.memoryNotes || [];
+          if (action === "add") {
+            const trimmed = (content || "").trim();
+            if (!trimmed) {
+              return { success: false, message: "Missing content for memory note" };
+            }
+            const newNote: UserMemoryNote = {
+              id:
+                "mem_" +
+                Date.now().toString(36) +
+                Math.random().toString(36).slice(2, 6),
+              category: (category as MemoryNoteCategory) || "general",
+              content: trimmed,
+              createdAt: new Date().toISOString(),
+              source: "agent",
+            };
+            workingConfig.memoryNotes = [newNote, ...currentNotes];
+            configTouched = true;
+            recordAction(
+              "memory",
+              `Remembered: "${trimmed.slice(0, 50)}${trimmed.length > 50 ? "..." : ""}"`,
+              `Category: ${newNote.category}`
+            );
+            return {
+              success: true,
+              message: `Saved to persistent memory under ${newNote.category}: "${trimmed}"`,
+              note: newNote,
+              totalCount: workingConfig.memoryNotes.length,
+            };
+          }
+
+          if (action === "update") {
+            const trimmed = (content || "").trim();
+            if (!note_id || !trimmed) {
+              return {
+                success: false,
+                message: "note_id and new content required for update",
+              };
+            }
+            let updated = false;
+            workingConfig.memoryNotes = currentNotes.map((n) => {
+              if (n.id === note_id) {
+                updated = true;
+                return {
+                  ...n,
+                  content: trimmed,
+                  category: (category as MemoryNoteCategory) || n.category,
+                  updatedAt: new Date().toISOString(),
+                };
+              }
+              return n;
+            });
+            if (updated) {
+              configTouched = true;
+              recordAction(
+                "memory",
+                `Updated memory note`,
+                `"${trimmed.slice(0, 50)}"`
+              );
+              return { success: true, message: `Updated memory note ${note_id}` };
+            }
+            return {
+              success: false,
+              message: `Memory note ${note_id} not found`,
+            };
+          }
+
+          if (action === "delete") {
+            if (!note_id) {
+              return {
+                success: false,
+                message: "note_id required for delete",
+              };
+            }
+            const nextNotes = currentNotes.filter((n) => n.id !== note_id);
+            if (nextNotes.length !== currentNotes.length) {
+              workingConfig.memoryNotes = nextNotes;
+              configTouched = true;
+              recordAction("memory", `Forgot memory note`, `ID: ${note_id}`);
+              return { success: true, message: `Deleted memory note ${note_id}` };
+            }
+            return {
+              success: false,
+              message: `Memory note ${note_id} not found`,
+            };
+          }
+
+          if (action === "clear") {
+            workingConfig.memoryNotes = [];
+            configTouched = true;
+            recordAction("memory", `Cleared all memory notes`);
+            return { success: true, message: "Cleared all persistent memory notes" };
+          }
+
+          return { success: false, message: "Unknown action" };
+        },
+      }),
       ...(qaSubmission
         ? {}
         : {
@@ -2833,7 +2991,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
           : "deepseek-ai/deepseek-v4.1-flash";
 
       const candidates = [primaryModel, backupModel];
-      const candidateTimeoutMs = qaSubmission ? 38000 : 34000;
+      const candidateTimeoutMs = qaSubmission ? 65000 : 55000;
 
       for (const candidate of candidates) {
         const candStart = Date.now();
@@ -2900,7 +3058,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
           : ["gemini-2.0-flash", "gemini-1.5-flash"];
 
       usedModel = modelChain[0];
-      const candidateTimeoutMs = qaSubmission ? 38000 : 34000;
+      const candidateTimeoutMs = qaSubmission ? 65000 : 55000;
 
       for (const candidate of modelChain) {
         const candStart = Date.now();

@@ -23,6 +23,7 @@ import {
   ArrowRight,
   ArrowUp,
   ArrowUpDown,
+  Brain,
   CalendarClock,
   Check,
   CheckCircle2,
@@ -354,6 +355,8 @@ function getActionCategoryIcon(category: AgentExecutedAction["category"]) {
       return <RefreshCw className="w-3.5 h-3.5 text-cyan-400 shrink-0" />;
     case "schedule":
       return <CalendarClock className="w-3.5 h-3.5 text-primary shrink-0" />;
+    case "memory":
+      return <Brain className="w-3.5 h-3.5 text-fuchsia-400 shrink-0" />;
     default:
       return <Settings2 className="w-3.5 h-3.5 text-primary shrink-0" />;
   }
@@ -705,7 +708,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
     const controller = new AbortController();
     const abortTimeout = setTimeout(() => {
       controller.abort();
-    }, 45000);
+    }, 95000);
 
     try {
       const now = new Date();
@@ -799,7 +802,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           id: `err-${Date.now()}`,
           role: "assistant",
           content: isTimeout
-            ? "The AI agent took longer than 45s to respond. Please check your internet connection or try again."
+            ? "The AI agent took longer than 90s to respond. Please check your internet connection or try again."
             : "Network hiccup while reaching the AI agent endpoint. Please try again.",
           timestamp: nowLabel,
           isError: true,

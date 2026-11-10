@@ -208,6 +208,22 @@ export const NVIDIA_MODEL_OPTIONS: NvidiaModelOption[] = [
 
 export const DEFAULT_NVIDIA_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b";
 
+export type MemoryNoteCategory =
+  | "life_event"
+  | "ongoing_goal"
+  | "preference"
+  | "academics"
+  | "general";
+
+export interface UserMemoryNote {
+  id: string;
+  category: MemoryNoteCategory;
+  content: string;
+  createdAt: string;
+  updatedAt?: string;
+  source?: "agent" | "user";
+}
+
 export interface WorkspaceConfig {
   workspaceTitle: string;
   workspaceSubtitle: string;
@@ -226,6 +242,7 @@ export interface WorkspaceConfig {
   tags: CustomOptionItem[];
   customThemeColors?: ThemeColors | null;
   myDaySchedule?: MyDaySchedule | null;
+  memoryNotes?: UserMemoryNote[];
 }
 
 export type WorkspaceTab = "chat" | "tasks" | "my_day";
@@ -300,7 +317,8 @@ export interface AgentExecutedAction {
     | "theme"
     | "settings"
     | "sync"
-    | "schedule";
+    | "schedule"
+    | "memory";
   summary: string;
   detail?: string;
 }
@@ -696,6 +714,7 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
   nvidiaModel: DEFAULT_NVIDIA_MODEL,
   customThemeColors: null,
   myDaySchedule: null,
+  memoryNotes: [],
 };
 
 export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
@@ -784,5 +803,6 @@ export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
       raw.myDaySchedule && Array.isArray(raw.myDaySchedule.blocks)
         ? raw.myDaySchedule
         : null,
+    memoryNotes: Array.isArray(raw.memoryNotes) ? raw.memoryNotes : [],
   };
 }
