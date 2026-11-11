@@ -358,6 +358,110 @@ export async function POST(request: Request) {
     endOfDayAfter.setDate(endOfDayAfter.getDate() + 2);
     endOfDayAfter.setHours(23, 59, 59, 999);
 
+    // ACTION: COMMIT SELECTED TASKS (User selected items in UI)
+    if (body.action === "commit" && Array.isArray(body.selectedTasks)) {
+      const selectedTasks: TaskItem[] = body.selectedTasks;
+      let dbSynced = false;
+      const finalSavedTasks: TaskItem[] = [];
+
+      if (isSupabaseConfigured()) {
+        try {
+          const supabase = createClient();
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+
+          if (user) {
+            // Purge past Canvas assignments (earlier than today)
+            await supabase
+              .from("tasks")
+              .delete()
+              .eq("user_id", user.id)
+              .eq("is_canvas_assignment", true)
+              .lt("due_date", startOfToday.toISOString());
+
+            for (const item of selectedTasks) {
+              const { data: existing } = await supabase
+                .from("tasks")
+                .select("id")
+                .eq("user_id", user.id)
+                .eq("title", item.title)
+                .maybeSingle();
+
+              if (existing?.id) {
+                const { data: updated } = await supabase
+                  .from("tasks")
+                  .update({
+                    due_date: item.due_date,
+                    section_group: item.section_group,
+                    priority: item.priority,
+                    estimated_minutes: item.estimated_minutes,
+                    tags: item.tags,
+                    notes: item.notes,
+                    canvas_course_code: item.canvas_course_code,
+                    updated_at: now.toISOString(),
+                  })
+                  .eq("id", existing.id)
+                  .select()
+                  .single();
+
+                if (updated) {
+                  finalSavedTasks.push(updated as TaskItem);
+                }
+              } else {
+                const newUuid =
+                  typeof crypto !== "undefined" &&
+                  typeof crypto.randomUUID === "function"
+                    ? crypto.randomUUID()
+                    : item.id;
+
+                const { data: inserted } = await supabase
+                  .from("tasks")
+                  .insert({
+                    id: newUuid,
+                    user_id: user.id,
+                    title: item.title,
+                    content: item.content,
+                    status: item.status,
+                    type: item.type,
+                    priority: item.priority,
+                    due_date: item.due_date,
+                    estimated_minutes: item.estimated_minutes,
+                    tags: item.tags,
+                    notes: item.notes,
+                    is_canvas_assignment: true,
+                    canvas_course_code: item.canvas_course_code,
+                    section_group: item.section_group,
+                    custom_properties: item.custom_properties,
+                    order_index: item.order_index ?? 0,
+                  })
+                  .select()
+                  .single();
+
+                if (inserted) {
+                  finalSavedTasks.push(inserted as TaskItem);
+                }
+              }
+            }
+            dbSynced = true;
+          }
+        } catch (dbErr) {
+          console.warn("Supabase Canvas commit error:", dbErr);
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        dbSynced,
+        count:
+          finalSavedTasks.length > 0
+            ? finalSavedTasks.length
+            : selectedTasks.length,
+        tasks:
+          finalSavedTasks.length > 0 ? finalSavedTasks : selectedTasks,
+      });
+    }
+
     let parsedEvents: Record<string, CalendarComponent> = {};
 
     if (feedUrl && feedUrl.startsWith("http")) {
@@ -467,116 +571,13 @@ export async function POST(request: Request) {
       });
     }
 
-    // Database Sync & Automatic Clutter Purge for Supabase
-    let dbSynced = false;
-    const finalSavedTasks: TaskItem[] = [];
-
-    if (isSupabaseConfigured()) {
-      try {
-        const supabase = createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (user) {
-          // 1. PURGE past Canvas assignments (e.g. 10/31 and earlier) from Supabase
-          await supabase
-            .from("tasks")
-            .delete()
-            .eq("user_id", user.id)
-            .eq("is_canvas_assignment", true)
-            .lt("due_date", startOfToday.toISOString());
-
-          // 2. PURGE Canvas assignments beyond the 3-day window from Supabase
-          await supabase
-            .from("tasks")
-            .delete()
-            .eq("user_id", user.id)
-            .eq("is_canvas_assignment", true)
-            .gt("due_date", endOfDayAfter.toISOString());
-
-          // 3. Upsert clean active class assignments
-          if (syncedTasks.length > 0) {
-            for (const item of syncedTasks) {
-              const { data: existing } = await supabase
-                .from("tasks")
-                .select("id")
-                .eq("user_id", user.id)
-                .eq("title", item.title)
-                .maybeSingle();
-
-              if (existing?.id) {
-                const { data: updated } = await supabase
-                  .from("tasks")
-                  .update({
-                    due_date: item.due_date,
-                    section_group: item.section_group,
-                    priority: item.priority,
-                    estimated_minutes: item.estimated_minutes,
-                    tags: item.tags,
-                    notes: item.notes,
-                    canvas_course_code: item.canvas_course_code,
-                    updated_at: now.toISOString(),
-                  })
-                  .eq("id", existing.id)
-                  .select()
-                  .single();
-
-                if (updated) {
-                  finalSavedTasks.push(updated as TaskItem);
-                }
-              } else {
-                const newUuid =
-                  typeof crypto !== "undefined" &&
-                  typeof crypto.randomUUID === "function"
-                    ? crypto.randomUUID()
-                    : item.id;
-
-                const { data: inserted } = await supabase
-                  .from("tasks")
-                  .insert({
-                    id: newUuid,
-                    user_id: user.id,
-                    title: item.title,
-                    content: item.content,
-                    status: item.status,
-                    type: item.type,
-                    priority: item.priority,
-                    due_date: item.due_date,
-                    estimated_minutes: item.estimated_minutes,
-                    tags: item.tags,
-                    notes: item.notes,
-                    is_canvas_assignment: true,
-                    canvas_course_code: item.canvas_course_code,
-                    section_group: item.section_group,
-                    custom_properties: item.custom_properties,
-                    order_index: 0,
-                  })
-                  .select()
-                  .single();
-
-                if (inserted) {
-                  finalSavedTasks.push(inserted as TaskItem);
-                }
-              }
-            }
-          }
-          dbSynced = true;
-        }
-      } catch (dbErr) {
-        console.warn("Supabase Canvas sync/purge error:", dbErr);
-      }
-    }
-
-    const resultTasks =
-      finalSavedTasks.length > 0 ? finalSavedTasks : syncedTasks;
-
+    // Preview / Fetch Mode: Return parsed upcoming assignments without mutating Supabase
     return NextResponse.json({
       success: true,
-      dbSynced,
+      dbSynced: false,
       usedDemoFeed: !(feedUrl && feedUrl.startsWith("http")),
-      count: resultTasks.length,
-      tasks: resultTasks,
+      count: syncedTasks.length,
+      tasks: syncedTasks,
     });
   } catch (error: unknown) {
     const message =

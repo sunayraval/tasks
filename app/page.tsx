@@ -33,6 +33,7 @@ import {
   SettingsTabId,
 } from "@/components/settings/SettingsModal";
 import { QuickCreateTaskModal } from "@/components/tasks/QuickCreateTaskModal";
+import { CanvasSyncModal } from "@/components/canvas/CanvasSyncModal";
 import { CheckCircle2 } from "lucide-react";
 
 const LOCAL_STORAGE_CONFIG_KEY = "taskit_workspace_config_v1";
@@ -143,17 +144,15 @@ export default function KiteWorkspacePage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [authChecked, setAuthChecked] = useState<boolean>(false);
   const [isSyncingCanvas, setIsSyncingCanvas] = useState<boolean>(false);
+  const [isCanvasSyncModalOpen, setIsCanvasSyncModalOpen] =
+    useState<boolean>(false);
+  const [isCommittingCanvas, setIsCommittingCanvas] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Persistent tracking of deleted task IDs to eliminate any re-query flicker
   const deletedTaskIdsRef = useRef<Set<string>>(new Set());
   const hasAutoPromptedSetupRef = useRef<boolean>(false);
   const chatHydratedRef = useRef<boolean>(false);
-
-  // Ref to trigger canvas sync in parallel from auth initialization without circular dependency
-  const syncCanvasParallelRef = useRef<
-    (feedUrl: string, isAutoSync?: boolean) => Promise<unknown>
-  >(async () => {});
 
   const workspaceConfig = useMemo(() => getWorkspaceConfig(profile), [profile]);
 
@@ -440,22 +439,6 @@ export default function KiteWorkspacePage() {
             }
           } else {
             setTasks(loadedTasks);
-          }
-
-          // Auto-sync Canvas in parallel in background if it hasn't synced already this session
-          const autoSyncKey = `canvas_autosynced_${user.id}`;
-          const alreadyAutoSynced =
-            typeof window !== "undefined" &&
-            sessionStorage.getItem(autoSyncKey) === "true";
-
-          if (!alreadyAutoSynced) {
-            if (typeof window !== "undefined") {
-              sessionStorage.setItem(autoSyncKey, "true");
-            }
-            // Trigger in parallel without awaiting to keep page load instant
-            const feedUrl =
-              dbProfile?.canvas_feed_url || profile.canvas_feed_url || "";
-            syncCanvasParallelRef.current(feedUrl, true).catch(() => {});
           }
         } else {
           setIsAuthenticated(false);
@@ -882,100 +865,101 @@ export default function KiteWorkspacePage() {
     [isAuthenticated]
   );
 
-  // 10. Sync Canvas (autofills due date, priority, tags, section_group; filters today/tmr/day-after)
-  const handleSyncCanvasTasks = useCallback(
-    async (
-      feedUrl: string,
-      isAutoSync: boolean = false
-    ): Promise<{ count: number; usedDemoFeed: boolean }> => {
-      setIsSyncingCanvas(true);
+  // 10. Canvas Assignment Sync with User Selection Modal
+  const handleOpenCanvasSyncModal = useCallback(() => {
+    setIsCanvasSyncModalOpen(true);
+  }, []);
+
+  const handleCloseCanvasSyncModal = useCallback(() => {
+    setIsCanvasSyncModalOpen(false);
+  }, []);
+
+  const handleCommitCanvasSelected = useCallback(
+    async (selectedTasks: TaskItem[]) => {
+      if (!selectedTasks || selectedTasks.length === 0) return;
+      setIsCommittingCanvas(true);
       try {
         const clientDate = new Date().toISOString();
+
+        // 1. Commit to Supabase / Backend via /api/sync/canvas
         const res = await fetch("/api/sync/canvas", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            Pragma: "no-cache",
           },
-          cache: "no-store",
           body: JSON.stringify({
-            canvasFeedUrl: feedUrl,
+            action: "commit",
+            canvasFeedUrl: profile.canvas_feed_url || "",
+            selectedTasks,
             clientDate,
           }),
         });
         const data = await res.json();
         if (!data.success) {
-          if (!isAutoSync) throw new Error(data.error || "Sync failed");
-          return { count: 0, usedDemoFeed: false };
+          throw new Error(data.error || "Failed to commit Canvas assignments");
         }
 
-        const incoming: TaskItem[] = data.tasks || [];
-        const now = new Date();
-        const startOfToday = new Date(now);
-        startOfToday.setHours(0, 0, 0, 0);
+        const savedTasks: TaskItem[] =
+          Array.isArray(data.tasks) && data.tasks.length > 0
+            ? data.tasks
+            : selectedTasks;
 
-        let addedCount = 0;
+        // 2. Update React tasks state (add new or update existing in place)
         setTasks((prev) => {
-          // Keep all user-created tasks and movable headers that are not in the past
-          const userTasksAndHeaders = prev.filter((t) => {
-            if (deletedTaskIdsRef.current.has(t.id)) return false;
-            if (t.custom_properties?.is_header) return true;
-            if (t.is_canvas_assignment) return false;
-            if (t.due_date) {
-              const dueTime = new Date(t.due_date).getTime();
-              if (!isNaN(dueTime) && dueTime < startOfToday.getTime()) return false;
+          const toUpdateMap = new Map<string, TaskItem>();
+          const toAdd: TaskItem[] = [];
+
+          for (const item of savedTasks) {
+            const itemUid = item.custom_properties?.canvas_uid;
+            const normTitle = item.title.trim().toLowerCase();
+
+            const existing = prev.find(
+              (t) =>
+                t.id === item.id ||
+                (itemUid && t.custom_properties?.canvas_uid === itemUid) ||
+                t.title.trim().toLowerCase() === normTitle
+            );
+
+            if (existing) {
+              toUpdateMap.set(existing.id, {
+                ...existing,
+                ...item,
+                id: existing.id,
+              });
+            } else {
+              toAdd.push(item);
             }
-            return true;
-          });
+          }
 
-          // Only add incoming assignments that haven't been deleted in this session
-          const cleanIncoming = incoming.filter(
-            (t) => !deletedTaskIdsRef.current.has(t.id)
+          const updated = prev.map((t) =>
+            toUpdateMap.has(t.id) ? toUpdateMap.get(t.id)! : t
           );
-
-          addedCount = cleanIncoming.length;
-          return [...userTasksAndHeaders, ...cleanIncoming];
+          return [...updated, ...toAdd];
         });
 
-        if (incoming.length === 0) {
-          if (!isAutoSync) {
-            showToast(
-              "Canvas feed up to date (no items due today, tomorrow, or day after)."
-            );
-          }
-          return { count: 0, usedDemoFeed: Boolean(data.usedDemoFeed) };
-        }
-
-        if (addedCount > 0 || !isAutoSync) {
-          showToast(
-            addedCount > 0
-              ? `Synced ${addedCount} Canvas assignment${
-                  addedCount > 1 ? "s" : ""
-                } due soon!`
-              : "Canvas assignments up to date."
-          );
-        }
-
-        return { count: addedCount, usedDemoFeed: Boolean(data.usedDemoFeed) };
+        showToast(
+          `Added ${selectedTasks.length} Canvas assignment${
+            selectedTasks.length > 1 ? "s" : ""
+          } to your board!`
+        );
+        setIsCanvasSyncModalOpen(false);
       } catch (err: unknown) {
-        const errMsg = err instanceof Error ? err.message : "Sync error";
-        if (!isAutoSync) {
-          showToast(`Canvas sync error: ${errMsg}`);
-          throw err;
-        }
-        return { count: 0, usedDemoFeed: false };
+        const msg = err instanceof Error ? err.message : "Sync error";
+        showToast(`Canvas commit error: ${msg}`);
       } finally {
-        setIsSyncingCanvas(false);
+        setIsCommittingCanvas(false);
       }
     },
-    [showToast]
+    [profile.canvas_feed_url, showToast]
   );
 
-  // Keep ref up to date for parallel autosync invocation
-  useEffect(() => {
-    syncCanvasParallelRef.current = handleSyncCanvasTasks;
-  }, [handleSyncCanvasTasks]);
+  const handleSyncCanvasTasks = useCallback(
+    async (_feedUrl?: string) => {
+      handleOpenCanvasSyncModal();
+      return { count: 0, usedDemoFeed: false };
+    },
+    [handleOpenCanvasSyncModal]
+  );
 
   // 11a. Toggle temporary session-scoped AI opt-out (always switchable in Settings -> AI)
   const handleSetAiTemporarilyDisabled = useCallback(
@@ -1456,9 +1440,7 @@ export default function KiteWorkspacePage() {
                 setSettingsTab("customize");
                 setIsSettingsOpen(true);
               }}
-              onQuickSyncCanvas={() =>
-                handleSyncCanvasTasks(profile.canvas_feed_url || "")
-              }
+              onQuickSyncCanvas={handleOpenCanvasSyncModal}
               onGoogleSignIn={handleGoogleSignIn}
               onSignOut={handleSignOut}
             />
@@ -1491,9 +1473,7 @@ export default function KiteWorkspacePage() {
                     setSettingsTab("ai");
                     setIsSettingsOpen(true);
                   }}
-                  onQuickSyncCanvas={() =>
-                    handleSyncCanvasTasks(profile.canvas_feed_url || "")
-                  }
+                  onQuickSyncCanvas={handleOpenCanvasSyncModal}
                   onApplyAgentMutation={handleApplyAgentMutation}
                   onUndoAgentMessage={handleUndoAgentMessage}
                   onToggleMyDayBlockComplete={handleToggleMyDayBlockComplete}
@@ -1586,9 +1566,20 @@ export default function KiteWorkspacePage() {
           onUpdateProfile={handleUpdateProfile}
           onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
           onCustomVideoUploaded={() => setCustomVideoVersion((v) => v + 1)}
+          onOpenCanvasSync={handleOpenCanvasSyncModal}
           onSyncCanvasTasks={handleSyncCanvasTasks}
         />
       )}
+
+      {/* Interactive Canvas LMS Assignment Selection Modal */}
+      <CanvasSyncModal
+        isOpen={isCanvasSyncModalOpen}
+        onClose={handleCloseCanvasSyncModal}
+        feedUrl={profile.canvas_feed_url || ""}
+        existingTasks={tasks}
+        onCommitSelected={handleCommitCanvasSelected}
+        isCommitting={isCommittingCanvas}
+      />
 
       {/* Quick Create Task Modal */}
       {canAccessWorkspace && (

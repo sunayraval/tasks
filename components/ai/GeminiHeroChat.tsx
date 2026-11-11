@@ -30,6 +30,7 @@ import {
   ChevronDown,
   CornerDownLeft,
   ExternalLink,
+  GraduationCap,
   Heading,
   HelpCircle,
   KeyRound,
@@ -789,6 +790,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
         undoSnapshot: undoSnap,
         showMyDayCard: Boolean(mutation?.showMyDayCard),
         qaPrompt: mutation?.qaPrompt || null,
+        triggerCanvasSync: Boolean(mutation?.triggerCanvasSync),
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -1849,6 +1851,36 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                     onOpenMyDay={() => onSelectTab("my_day")}
                     onToggleBlockComplete={onToggleMyDayBlockComplete}
                   />
+                )}
+
+                {/* Embedded Interactive Canvas LMS Sync Card */}
+                {m.triggerCanvasSync && (
+                  <div className="rounded-2xl border border-primary/35 bg-[#12161f]/95 p-3.5 space-y-2.5 shadow-lg backdrop-blur-md">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/20 text-primary border border-primary/40 shadow-neon shrink-0">
+                          <GraduationCap className="w-4 h-4" />
+                        </span>
+                        <div>
+                          <h4 className="text-xs font-bold text-white tracking-wide">
+                            Canvas LMS Assignment Picker
+                          </h4>
+                          <p className="text-[11px] text-white/55">
+                            Choose which upcoming assignments to import into your workspace.
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={onQuickSyncCanvas}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-black hover:brightness-110 active:scale-95 transition-all shadow-neon shrink-0"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Select Assignments</span>
+                      </button>
+                    </div>
+                  </div>
                 )}
 
                 {/* Agent Markdown Reply */}

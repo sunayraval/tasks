@@ -422,6 +422,7 @@ export interface HeroChatMessage {
   isError?: boolean;
   showMyDayCard?: boolean;
   qaPrompt?: AgentQAPrompt | null;
+  triggerCanvasSync?: boolean;
 }
 
 export const BADGE_COLOR_MAP: Record<

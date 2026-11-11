@@ -1310,7 +1310,10 @@ You have direct, live read/write control over the user's entire workspace via yo
 3. Section Headers: Create, rename, move, or remove movable divider headers (like TODAY, TOMORROW, COLLEGE, SOON, REMEMBER, or custom sections).
 4. Themes & Atmosphere: Switch between preset themes (${THEME_OPTIONS.map((t) => `${t.id} ("${t.name}")`).join(", ")}) OR design bespoke custom 5-color hex palettes, switch ambient backgrounds (aurora, cyber, lofi, particles), and adjust dim/blur.
 5. Workspace Settings & Customization: Update workspace title/subtitle/brand, toggle "Show completed tasks", change task document view mode (slide_drawer, center_modal, inline), change AI coaching tone, rename table columns, or create custom color-coded tags/categories/statuses/priorities.
-6. Integrations & Navigation: Trigger a live Canvas LMS sync or switch the user's active view between Chat, Tasks, and my day.
+6. Integrations & Navigation:
+   - When user asks to sync Canvas, import Canvas assignments, or refresh school homework (e.g. "sync canvas", "sync my canvas assignments", "pull assignments from canvas"), invoke \`workspace_utilities\` with \`sync_canvas: true\`.
+   - IMPORTANT: Calling \`sync_canvas: true\` opens the interactive Canvas assignment picker UI where the user can select exactly what to add and what not to. In your text response, tell the user that you've fetched their Canvas assignments and opened the assignment selector for them to choose which ones to add.
+   - Switch active workspace view between Chat, Tasks, and my day via \`switch_to_tab\`.
 7. Interactive Guided Q&A (\`prompt_user_qa\`):
    - Use \`prompt_user_qa\` at moments when gauging user input via a structured Q&A UI will produce a dramatically better plan—specifically: (a) when the user asks to plan/organize their day or routine and has 0 active tasks on their board without naming tasks, (b) when the user asks to break down a broad goal, exam study plan, or multi-step project without enough context, or (c) when the user asks you to ask them questions / interview them to figure out their tasks or schedule.
    - \`prompt_user_qa\` renders a consent card first ("Can I ask a few questions to fulfill your request?") and then collects structured answers so you can populate their Tasks list and \`my day\` schedule. Do NOT use \`prompt_user_qa\` for direct, clear commands where you already have enough info to act immediately.
@@ -2993,12 +2996,14 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
 
       workspace_utilities: tool({
         description:
-          "Trigger live Canvas LMS assignment sync or switch the user's active tab between Chat, Tasks table, and MY DAY.",
+          "Open the Canvas LMS assignment selection picker or switch the user's active tab between Chat, Tasks table, and MY DAY.",
         parameters: z.object({
           sync_canvas: z
             .boolean()
             .optional()
-            .describe("Set true when user asks to sync or refresh Canvas assignments"),
+            .describe(
+              "Set true when user asks to sync, import, or refresh Canvas assignments so the assignment selection UI opens for them"
+            ),
           switch_to_tab: z
             .enum(["chat", "tasks", "my_day"])
             .optional()
@@ -3009,7 +3014,11 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
         execute: async ({ sync_canvas, switch_to_tab }) => {
           if (sync_canvas) {
             triggerCanvasSync = true;
-            recordAction("sync", "Triggered live Canvas LMS sync");
+            recordAction(
+              "sync",
+              "Opened Canvas assignment selector",
+              "Review upcoming assignments and select which ones to add"
+            );
           }
           if (switch_to_tab) {
             switchTab = switch_to_tab;

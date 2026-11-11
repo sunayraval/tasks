@@ -82,7 +82,8 @@ interface SettingsModalProps {
   onUpdateProfile: (updates: Partial<UserProfile>) => void;
   onUpdateWorkspaceConfig: (updates: Partial<WorkspaceConfig>) => void;
   onCustomVideoUploaded: () => void;
-  onSyncCanvasTasks: (feedUrl: string) => Promise<{
+  onOpenCanvasSync?: () => void;
+  onSyncCanvasTasks?: (feedUrl: string) => Promise<{
     count: number;
     usedDemoFeed: boolean;
   }>;
@@ -256,6 +257,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateProfile,
   onUpdateWorkspaceConfig,
   onCustomVideoUploaded,
+  onOpenCanvasSync,
   onSyncCanvasTasks,
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTabId>(initialTab);
@@ -460,6 +462,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleCanvasSyncClick = async () => {
+    if (onOpenCanvasSync) {
+      onOpenCanvasSync();
+      return;
+    }
+    if (!onSyncCanvasTasks) return;
     setCanvasSyncLoading(true);
     setCanvasSyncMessage("");
     try {
