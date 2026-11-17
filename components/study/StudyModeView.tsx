@@ -2,12 +2,13 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
+  AIProvider,
+  DEFAULT_NVIDIA_MODEL,
+  NVIDIA_MODEL_OPTIONS,
   StudyCheckpoint,
   StudyLessonTurn,
   StudyMCQOption,
-  StudyModule,
   StudySessionState,
-  StudySubtopic,
   StudySyllabus,
   UserProfile,
   WorkspaceConfig,
@@ -21,7 +22,10 @@ import { StudyCheckpointCard } from "@/components/study/StudyCheckpointCard";
 import {
   ArrowRight,
   BookOpen,
+  Check,
   CheckCircle2,
+  ChevronDown,
+  Cpu,
   FastForward,
   GraduationCap,
   KeyRound,
@@ -38,6 +42,7 @@ import {
   Trophy,
   Wand2,
   X,
+  Zap,
 } from "lucide-react";
 
 const LOCAL_STUDY_SESSION_KEY = "flo_study_session_v1";
@@ -101,12 +106,51 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
   const [isGeneratingSyllabus, setIsGeneratingSyllabus] =
     useState<boolean>(false);
   const [isTutorThinking, setIsTutorThinking] = useState<boolean>(false);
+  const [lastTutorError, setLastTutorError] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState<string>("");
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState<boolean>(false);
   const [showNewTopicForm, setShowNewTopicForm] = useState<boolean>(false);
+  const [modelDropdownOpen, setModelDropdownOpen] = useState<boolean>(false);
+  const [geminiTier, setGeminiTier] = useState<"flash" | "pro">("flash");
 
   const hydratedRef = useRef<boolean>(false);
   const streamEndRef = useRef<HTMLDivElement | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const lastTurnParamsRef = useRef<{
+    currentSyllabus: StudySyllabus;
+    actionType:
+      | "start_or_continue"
+      | "answer_checkpoint"
+      | "chat_message"
+      | "remediate";
+    userMessage?: string;
+    targetSubtopicId?: string;
+    checkpointSubmission?: {
+      checkpointId: string;
+      subtopicId: string;
+      questionType: "mcq" | "short_answer";
+      question: string;
+      selectedOptionId?: string;
+      selectedOptionText?: string;
+      isMcqCorrect?: boolean;
+      shortAnswerText?: string;
+    };
+  } | null>(null);
+
+  const activeProvider: AIProvider = workspaceConfig.aiProvider || "nvidia";
+  const activeNvidiaModel =
+    NVIDIA_MODEL_OPTIONS.find((m) => m.id === workspaceConfig.nvidiaModel)
+      ?.id || DEFAULT_NVIDIA_MODEL;
+  const activeModelMeta =
+    NVIDIA_MODEL_OPTIONS.find((m) => m.id === activeNvidiaModel) ||
+    NVIDIA_MODEL_OPTIONS[0];
+
+  const activeModelLabel =
+    activeProvider === "nvidia"
+      ? activeModelMeta.shortName
+      : geminiTier === "pro"
+      ? "Gemini 1.5 Pro"
+      : "Gemini 2.0 Flash";
 
   // 1. Hydrate Study Session from WorkspaceConfig or localStorage
   useEffect(() => {
@@ -181,7 +225,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
   const progress = computeSyllabusProgress(syllabus);
 
   // ===========================================================================
-  // Core AI Tutor Turn Request
+  // Core AI Tutor Turn Request (with AbortController & Model Override Support)
   // ===========================================================================
   const requestTutorTurn = useCallback(
     async (params: {
@@ -204,6 +248,9 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
         shortAnswerText?: string;
       };
       appendUserBubble?: boolean;
+      overrideProvider?: AIProvider;
+      overrideNvidiaModel?: string;
+      overrideGeminiTier?: "flash" | "pro";
     }) => {
       const {
         currentSyllabus,
@@ -212,9 +259,28 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
         targetSubtopicId,
         checkpointSubmission,
         appendUserBubble,
+        overrideProvider,
+        overrideNvidiaModel,
+        overrideGeminiTier,
       } = params;
 
+      // Abort any previous in-flight request if switching models mid-flight
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      lastTurnParamsRef.current = {
+        currentSyllabus,
+        actionType,
+        userMessage,
+        targetSubtopicId,
+        checkpointSubmission,
+      };
+
       setIsTutorThinking(true);
+      setLastTutorError(null);
 
       let updatedTurns = [...turns];
       if (appendUserBubble && userMessage?.trim()) {
@@ -232,9 +298,14 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
       }
 
       try {
+        const providerToUse = overrideProvider || activeProvider;
+        const nvidiaModelToUse = overrideNvidiaModel || activeNvidiaModel;
+        const geminiModelToUse = overrideGeminiTier || geminiTier;
+
         const res = await fetch("/api/study", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             mode: "tutor_turn",
             syllabus: currentSyllabus,
@@ -243,18 +314,26 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
             targetSubtopicId,
             checkpointSubmission,
             tone: profile.ai_tone,
-            aiProvider: workspaceConfig.aiProvider || "nvidia",
-            nvidiaModel: workspaceConfig.nvidiaModel,
-            workspaceConfig,
+            aiProvider: providerToUse,
+            nvidiaModel: nvidiaModelToUse,
+            geminiModel: geminiModelToUse,
+            workspaceConfig: {
+              ...workspaceConfig,
+              aiProvider: providerToUse,
+              nvidiaModel: nvidiaModelToUse,
+            },
             customApiKey: effectiveApiKey,
           }),
         });
 
         const data = await res.json();
         if (!res.ok || !data.turn) {
-          onShowToast(
-            data.message || data.error || "Could not load micro-lesson."
-          );
+          const errMsg =
+            data.message ||
+            data.error ||
+            "Could not load micro-lesson. Try switching models below.";
+          setLastTutorError(errMsg);
+          onShowToast(errMsg);
           return;
         }
 
@@ -262,7 +341,6 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
           data.syllabus || currentSyllabus;
         const assistantTurn: StudyLessonTurn = data.turn;
 
-        // If this was a short-answer checkpoint evaluation, also update the checkpoint card on the previous turn
         if (
           actionType === "answer_checkpoint" &&
           checkpointSubmission &&
@@ -293,15 +371,25 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
         setTurns(finalTurns);
         setSessionStarted(true);
         persistSession(returnedSyllabus, finalTurns, true);
-      } catch (err) {
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === "AbortError") {
+          return;
+        }
         console.error("[StudyModeView] Tutor turn error:", err);
-        onShowToast("Connection error while reaching AI Tutor.");
+        setLastTutorError(
+          "Connection timed out or interrupted. Switch to a faster model below to retry immediately."
+        );
       } finally {
-        setIsTutorThinking(false);
+        if (abortControllerRef.current === controller) {
+          setIsTutorThinking(false);
+        }
       }
     },
     [
       turns,
+      activeProvider,
+      activeNvidiaModel,
+      geminiTier,
       profile.ai_tone,
       workspaceConfig,
       effectiveApiKey,
@@ -309,6 +397,49 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
       persistSession,
     ]
   );
+
+  // Switch model and optionally retry in-flight or failed turn immediately
+  const handleSelectModel = (
+    provider: AIProvider,
+    nvidiaModelId?: string,
+    gemTier?: "flash" | "pro",
+    retryNow = false
+  ) => {
+    const nextNvidia = nvidiaModelId || activeNvidiaModel;
+    const nextGem = gemTier || geminiTier;
+    if (gemTier) setGeminiTier(gemTier);
+
+    onUpdateWorkspaceConfig({
+      aiProvider: provider,
+      nvidiaModel: nextNvidia,
+    });
+    setModelDropdownOpen(false);
+
+    const label =
+      provider === "nvidia"
+        ? NVIDIA_MODEL_OPTIONS.find((m) => m.id === nextNvidia)?.shortName ||
+          nextNvidia
+        : nextGem === "pro"
+        ? "Gemini 1.5 Pro"
+        : "Gemini 2.0 Flash";
+
+    onShowToast(`Switched Study Mode model to ${label}`);
+
+    // If tutor is currently thinking (hung/slow) or had an error, immediately abort & re-run with the new model!
+    if ((isTutorThinking || retryNow || lastTutorError) && syllabus) {
+      const retryParams = lastTurnParamsRef.current || {
+        currentSyllabus: syllabus,
+        actionType: "start_or_continue" as const,
+      };
+      requestTutorTurn({
+        ...retryParams,
+        overrideProvider: provider,
+        overrideNvidiaModel: nextNvidia,
+        overrideGeminiTier: nextGem,
+        appendUserBubble: false,
+      });
+    }
+  };
 
   // ===========================================================================
   // Topic Ingestion & Syllabus Generation
@@ -321,6 +452,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
     if (!query || isGeneratingSyllabus) return;
 
     setIsGeneratingSyllabus(true);
+    setLastTutorError(null);
     try {
       const res = await fetch("/api/study", {
         method: "POST",
@@ -329,8 +461,9 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
           mode: "generate_syllabus",
           topicInput: query,
           tone: profile.ai_tone,
-          aiProvider: workspaceConfig.aiProvider || "nvidia",
-          nvidiaModel: workspaceConfig.nvidiaModel,
+          aiProvider: activeProvider,
+          nvidiaModel: activeNvidiaModel,
+          geminiModel: geminiTier,
           workspaceConfig,
           customApiKey: effectiveApiKey,
         }),
@@ -350,6 +483,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
       if (autoStartFirstLesson) {
         setSessionStarted(true);
         persistSession(generatedSyllabus, [], true);
+        setIsGeneratingSyllabus(false);
         await requestTutorTurn({
           currentSyllabus: generatedSyllabus,
           actionType: "start_or_continue",
@@ -387,8 +521,6 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
     persistSession(normalized, turns, sessionStarted);
     if (toastText) onShowToast(toastText);
 
-    // If the active in_progress subtopic changed during an active session (e.g. skipped or deleted current subtopic),
-    // automatically transition and teach the new active subtopic!
     if (
       autoTeachIfActiveChanged &&
       sessionStarted &&
@@ -452,8 +584,8 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
             subtopics: [
               {
                 id: makeLocalId("sub"),
-                title: `${title}: Core Concepts`,
-                description: `Foundational overview of ${title}`,
+                title: `${title}: Core Concepts & Examples`,
+                description: `Foundational overview and worked examples for ${title}`,
                 estimatedMinutes: 8,
                 state: "locked",
               },
@@ -618,8 +750,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
   };
 
   const handleSelectActiveSubtopic = (subtopicId: string) => {
-    if (!syllabus || isTutorThinking) return;
-    // Allow jumping to any subtopic to study/review it right now
+    if (!syllabus) return;
     const reopened: StudySyllabus = {
       ...syllabus,
       modules: syllabus.modules.map((m) => ({
@@ -657,7 +788,6 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
   ) => {
     if (!syllabus || isTutorThinking) return;
 
-    // 1. Immediately update the checkpoint state in the lesson turn so validation & explanation appear instantaneously
     const nextTurns = turns.map((t) => {
       if (t.checkpoint && t.checkpoint.id === checkpoint.id) {
         return {
@@ -675,7 +805,6 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
     setTurns(nextTurns);
 
     if (option.isCorrect) {
-      // Mark the subtopic as mastered and promote the next locked subtopic to in_progress
       const updatedSyllabus = normalizeSyllabusStates({
         ...syllabus,
         modules: syllabus.modules.map((m) => ({
@@ -698,7 +827,6 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
         });
       }
     } else {
-      // Incorrect answer: do NOT advance! Trigger adaptive remediation for the current subtopic
       persistSession(syllabus, nextTurns, true);
       requestTutorTurn({
         currentSyllabus: syllabus,
@@ -736,9 +864,6 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
     });
   };
 
-  // ===========================================================================
-  // Chat Input Submit (Natural Language Overrides & Questions)
-  // ===========================================================================
   const handleSendChatMessage = (overrideText?: string) => {
     const text = (overrideText ?? chatInput).trim();
     if (!text || !syllabus || isTutorThinking) return;
@@ -753,13 +878,120 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
     });
   };
 
+  // ===========================================================================
+  // Reusable Model Selector Dropdown Component
+  // ===========================================================================
+  const ModelSelectorDropdown = (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setModelDropdownOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-semibold text-highlight hover:bg-primary/25 transition-colors"
+        title="Choose AI Tutor Model (NVIDIA NIM or Google Gemini)"
+      >
+        <Cpu className="h-3.5 w-3.5 text-primary" />
+        <span className="truncate max-w-[140px]">{activeModelLabel}</span>
+        <ChevronDown className="h-3.5 w-3.5 text-white/60" />
+      </button>
+
+      {modelDropdownOpen && (
+        <div
+          className="absolute right-0 mt-2 w-80 max-h-[420px] overflow-y-auto rounded-2xl border border-white/20 bg-[#14161c]/95 p-2.5 shadow-2xl backdrop-blur-2xl z-50 space-y-2.5"
+          onMouseLeave={() => setModelDropdownOpen(false)}
+        >
+          <div className="px-2 py-1 flex items-center justify-between border-b border-white/10">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400">
+              NVIDIA NIM Models (Fastest First)
+            </span>
+            <span className="text-[10px] text-white/50">Click to switch</span>
+          </div>
+
+          <div className="space-y-1">
+            {NVIDIA_MODEL_OPTIONS.map((m) => {
+              const isSelected =
+                activeProvider === "nvidia" && activeNvidiaModel === m.id;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => handleSelectModel("nvidia", m.id, undefined, true)}
+                  className={`w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
+                    isSelected
+                      ? "bg-primary/25 border border-primary/50 text-white"
+                      : "hover:bg-white/10 text-zinc-200"
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-white truncate">
+                        {m.name}
+                      </span>
+                      <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-mono font-semibold text-highlight shrink-0">
+                        {m.badge}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-white/55 truncate">
+                      {m.provider} • {m.desc}
+                    </div>
+                  </div>
+                  {isSelected && (
+                    <Check className="h-4 w-4 text-primary shrink-0" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="pt-1 border-t border-white/10 space-y-1">
+            <div className="px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-sky-400">
+              Google Gemini Models
+            </div>
+            {(["flash", "pro"] as const).map((tier) => {
+              const isSelected =
+                activeProvider === "gemini" && geminiTier === tier;
+              return (
+                <button
+                  key={tier}
+                  type="button"
+                  onClick={() =>
+                    handleSelectModel("gemini", undefined, tier, true)
+                  }
+                  className={`w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
+                    isSelected
+                      ? "bg-primary/25 border border-primary/50 text-white"
+                      : "hover:bg-white/10 text-zinc-200"
+                  }`}
+                >
+                  <div>
+                    <div className="text-xs font-bold text-white">
+                      {tier === "flash"
+                        ? "Gemini 2.0 Flash"
+                        : "Gemini 1.5 Pro"}
+                    </div>
+                    <div className="text-[10px] text-white/55">
+                      {tier === "flash"
+                        ? "Low-latency multimodal tutor"
+                        : "Deep reasoning & complex STEM derivations"}
+                    </div>
+                  </div>
+                  {isSelected && (
+                    <Check className="h-4 w-4 text-primary shrink-0" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   const showEntryScreen = !syllabus || showNewTopicForm;
 
   return (
     <div className="flex flex-col space-y-4">
       {/* =====================================================================
-          TOP ANCHORED REAL-TIME STUDY PROGRESS BAR
-          Calculates (mastered + skipped_known) / total_active_subtopics
+          TOP ANCHORED REAL-TIME STUDY PROGRESS BAR + MODEL SELECTOR
          ===================================================================== */}
       {syllabus && !showNewTopicForm && (
         <div className="sticky top-14 z-20 rounded-2xl border theme-panel px-4 py-3 backdrop-blur-2xl shadow-xl">
@@ -786,23 +1018,22 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
               </div>
             </div>
 
-            {/* Center/Right: Progress Bar & Telemetry */}
-            <div className="flex flex-1 items-center justify-end gap-3 min-w-[260px]">
-              <div className="flex-1 max-w-md space-y-1">
+            {/* Center/Right: Progress Bar, Model Selector & New Topic */}
+            <div className="flex flex-1 items-center justify-end gap-2.5 min-w-[260px]">
+              <div className="flex-1 max-w-xs sm:max-w-sm space-y-1">
                 <div className="flex items-center justify-between text-[11px] font-mono">
                   <span className="text-white/75">
-                    Session Mastery:{" "}
+                    Mastery:{" "}
                     <strong className="text-white">
                       {progress.completedCount}
-                    </strong>{" "}
-                    / {progress.totalActive} active subtopics
+                    </strong>
+                    /{progress.totalActive}
                   </span>
                   <span className="font-bold text-highlight">
                     {progress.percentage}%
                   </span>
                 </div>
 
-                {/* Accessible semantic <progress> + high-contrast visual progress bar */}
                 <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-white/10 border border-white/10">
                   <progress
                     aria-label="Study Mode curriculum completion progress"
@@ -821,6 +1052,9 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                   />
                 </div>
               </div>
+
+              {/* Live Model Selector Dropdown */}
+              {ModelSelectorDropdown}
 
               <button
                 type="button"
@@ -845,12 +1079,16 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
       {showEntryScreen ? (
         <div className="mx-auto w-full max-w-3xl py-6 sm:py-10">
           <div className="rounded-3xl border theme-panel p-6 sm:p-8 shadow-2xl backdrop-blur-2xl space-y-6">
-            {/* Header */}
-            <div className="space-y-2 text-center">
-              <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/15 px-3.5 py-1 text-xs font-mono font-bold text-highlight">
+            {/* Top Bar with Model Selector */}
+            <div className="flex items-center justify-between">
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/15 px-3.5 py-1 text-xs font-mono font-bold text-highlight">
                 <GraduationCap className="h-4 w-4 text-primary" />
                 <span>flo study • Interactive AI Tutor</span>
               </div>
+              {ModelSelectorDropdown}
+            </div>
+
+            <div className="space-y-2 text-center">
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
                 What do you want to master today?
               </h1>
@@ -859,7 +1097,8 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                 focus areas.{" "}
                 <strong className="text-white">flo study</strong> breaks them
                 into an editable micro-curriculum and teaches you step-by-step
-                with inline diagrams and comprehension checkpoints.
+                with concrete formulas, worked examples, visual diagrams, and
+                comprehension checkpoints.
               </p>
             </div>
 
@@ -869,8 +1108,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                   <KeyRound className="h-4 w-4 text-amber-400 shrink-0" />
                   <span>
                     Connect your free NVIDIA NIM or Google Gemini API key for
-                    live AI tutoring, or test right away with the built-in
-                    structured study engine.
+                    live AI tutoring.
                   </span>
                 </div>
                 <button
@@ -896,7 +1134,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                 value={topicInput}
                 onChange={(e) => setTopicInput(e.target.value)}
                 rows={4}
-                placeholder="e.g., AP Biology Unit 3: Enzyme catalysis, competitive vs non-competitive inhibition, cellular respiration (glycolysis, Krebs cycle, electron transport chain), and photosynthesis..."
+                placeholder="e.g., AP Calculus AB: Limits & continuity, evaluating limits algebraically (factoring & conjugates), one-sided limits, and graphical interpretation..."
                 className="w-full rounded-2xl border border-white/15 bg-black/50 p-4 text-sm text-white placeholder:text-white/35 focus:border-primary focus:outline-none leading-relaxed"
               />
             </div>
@@ -954,7 +1192,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                   {isGeneratingSyllabus ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Building Curriculum...</span>
+                      <span>Building Curriculum ({activeModelLabel})...</span>
                     </>
                   ) : (
                     <>
@@ -1089,7 +1327,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
             )}
 
             {/* Pre-Session Curriculum Review Card (if session hasn't started teaching yet) */}
-            {!sessionStarted && turns.length === 0 && (
+            {!sessionStarted && turns.length === 0 && !isTutorThinking && (
               <div className="rounded-2xl border theme-panel p-6 backdrop-blur-xl space-y-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
@@ -1211,7 +1449,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
 
                       <div className="flex items-center gap-2 text-[11px] font-mono text-white/45">
                         {turn.modelUsed && (
-                          <span className="hidden sm:inline rounded bg-white/5 px-1.5 py-0.5">
+                          <span className="rounded bg-white/5 px-2 py-0.5 text-highlight/80">
                             {turn.modelUsed.split("/").pop()}
                           </span>
                         )}
@@ -1219,7 +1457,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Applied Syllabus Mutation Pills (from Natural Language Chat Overrides) */}
+                    {/* Applied Syllabus Mutation Pills */}
                     {turn.syllabusMutationsApplied &&
                       turn.syllabusMutationsApplied.length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
@@ -1235,7 +1473,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                         </div>
                       )}
 
-                    {/* Evaluation Feedback Banner (after Short-Answer check) */}
+                    {/* Evaluation Feedback Banner */}
                     {turn.evaluationResult && (
                       <div
                         className={`rounded-xl border px-4 py-3 text-xs sm:text-sm leading-relaxed ${
@@ -1266,7 +1504,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                       </div>
                     )}
 
-                    {/* Main Lesson Markdown + LaTeX Explanation */}
+                    {/* Main Lesson Markdown + LaTeX + Worked Examples */}
                     <StudyMarkdown content={turn.content} />
 
                     {/* Key Takeaways Box */}
@@ -1290,7 +1528,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                       </div>
                     )}
 
-                    {/* Inline Visualization (Mermaid, SVG, Comparison Table, or Visual Cards) */}
+                    {/* Inline Visualization */}
                     {turn.visual && (
                       <StudyVisualRenderer visual={turn.visual} />
                     )}
@@ -1325,19 +1563,151 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                 );
               })}
 
-              {/* AI Tutor Thinking Indicator */}
+              {/* =============================================================
+                  AI TUTOR THINKING INDICATOR WITH LIVE MODEL SWITCHER
+                  Allows user to switch models on the spot if a model is slow!
+                 ============================================================= */}
               {isTutorThinking && (
-                <div className="rounded-2xl border theme-panel p-5 flex items-center gap-3 text-xs sm:text-sm text-white/80">
-                  <Loader2 className="h-5 w-5 animate-spin text-primary shrink-0" />
-                  <div>
-                    <div className="font-bold text-white">
-                      flo study Tutor is preparing your micro-lesson &amp;
-                      visual diagram...
+                <div className="rounded-2xl border border-primary/40 theme-panel p-5 space-y-3.5 shadow-xl">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary shrink-0" />
+                      <div>
+                        <div className="text-xs sm:text-sm font-bold text-white">
+                          flo study Tutor is preparing your micro-lesson, worked
+                          examples &amp; visual diagram...
+                        </div>
+                        <div className="text-xs text-white/60">
+                          Syncing with your live syllabus state (
+                          {progress.percentage}% complete) • Active model:{" "}
+                          <strong className="text-highlight">
+                            {activeModelLabel}
+                          </strong>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-xs text-white/55">
-                      Syncing with your live syllabus state (
-                      {progress.percentage}% complete)
+
+                    {ModelSelectorDropdown}
+                  </div>
+
+                  {/* Instant 1-Click Fast Model Switch Pills right inside the loading box */}
+                  <div className="border-t border-white/10 pt-3 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11px] font-mono text-white/55 mr-1 flex items-center gap-1">
+                      <Zap className="h-3 w-3 text-amber-400" />
+                      Taking too long? Switch &amp; retry instantly:
+                    </span>
+                    {[
+                      {
+                        provider: "nvidia" as AIProvider,
+                        id: "google/gemma-4-31b-it",
+                        label: "Gemma 4 31B (Fast)",
+                      },
+                      {
+                        provider: "nvidia" as AIProvider,
+                        id: "google/gemma-3-12b-it",
+                        label: "Gemma 3 12B (Ultra Fast)",
+                      },
+                      {
+                        provider: "nvidia" as AIProvider,
+                        id: "nvidia/nemotron-3.5-bolt-e4b",
+                        label: "Nemotron Bolt",
+                      },
+                      {
+                        provider: "nvidia" as AIProvider,
+                        id: "nvidia/nemotron-3.5-lightning-30b-a3b",
+                        label: "Nemotron Lightning",
+                      },
+                      {
+                        provider: "nvidia" as AIProvider,
+                        id: "mistralai/mistral-large-4-1t-a52b",
+                        label: "Mistral Large 4",
+                      },
+                    ].map((opt) => {
+                      const isCurrent =
+                        activeProvider === opt.provider &&
+                        activeNvidiaModel === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() =>
+                            handleSelectModel(
+                              opt.provider,
+                              opt.id,
+                              undefined,
+                              true
+                            )
+                          }
+                          className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                            isCurrent
+                              ? "border-primary bg-primary/25 text-white"
+                              : "border-white/15 bg-white/5 text-zinc-200 hover:border-primary/50 hover:bg-primary/15 hover:text-white"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Retry Card if a Model Timed Out */}
+              {lastTutorError && !isTutorThinking && (
+                <div className="rounded-2xl border border-rose-400/40 bg-rose-950/30 p-5 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-xs sm:text-sm font-bold text-rose-200">
+                      {lastTutorError}
                     </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleSelectModel(
+                          activeProvider,
+                          activeNvidiaModel,
+                          geminiTier,
+                          true
+                        )
+                      }
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-black hover:brightness-110 shrink-0"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      <span>Retry Now</span>
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11px] font-mono text-white/60 mr-1">
+                      Or switch to a faster model:
+                    </span>
+                    {[
+                      {
+                        id: "google/gemma-4-31b-it",
+                        label: "Gemma 4 31B (Fast)",
+                      },
+                      {
+                        id: "google/gemma-3-12b-it",
+                        label: "Gemma 3 12B (Ultra Fast)",
+                      },
+                      {
+                        id: "nvidia/nemotron-3.5-bolt-e4b",
+                        label: "Nemotron Bolt",
+                      },
+                      {
+                        id: "mistralai/mistral-large-4-1t-a52b",
+                        label: "Mistral Large 4",
+                      },
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() =>
+                          handleSelectModel("nvidia", opt.id, undefined, true)
+                        }
+                        className="rounded-lg border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white hover:border-primary/50 hover:bg-primary/20"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
@@ -1402,6 +1772,18 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                   disabled={isTutorThinking || progress.isComplete}
                   onClick={() =>
                     handleSendChatMessage(
+                      "Give me 2 more step-by-step worked examples with numbers on this topic"
+                    )
+                  }
+                  className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/75 hover:border-primary/40 hover:text-white transition-colors disabled:opacity-40"
+                >
+                  &ldquo;Show 2 more worked examples&rdquo;
+                </button>
+                <button
+                  type="button"
+                  disabled={isTutorThinking || progress.isComplete}
+                  onClick={() =>
+                    handleSendChatMessage(
                       "Explain this concept with a simpler real-world analogy"
                     )
                   }
@@ -1439,7 +1821,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   disabled={isTutorThinking}
-                  placeholder='Ask a question, or type "I already know this, skip ahead" or "Remove [topic]..."'
+                  placeholder='Ask for more examples, ask a question, or type "I already know this, skip ahead"...'
                   className="flex-1 rounded-xl border border-white/15 bg-black/55 px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder:text-white/35 focus:border-primary focus:outline-none disabled:opacity-50"
                 />
                 <button
