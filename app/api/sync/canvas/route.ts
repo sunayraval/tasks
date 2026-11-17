@@ -372,12 +372,13 @@ export async function POST(request: Request) {
           } = await supabase.auth.getUser();
 
           if (user) {
-            // Purge past Canvas assignments (earlier than today)
+            // Purge past completed Canvas assignments (earlier than today)
             await supabase
               .from("tasks")
               .delete()
               .eq("user_id", user.id)
               .eq("is_canvas_assignment", true)
+              .eq("status", "Done")
               .lt("due_date", startOfToday.toISOString());
 
             for (const item of selectedTasks) {

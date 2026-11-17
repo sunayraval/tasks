@@ -18,6 +18,7 @@ import {
 } from "@/types/taskit";
 import { DEFAULT_PROFILE, INITIAL_SEED_TASKS } from "@/utils/seedData";
 import { createClient, isSupabaseConfigured } from "@/utils/supabase/client";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { VideoBackground } from "@/components/background/VideoBackground";
 import { TopNavBar } from "@/components/dashboard/TopNavBar";
 import { CircularProgress } from "@/components/dashboard/CircularProgress";
@@ -308,8 +309,10 @@ export default function KiteWorkspacePage() {
     }
 
     const supabase = createClient();
+    let realtimeChannel: RealtimeChannel | null = null;
+    let lastRefetchTimestamp = 0;
 
-    async function initSession() {
+    async function initSession(isRefetch = false) {
       try {
         const {
           data: { user },
@@ -318,6 +321,7 @@ export default function KiteWorkspacePage() {
         if (user) {
           setIsAuthenticated(true);
 
+          // 1. Fetch Profile
           const { data: dbProfile } = await supabase
             .from("profiles")
             .select("*")
@@ -332,49 +336,44 @@ export default function KiteWorkspacePage() {
               custom_theme_json:
                 dbProfile.custom_theme_json || prev.custom_theme_json,
             }));
+            if (dbProfile.custom_theme_json && typeof window !== "undefined") {
+              try {
+                localStorage.setItem(
+                  LOCAL_STORAGE_CONFIG_KEY,
+                  JSON.stringify(dbProfile.custom_theme_json)
+                );
+              } catch {}
+            }
           } else {
-            setProfile((prev) => ({
-              ...prev,
+            const initialProfile = {
               id: user.id,
               email: user.email || "",
               full_name:
                 user.user_metadata?.full_name ||
                 user.user_metadata?.name ||
                 null,
+              avatar_url: user.user_metadata?.avatar_url || null,
+              custom_theme_json:
+                DEFAULT_WORKSPACE_CONFIG as unknown as Record<string, unknown>,
+            };
+            supabase.from("profiles").upsert(initialProfile).then();
+            setProfile((prev) => ({
+              ...prev,
+              ...initialProfile,
             }));
           }
 
+          // 2. Fetch Tasks (preserve ALL tasks without destructive due-date filtering)
           const { data: dbTasks } = await supabase
             .from("tasks")
             .select("*")
             .eq("user_id", user.id)
             .order("order_index", { ascending: true });
 
-          const now = new Date();
-          const startOfToday = new Date(now);
-          startOfToday.setHours(0, 0, 0, 0);
-
           const loadedTasks = ((dbTasks || []) as TaskItem[]).filter((t) => {
             if (deletedTaskIdsRef.current.has(t.id)) return false;
-            // Always preserve movable header divider rows
-            if (t.custom_properties?.is_header) return true;
-            // Cut out any past tasks (such as 10/31/2026 and earlier)
-            if (t.due_date) {
-              const dueTime = new Date(t.due_date).getTime();
-              if (!isNaN(dueTime) && dueTime < startOfToday.getTime()) {
-                return false;
-              }
-            }
             return true;
           });
-
-          // Purge all past tasks (e.g. 10/31 and earlier) from Supabase database
-          supabase
-            .from("tasks")
-            .delete()
-            .eq("user_id", user.id)
-            .lt("due_date", startOfToday.toISOString())
-            .then();
 
           const hasAnyHeaderRow = loadedTasks.some((t) =>
             Boolean(t.custom_properties?.is_header)
@@ -384,7 +383,7 @@ export default function KiteWorkspacePage() {
             localStorage.getItem(`${HEADERS_SEEDED_STORAGE_KEY}_${user.id}`) ===
               "true";
 
-          if (!hasAnyHeaderRow && !alreadySeeded) {
+          if (!hasAnyHeaderRow && !alreadySeeded && !isRefetch) {
             if (typeof window !== "undefined") {
               localStorage.setItem(
                 `${HEADERS_SEEDED_STORAGE_KEY}_${user.id}`,
@@ -403,7 +402,6 @@ export default function KiteWorkspacePage() {
             );
             setTasks(combined);
 
-            // Insert movable header rows into Supabase tasks table with exact UUIDs
             if (createdHeaders.length > 0) {
               const payload = createdHeaders.map((h) => ({
                 id: h.id,
@@ -426,7 +424,6 @@ export default function KiteWorkspacePage() {
 
               await supabase.from("tasks").insert(payload);
 
-              // Also persist updated order_index for existing tasks
               for (const item of combined) {
                 if (!createdHeaders.some((h) => h.id === item.id)) {
                   supabase
@@ -439,25 +436,136 @@ export default function KiteWorkspacePage() {
             }
           } else {
             setTasks(loadedTasks);
+            if (hasAnyHeaderRow && typeof window !== "undefined") {
+              localStorage.setItem(
+                `${HEADERS_SEEDED_STORAGE_KEY}_${user.id}`,
+                "true"
+              );
+            }
+          }
+
+          // 3. Setup Supabase Realtime Multi-Device Sync Channel
+          if (!realtimeChannel) {
+            realtimeChannel = supabase
+              .channel(`kite-cross-device-${user.id}`)
+              .on(
+                "postgres_changes",
+                {
+                  event: "*",
+                  schema: "public",
+                  table: "tasks",
+                  filter: `user_id=eq.${user.id}`,
+                },
+                (payload) => {
+                  if (payload.eventType === "INSERT") {
+                    const newTask = payload.new as TaskItem;
+                    if (deletedTaskIdsRef.current.has(newTask.id)) return;
+                    setTasks((prev) => {
+                      if (prev.some((t) => t.id === newTask.id)) return prev;
+                      const next = [...prev, newTask];
+                      return next.sort(
+                        (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
+                      );
+                    });
+                  } else if (payload.eventType === "UPDATE") {
+                    const updated = payload.new as TaskItem;
+                    if (deletedTaskIdsRef.current.has(updated.id)) return;
+                    setTasks((prev) => {
+                      const exists = prev.some((t) => t.id === updated.id);
+                      if (!exists) {
+                        return [...prev, updated].sort(
+                          (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
+                        );
+                      }
+                      return prev.map((t) =>
+                        t.id === updated.id ? { ...t, ...updated } : t
+                      );
+                    });
+                  } else if (payload.eventType === "DELETE") {
+                    const delId = (payload.old as { id?: string })?.id;
+                    if (delId) {
+                      deletedTaskIdsRef.current.add(delId);
+                      setTasks((prev) => prev.filter((t) => t.id !== delId));
+                    }
+                  }
+                }
+              )
+              .on(
+                "postgres_changes",
+                {
+                  event: "UPDATE",
+                  schema: "public",
+                  table: "profiles",
+                  filter: `id=eq.${user.id}`,
+                },
+                (payload) => {
+                  const updatedProfile = payload.new as UserProfile;
+                  if (updatedProfile) {
+                    setProfile((prev) => ({
+                      ...prev,
+                      ...updatedProfile,
+                      video_bg_preset: normalizeVideoPreset(
+                        updatedProfile.video_bg_preset
+                      ),
+                      custom_theme_json:
+                        updatedProfile.custom_theme_json ||
+                        prev.custom_theme_json,
+                    }));
+                    if (
+                      updatedProfile.custom_theme_json &&
+                      typeof window !== "undefined"
+                    ) {
+                      try {
+                        localStorage.setItem(
+                          LOCAL_STORAGE_CONFIG_KEY,
+                          JSON.stringify(updatedProfile.custom_theme_json)
+                        );
+                      } catch {}
+                    }
+                  }
+                }
+              )
+              .subscribe();
           }
         } else {
           setIsAuthenticated(false);
           setTasks([]);
         }
       } catch (err) {
-        console.error("Auth init error:", err);
+        console.error("Auth init / sync error:", err);
       } finally {
         setAuthChecked(true);
       }
     }
 
-    initSession();
+    initSession(false);
 
+    // 4. Tab Visibility & Window Focus Auto-Resync
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+        return;
+      }
+      const now = Date.now();
+      // Throttle re-queries to at most once every 4 seconds
+      if (now - lastRefetchTimestamp < 4000) return;
+      lastRefetchTimestamp = now;
+      initSession(true);
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("focus", handleVisibilityOrFocus);
+      document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    }
+
+    // 5. Auth State Listener
     const {
       data: { subscription: authListener },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setIsAuthenticated(true);
+        if (event === "SIGNED_IN" || event === "USER_UPDATED") {
+          initSession(true);
+        }
       } else {
         setIsAuthenticated(false);
         setTasks([]);
@@ -466,8 +574,15 @@ export default function KiteWorkspacePage() {
 
     return () => {
       authListener.unsubscribe();
+      if (realtimeChannel) {
+        supabase.removeChannel(realtimeChannel);
+      }
+      if (typeof window !== "undefined") {
+        window.removeEventListener("focus", handleVisibilityOrFocus);
+        document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      }
     };
-  }, []); // Run strictly once on mount to avoid re-fetch loops and resurrection flickers
+  }, []);
 
   // 2. Apply theme & custom colors to html element
   useEffect(() => {
@@ -503,11 +618,19 @@ export default function KiteWorkspacePage() {
       if (isSupabaseConfigured() && isAuthenticated) {
         try {
           const supabase = createClient();
-          await supabase
-            .from("profiles")
-            .update(finalUpdates)
-            .eq("id", profile.id);
-        } catch {}
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          const targetId =
+            user?.id || (profile.id !== "user-default" ? profile.id : null);
+          if (targetId) {
+            await supabase
+              .from("profiles")
+              .upsert({ id: targetId, ...finalUpdates });
+          }
+        } catch (err) {
+          console.warn("Profile update error:", err);
+        }
       }
 
       if (updates.theme === "sharingan") {
@@ -544,11 +667,16 @@ export default function KiteWorkspacePage() {
 
         if (isSupabaseConfigured() && isAuthenticated) {
           const supabase = createClient();
-          supabase
-            .from("profiles")
-            .update({ custom_theme_json: nextJson })
-            .eq("id", prev.id)
-            .then();
+          supabase.auth.getUser().then(({ data: { user } }) => {
+            const targetId =
+              user?.id || (prev.id !== "user-default" ? prev.id : null);
+            if (targetId) {
+              supabase
+                .from("profiles")
+                .upsert({ id: targetId, custom_theme_json: nextJson })
+                .then();
+            }
+          });
         }
 
         return {
@@ -578,24 +706,31 @@ export default function KiteWorkspacePage() {
       if (isSupabaseConfigured() && isAuthenticated) {
         try {
           const supabase = createClient();
-          await supabase.from("tasks").insert({
-            id: newUuid,
-            user_id: profile.id,
-            title: created.title,
-            content: created.content,
-            status: created.status,
-            type: created.type,
-            priority: created.priority,
-            due_date: created.due_date,
-            estimated_minutes: created.estimated_minutes,
-            tags: created.tags,
-            notes: created.notes,
-            is_canvas_assignment: created.is_canvas_assignment,
-            canvas_course_code: created.canvas_course_code,
-            custom_properties: created.custom_properties || {},
-            section_group: created.section_group,
-            order_index: created.order_index,
-          });
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          const targetUserId =
+            user?.id || (profile.id !== "user-default" ? profile.id : null);
+          if (targetUserId) {
+            await supabase.from("tasks").insert({
+              id: newUuid,
+              user_id: targetUserId,
+              title: created.title,
+              content: created.content,
+              status: created.status,
+              type: created.type,
+              priority: created.priority,
+              due_date: created.due_date,
+              estimated_minutes: created.estimated_minutes,
+              tags: created.tags,
+              notes: created.notes,
+              is_canvas_assignment: created.is_canvas_assignment,
+              canvas_course_code: created.canvas_course_code,
+              custom_properties: created.custom_properties || {},
+              section_group: created.section_group,
+              order_index: created.order_index,
+            });
+          }
         } catch (err) {
           console.error("Create task error:", err);
         }
@@ -659,27 +794,33 @@ export default function KiteWorkspacePage() {
 
       if (isSupabaseConfigured() && isAuthenticated) {
         const supabase = createClient();
-        supabase
-          .from("tasks")
-          .insert({
-            id: newUuid,
-            user_id: profile.id,
-            title: created.title,
-            content: created.content,
-            status: created.status,
-            type: created.type,
-            priority: created.priority,
-            due_date: created.due_date,
-            estimated_minutes: created.estimated_minutes,
-            tags: created.tags,
-            notes: created.notes,
-            is_canvas_assignment: created.is_canvas_assignment,
-            canvas_course_code: created.canvas_course_code,
-            custom_properties: {},
-            section_group: created.section_group,
-            order_index: insertOrderIndex,
-          })
-          .then();
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          const targetUserId =
+            user?.id || (profile.id !== "user-default" ? profile.id : null);
+          if (targetUserId) {
+            supabase
+              .from("tasks")
+              .insert({
+                id: newUuid,
+                user_id: targetUserId,
+                title: created.title,
+                content: created.content,
+                status: created.status,
+                type: created.type,
+                priority: created.priority,
+                due_date: created.due_date,
+                estimated_minutes: created.estimated_minutes,
+                tags: created.tags,
+                notes: created.notes,
+                is_canvas_assignment: created.is_canvas_assignment,
+                canvas_course_code: created.canvas_course_code,
+                custom_properties: {},
+                section_group: created.section_group,
+                order_index: insertOrderIndex,
+              })
+              .then();
+          }
+        });
       }
 
       return newUuid;
@@ -740,27 +881,33 @@ export default function KiteWorkspacePage() {
 
       if (isSupabaseConfigured() && isAuthenticated) {
         const supabase = createClient();
-        supabase
-          .from("tasks")
-          .insert({
-            id: newUuid,
-            user_id: profile.id,
-            title: createdHeader.title,
-            content: "",
-            status: createdHeader.status,
-            type: createdHeader.type,
-            priority: createdHeader.priority,
-            due_date: null,
-            estimated_minutes: 0,
-            tags: [],
-            notes: "",
-            is_canvas_assignment: false,
-            canvas_course_code: null,
-            custom_properties: { is_header: true },
-            section_group: createdHeader.section_group,
-            order_index: insertOrderIndex,
-          })
-          .then();
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          const targetUserId =
+            user?.id || (profile.id !== "user-default" ? profile.id : null);
+          if (targetUserId) {
+            supabase
+              .from("tasks")
+              .insert({
+                id: newUuid,
+                user_id: targetUserId,
+                title: createdHeader.title,
+                content: "",
+                status: createdHeader.status,
+                type: createdHeader.type,
+                priority: createdHeader.priority,
+                due_date: null,
+                estimated_minutes: 0,
+                tags: [],
+                notes: "",
+                is_canvas_assignment: false,
+                canvas_course_code: null,
+                custom_properties: { is_header: true },
+                section_group: createdHeader.section_group,
+                order_index: insertOrderIndex,
+              })
+              .then();
+          }
+        });
       }
 
       return newUuid;
@@ -1113,25 +1260,31 @@ export default function KiteWorkspacePage() {
 
           // 2) Persist newly added tasks & headers
           if (tm.addedTasks.length > 0) {
-            const insertPayload = tm.addedTasks.map((created) => ({
-              id: created.id,
-              user_id: profile.id,
-              title: created.title,
-              content: created.content,
-              status: created.status,
-              type: created.type,
-              priority: created.priority,
-              due_date: created.due_date,
-              estimated_minutes: created.estimated_minutes,
-              tags: created.tags,
-              notes: created.notes,
-              is_canvas_assignment: created.is_canvas_assignment,
-              canvas_course_code: created.canvas_course_code,
-              custom_properties: created.custom_properties || {},
-              section_group: created.section_group,
-              order_index: created.order_index,
-            }));
-            supabase.from("tasks").insert(insertPayload).then();
+            supabase.auth.getUser().then(({ data: { user } }) => {
+              const targetUserId =
+                user?.id || (profile.id !== "user-default" ? profile.id : null);
+              if (targetUserId) {
+                const insertPayload = tm.addedTasks.map((created) => ({
+                  id: created.id,
+                  user_id: targetUserId,
+                  title: created.title,
+                  content: created.content,
+                  status: created.status,
+                  type: created.type,
+                  priority: created.priority,
+                  due_date: created.due_date,
+                  estimated_minutes: created.estimated_minutes,
+                  tags: created.tags,
+                  notes: created.notes,
+                  is_canvas_assignment: created.is_canvas_assignment,
+                  canvas_course_code: created.canvas_course_code,
+                  custom_properties: created.custom_properties || {},
+                  section_group: created.section_group,
+                  order_index: created.order_index,
+                }));
+                supabase.from("tasks").insert(insertPayload).then();
+              }
+            });
           }
 
           // 3) Persist modified tasks & headers
