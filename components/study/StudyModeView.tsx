@@ -102,6 +102,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
   const [chatInput, setChatInput] = useState<string>("");
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState<boolean>(false);
   const [modelDropdownOpen, setModelDropdownOpen] = useState<boolean>(false);
+  const [priorTopicsOpen, setPriorTopicsOpen] = useState<boolean>(false);
   const [geminiTier, setGeminiTier] = useState<"flash" | "pro">("flash");
 
   const hydratedRef = useRef<boolean>(false);
@@ -143,45 +144,91 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
       ? "Gemini 1.5 Pro"
       : "Gemini 2.0 Flash";
 
-  // 1. Hydrate from WorkspaceConfig or localStorage
+  // 1. Hydrate & Merge from both WorkspaceConfig (Supabase) and localStorage
   useEffect(() => {
-    if (hydratedRef.current) return;
-    hydratedRef.current = true;
-
-    const hydrateFromState = (s: StudySessionState) => {
-      if (s.syllabus) {
-        setSyllabus(s.syllabus);
-        setTurns(s.turns || []);
-        setSessionStarted(Boolean(s.sessionStarted));
+    const mergeCourses = (
+      a: SavedStudyCourse[],
+      b: SavedStudyCourse[]
+    ): SavedStudyCourse[] => {
+      const map = new Map<string, SavedStudyCourse>();
+      for (const item of [...a, ...b]) {
+        if (!item?.id || !item?.syllabus) continue;
+        const existing = map.get(item.id);
+        if (
+          !existing ||
+          new Date(item.updatedAt || 0).getTime() >=
+            new Date(existing.updatedAt || 0).getTime()
+        ) {
+          map.set(item.id, item);
+        }
       }
-      if (Array.isArray(s.savedCourses) && s.savedCourses.length > 0) {
-        setSavedCourses(s.savedCourses);
-      } else if (s.syllabus) {
-        setSavedCourses([
-          {
-            id: s.syllabus.id,
-            syllabus: s.syllabus,
-            turns: s.turns || [],
-            sessionStarted: Boolean(s.sessionStarted),
-            updatedAt: s.updatedAt || new Date().toISOString(),
-          },
-        ]);
-      }
+      return Array.from(map.values())
+        .sort(
+          (x, y) =>
+            new Date(y.updatedAt || 0).getTime() -
+            new Date(x.updatedAt || 0).getTime()
+        )
+        .slice(0, 15);
     };
 
-    if (workspaceConfig.studySession) {
-      hydrateFromState(workspaceConfig.studySession);
-      return;
-    }
-
+    let localParsed: StudySessionState | null = null;
     if (typeof window !== "undefined") {
       try {
         const raw = localStorage.getItem(LOCAL_STUDY_SESSION_KEY);
         if (raw) {
-          const parsed = JSON.parse(raw) as StudySessionState;
-          if (parsed) hydrateFromState(parsed);
+          localParsed = JSON.parse(raw) as StudySessionState;
         }
       } catch {}
+    }
+
+    const remoteSession = workspaceConfig.studySession || null;
+    const remoteCourses: SavedStudyCourse[] = Array.isArray(
+      remoteSession?.savedCourses
+    )
+      ? remoteSession!.savedCourses!
+      : remoteSession?.syllabus
+      ? [
+          {
+            id: remoteSession.syllabus.id,
+            syllabus: remoteSession.syllabus,
+            turns: remoteSession.turns || [],
+            sessionStarted: Boolean(remoteSession.sessionStarted),
+            updatedAt: remoteSession.updatedAt || new Date().toISOString(),
+          },
+        ]
+      : [];
+
+    const localCourses: SavedStudyCourse[] = Array.isArray(
+      localParsed?.savedCourses
+    )
+      ? localParsed!.savedCourses!
+      : localParsed?.syllabus
+      ? [
+          {
+            id: localParsed.syllabus.id,
+            syllabus: localParsed.syllabus,
+            turns: localParsed.turns || [],
+            sessionStarted: Boolean(localParsed.sessionStarted),
+            updatedAt: localParsed.updatedAt || new Date().toISOString(),
+          },
+        ]
+      : [];
+
+    const merged = mergeCourses(localCourses, remoteCourses);
+    if (merged.length > 0) {
+      setSavedCourses((prev) => mergeCourses(prev, merged));
+    }
+
+    if (!hydratedRef.current) {
+      hydratedRef.current = true;
+      const initialActive = remoteSession?.syllabus
+        ? remoteSession
+        : localParsed;
+      if (initialActive?.syllabus) {
+        setSyllabus(initialActive.syllabus);
+        setTurns(initialActive.turns || []);
+        setSessionStarted(Boolean(initialActive.sessionStarted));
+      }
     }
   }, [workspaceConfig.studySession]);
 
@@ -932,12 +979,17 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
             </div>
           </div>
 
-          {/* Saved Courses ("Continue learning") — only shown if user has courses */}
+          {/* Saved Courses ("Prior Study Topics") — always visible when user has prior topics */}
           {savedCourses.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-white/60 px-1">
-                Continue learning
-              </h2>
+              <div className="flex items-center justify-between px-1">
+                <h2 className="text-sm font-bold uppercase tracking-wider text-white/70">
+                  Prior Study Topics ({savedCourses.length})
+                </h2>
+                <span className="text-xs text-white/45">
+                  Click any topic to pick up where you left off
+                </span>
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
                 {savedCourses.map((course) => {
@@ -1008,15 +1060,72 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
         <div className="space-y-4">
           {/* Single Compact Top Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border theme-panel px-4 py-2.5 backdrop-blur-2xl">
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
               <button
                 type="button"
                 onClick={() => setFloSubView("home")}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-white/80 hover:text-white transition-colors shrink-0"
               >
                 <ArrowLeft className="h-3.5 w-3.5 text-primary" />
-                <span>Topics</span>
+                <span>New / All Topics</span>
               </button>
+
+              {savedCourses.length > 0 && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setPriorTopicsOpen((v) => !v)}
+                    className="inline-flex items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-white/80 hover:text-white hover:border-primary/40 transition-colors shrink-0"
+                    title="Switch to a prior study topic"
+                  >
+                    <span>Prior ({savedCourses.length})</span>
+                    <ChevronDown className="h-3 w-3 text-white/55" />
+                  </button>
+
+                  {priorTopicsOpen && (
+                    <div
+                      className="absolute left-0 mt-1.5 w-72 max-h-72 overflow-y-auto rounded-2xl border border-white/20 bg-[#14161c]/95 p-2 shadow-2xl backdrop-blur-2xl z-50 space-y-1"
+                      onMouseLeave={() => setPriorTopicsOpen(false)}
+                    >
+                      <div className="px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-white/45">
+                        Switch Study Topic
+                      </div>
+                      {savedCourses.map((course) => {
+                        const prog = computeSyllabusProgress(course.syllabus);
+                        const isCurrent = course.id === syllabus.id;
+                        return (
+                          <button
+                            key={course.id}
+                            type="button"
+                            onClick={() => {
+                              setPriorTopicsOpen(false);
+                              handleOpenSavedCourse(course);
+                            }}
+                            className={`w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left text-xs transition-colors ${
+                              isCurrent
+                                ? "bg-primary/20 text-white font-bold"
+                                : "text-zinc-300 hover:bg-white/10 hover:text-white"
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate">
+                                {course.syllabus.title}
+                              </div>
+                              <div className="text-[10px] text-white/50 truncate">
+                                {prog.completedCount}/{prog.totalActive} done •{" "}
+                                {prog.percentage}%
+                              </div>
+                            </div>
+                            {isCurrent && (
+                              <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <button
                 type="button"

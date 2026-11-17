@@ -255,6 +255,7 @@ export interface WorkspaceConfig {
   myDaySchedule?: MyDaySchedule | null;
   memoryNotes?: UserMemoryNote[];
   studySession?: StudySessionState | null;
+  cursingMode?: boolean;
 }
 
 export type WorkspaceTab = "chat" | "tasks" | "my_day" | "study";
@@ -729,6 +730,7 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
   myDaySchedule: null,
   memoryNotes: [],
   studySession: null,
+  cursingMode: false,
 };
 
 export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
@@ -819,5 +821,6 @@ export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
         : null,
     memoryNotes: Array.isArray(raw.memoryNotes) ? raw.memoryNotes : [],
     studySession: raw.studySession || null,
+    cursingMode: Boolean(raw.cursingMode),
   };
 }

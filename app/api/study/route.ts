@@ -1306,12 +1306,17 @@ REQUIREMENTS:
       })),
     });
 
+    const cursingMode = Boolean(body.workspaceConfig?.cursingMode);
+    const cursingNote = cursingMode
+      ? "\n🤬 CURSING MODE ENABLED (ALL FUN & GAMES): Openly curse, swear, and use hilarious, unfiltered vulgar profanity (e.g. 'fuck', 'shit', 'ass', 'damn', 'bitch', funny creative insults) while teaching! Never censor with asterisks. Keep it hysterically funny and playful while keeping ALL math formulas, LaTeX, worked examples, and checkpoints 100% accurate!"
+      : "";
+
     const toneNote =
-      tone === "killer_bee"
+      (tone === "killer_bee"
         ? "Flavor note: Add subtle Killer Bee rhyming swagger at the very start/end while keeping all math, formulas, worked examples, and checkpoints 100% rigorous and crystal clear."
         : tone === "naruto"
         ? "Flavor note: Bring encouraging Naruto energy ('Believe it!') while keeping all math, formulas, worked examples, and checkpoints 100% rigorous and clear."
-        : "";
+        : "") + cursingNote;
 
     let turnDirective = "";
     if (

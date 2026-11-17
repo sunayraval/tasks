@@ -39,6 +39,7 @@ import { CanvasSyncModal } from "@/components/canvas/CanvasSyncModal";
 import { CheckCircle2 } from "lucide-react";
 
 const LOCAL_STORAGE_CONFIG_KEY = "taskit_workspace_config_v1";
+const LOCAL_STORAGE_PROFILE_PREFS_KEY = "kite_profile_prefs_v1";
 const HEADERS_SEEDED_STORAGE_KEY = "taskit_doc_headers_seeded_v1";
 const GEMINI_API_KEY_STORAGE_KEY = "taskit_gemini_api_key_v1";
 const AI_TEMP_DISABLED_SESSION_KEY = "taskit_ai_temp_disabled_v1";
@@ -155,6 +156,7 @@ export default function KiteWorkspacePage() {
   const deletedTaskIdsRef = useRef<Set<string>>(new Set());
   const hasAutoPromptedSetupRef = useRef<boolean>(false);
   const chatHydratedRef = useRef<boolean>(false);
+  const lastLocalProfileWriteRef = useRef<number>(0);
 
   const workspaceConfig = useMemo(() => getWorkspaceConfig(profile), [profile]);
 
@@ -288,16 +290,19 @@ export default function KiteWorkspacePage() {
       } catch {}
       chatHydratedRef.current = true;
 
-      // Load cached customization from localStorage as immediate fallback
+      // Load cached customization & theme prefs from localStorage as immediate fallback
       try {
         const cached = localStorage.getItem(LOCAL_STORAGE_CONFIG_KEY);
-        if (cached) {
-          const parsed = JSON.parse(cached);
+        const cachedPrefsRaw = localStorage.getItem(LOCAL_STORAGE_PROFILE_PREFS_KEY);
+        const cachedPrefs = cachedPrefsRaw ? JSON.parse(cachedPrefsRaw) : null;
+        if (cached || cachedPrefs) {
+          const parsedConfig = cached ? JSON.parse(cached) : {};
           setProfile((prev) => ({
             ...prev,
+            ...(cachedPrefs || {}),
             custom_theme_json: {
               ...(prev.custom_theme_json || {}),
-              ...parsed,
+              ...parsedConfig,
             },
           }));
         }
@@ -329,7 +334,10 @@ export default function KiteWorkspacePage() {
             .eq("id", user.id)
             .maybeSingle();
 
-          if (dbProfile) {
+          const hasRecentLocalWrite =
+            Date.now() - lastLocalProfileWriteRef.current < 4000;
+
+          if (dbProfile && !hasRecentLocalWrite) {
             setProfile((prev) => ({
               ...prev,
               ...dbProfile,
@@ -337,15 +345,28 @@ export default function KiteWorkspacePage() {
               custom_theme_json:
                 dbProfile.custom_theme_json || prev.custom_theme_json,
             }));
-            if (dbProfile.custom_theme_json && typeof window !== "undefined") {
+            if (typeof window !== "undefined") {
               try {
+                if (dbProfile.custom_theme_json) {
+                  localStorage.setItem(
+                    LOCAL_STORAGE_CONFIG_KEY,
+                    JSON.stringify(dbProfile.custom_theme_json)
+                  );
+                }
                 localStorage.setItem(
-                  LOCAL_STORAGE_CONFIG_KEY,
-                  JSON.stringify(dbProfile.custom_theme_json)
+                  LOCAL_STORAGE_PROFILE_PREFS_KEY,
+                  JSON.stringify({
+                    theme: dbProfile.theme,
+                    ai_tone: dbProfile.ai_tone,
+                    video_bg_preset: normalizeVideoPreset(dbProfile.video_bg_preset),
+                    video_bg_dim: dbProfile.video_bg_dim,
+                    video_bg_blur: dbProfile.video_bg_blur,
+                    view_mode: dbProfile.view_mode,
+                  })
                 );
               } catch {}
             }
-          } else {
+          } else if (!dbProfile) {
             const initialProfile = {
               id: user.id,
               email: user.email || "",
@@ -614,7 +635,29 @@ export default function KiteWorkspacePage() {
         finalUpdates.ai_tone = "killer_bee";
       }
 
-      setProfile((prev) => ({ ...prev, ...finalUpdates }));
+      lastLocalProfileWriteRef.current = Date.now();
+
+      setProfile((prev) => {
+        const nextProfile = { ...prev, ...finalUpdates };
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem(
+              LOCAL_STORAGE_PROFILE_PREFS_KEY,
+              JSON.stringify({
+                theme: nextProfile.theme,
+                ai_tone: nextProfile.ai_tone,
+                video_bg_preset: normalizeVideoPreset(
+                  nextProfile.video_bg_preset
+                ),
+                video_bg_dim: nextProfile.video_bg_dim,
+                video_bg_blur: nextProfile.video_bg_blur,
+                view_mode: nextProfile.view_mode,
+              })
+            );
+          } catch {}
+        }
+        return nextProfile;
+      });
 
       if (isSupabaseConfigured() && isAuthenticated) {
         try {
@@ -625,9 +668,19 @@ export default function KiteWorkspacePage() {
           const targetId =
             user?.id || (profile.id !== "user-default" ? profile.id : null);
           if (targetId) {
-            await supabase
+            const { data: updatedRows, error: updateErr } = await supabase
               .from("profiles")
-              .upsert({ id: targetId, ...finalUpdates });
+              .update(finalUpdates)
+              .eq("id", targetId)
+              .select("id");
+
+            if (updateErr || !updatedRows || updatedRows.length === 0) {
+              await supabase.from("profiles").upsert({
+                id: targetId,
+                email: user?.email || profile.email || "",
+                ...finalUpdates,
+              });
+            }
           }
         } catch (err) {
           console.warn("Profile update error:", err);
@@ -635,15 +688,19 @@ export default function KiteWorkspacePage() {
       }
 
       if (updates.theme === "sharingan") {
-        showToast("Switched to Sharingan Eye — Killer Bee has entered the chat! Bakayaro! Konoyaro!");
+        showToast(
+          "Switched to Sharingan Eye — Killer Bee has entered the chat! Bakayaro! Konoyaro!"
+        );
       }
     },
-    [isAuthenticated, profile.id, showToast]
+    [isAuthenticated, profile.id, profile.email, showToast]
   );
 
   // 4. Update Workspace Customization Config (persisted in custom_theme_json & localStorage)
   const handleUpdateWorkspaceConfig = useCallback(
     async (updates: Partial<WorkspaceConfig>) => {
+      lastLocalProfileWriteRef.current = Date.now();
+
       setProfile((prev) => {
         const currentConfig = getWorkspaceConfig(prev);
         const mergedConfig: WorkspaceConfig = {
@@ -668,14 +725,23 @@ export default function KiteWorkspacePage() {
 
         if (isSupabaseConfigured() && isAuthenticated) {
           const supabase = createClient();
-          supabase.auth.getUser().then(({ data: { user } }) => {
+          supabase.auth.getUser().then(async ({ data: { user } }) => {
             const targetId =
               user?.id || (prev.id !== "user-default" ? prev.id : null);
             if (targetId) {
-              supabase
+              const { data: updatedRows, error: updateErr } = await supabase
                 .from("profiles")
-                .upsert({ id: targetId, custom_theme_json: nextJson })
-                .then();
+                .update({ custom_theme_json: nextJson })
+                .eq("id", targetId)
+                .select("id");
+
+              if (updateErr || !updatedRows || updatedRows.length === 0) {
+                await supabase.from("profiles").upsert({
+                  id: targetId,
+                  email: user?.email || prev.email || "",
+                  custom_theme_json: nextJson,
+                });
+              }
             }
           });
         }

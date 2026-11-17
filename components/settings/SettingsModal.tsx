@@ -1279,6 +1279,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
+              {/* 1b. Cursing Mode (Unfiltered Comedy) Toggle */}
+              <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">🤬</span>
+                      <h4 className="text-xs font-bold text-white">
+                        Cursing Mode (Unfiltered Comedy)
+                      </h4>
+                      <span
+                        className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                          workspaceConfig.cursingMode
+                            ? "border-rose-400/50 bg-rose-500/20 text-rose-200"
+                            : "border-zinc-400/30 bg-zinc-500/15 text-zinc-300"
+                        }`}
+                      >
+                        {workspaceConfig.cursingMode ? "UNFILTERED ON" : "Off"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-white/60 leading-relaxed">
+                      All fun and games! When enabled, all AI models (Chat &amp;{" "}
+                      <strong className="text-white">flo</strong> Study Tutor) openly
+                      curse, roast, and drop hilarious vulgar profanity while still
+                      organizing your tasks and teaching you accurately.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onUpdateWorkspaceConfig({
+                        cursingMode: !workspaceConfig.cursingMode,
+                      })
+                    }
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      workspaceConfig.cursingMode ? "bg-rose-500" : "bg-white/20"
+                    }`}
+                    role="switch"
+                    aria-checked={Boolean(workspaceConfig.cursingMode)}
+                    aria-label="Toggle Cursing Mode"
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full shadow ring-0 transition duration-200 ease-in-out ${
+                        workspaceConfig.cursingMode
+                          ? "translate-x-5 bg-white"
+                          : "translate-x-0 bg-white"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
               {/* 2. AI Provider & API Key Setup */}
               <div className="rounded-xl border border-white/15 bg-black/35 p-4 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">

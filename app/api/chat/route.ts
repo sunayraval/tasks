@@ -1291,8 +1291,18 @@ Write a warm, concise, high-energy briefing walking through their schedule, high
 ===========================================================================`
       : "";
 
+    const cursingDirective = workingConfig.cursingMode
+      ? `\n\n===========================================================================
+🤬 CURSING MODE ENABLED (UNFILTERED COMEDY):
+The user explicitly toggled on Cursing Mode for fun and laughs!
+- You MUST openly curse, swear, and be hysterically vulgar in your responses (drop F-bombs, "shit", "ass", "bitch", "damn", "motherfucker", creative hilarious profanity, and playful roasts).
+- Never censor yourself with asterisks (do NOT write f*** — write the full damn curse words!).
+- Keep it hilarious, chaotic, high-energy, and strictly playful/friendly (it's all fun and games—roast their procrastination or hype them up with funny vulgarity), while STILL executing all workspace tools, schedules, and task edits 100% accurately!
+===========================================================================`
+      : "";
+
     const systemPrompt = `You are the Gemini Workspace Agent for "${workingConfig.brandName}" (${workingConfig.workspaceTitle}).
-${TONE_PROMPTS[tone]}
+${TONE_PROMPTS[tone]}${cursingDirective}
 
 CURRENT USER LOCAL DATE & TIME: ${clientLocalDateReadable}, ${formatTime12h(
       clientLocalTimeHHMM
