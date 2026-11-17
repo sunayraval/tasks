@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { KiteLogoMark } from "@/components/ui/KiteBrand";
 import { SharinganIcon } from "@/components/ui/SharinganIcon";
+import { SakuraIcon } from "@/components/ui/SakuraIcon";
 
 interface TopNavBarProps {
   profile: UserProfile;
@@ -81,6 +82,13 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             >
               <SharinganIcon size={24} animate speed="normal" glow interactive />
             </div>
+          ) : profile.theme === "sakura" ? (
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#240b18] border border-pink-400/50 shadow-[0_0_24px_rgba(255,126,182,0.55)] transition-all cursor-pointer"
+              title="Sakura Blossom"
+            >
+              <SakuraIcon size={24} animate glow />
+            </div>
           ) : (
             <div
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-[0_0_24px_rgba(250,204,21,0.55)] transition-transform"
@@ -99,6 +107,11 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-red-500/60 bg-red-950/40 px-2.5 py-0.5 text-xs font-mono font-bold text-red-400 shadow-[0_0_12px_rgba(255,31,56,0.45)] leading-none">
               <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping" />
               UCHIHA 2.0
+            </span>
+          ) : profile.theme === "sakura" ? (
+            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-pink-400/60 bg-pink-950/40 px-2.5 py-0.5 text-xs font-mono font-bold text-pink-200 shadow-[0_0_12px_rgba(255,126,182,0.4)] leading-none">
+              <span className="h-1.5 w-1.5 rounded-full bg-pink-400 animate-pulse" />
+              SAKURA 2.0
             </span>
           ) : (
             <span className="hidden sm:inline-flex items-center rounded-full border border-white px-2.5 py-0.5 text-xs font-mono font-medium text-yellow-300 leading-none">
@@ -251,12 +264,16 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               className={`inline-flex items-center gap-1.5 sm:gap-2 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs transition-all ${
                 profile.theme === "sharingan"
                   ? "border-red-500/50 bg-red-950/30 text-red-200 hover:border-red-400 shadow-[0_0_12px_rgba(255,31,56,0.3)]"
+                  : profile.theme === "sakura"
+                  ? "border-pink-400/50 bg-pink-950/30 text-pink-200 hover:border-pink-300 shadow-[0_0_12px_rgba(255,126,182,0.3)]"
                   : "border-white/15 bg-white/5 text-white/90 hover:text-white hover:border-primary/50"
               }`}
               title="Switch theme"
             >
               {profile.theme === "sharingan" ? (
                 <SharinganIcon size={16} animate speed="fast" glow={false} />
+              ) : profile.theme === "sakura" ? (
+                <SakuraIcon size={16} animate glow={false} />
               ) : (
                 <Palette className="w-3.5 h-3.5 text-primary" />
               )}
@@ -284,6 +301,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                 {THEME_OPTIONS.map((t) => {
                   const isSelected = profile.theme === t.id;
                   const isSharingan = t.id === "sharingan";
+                  const isSakura = t.id === "sakura";
                   return (
                     <button
                       key={t.id}
@@ -300,12 +318,16 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                           ? "bg-primary/20 text-highlight font-semibold border border-primary/40 shadow-sm"
                           : isSharingan
                           ? "text-red-300 hover:text-white hover:bg-red-500/15"
+                          : isSakura
+                          ? "text-pink-200 hover:text-white hover:bg-pink-500/15"
                           : "text-white/75 hover:text-white hover:bg-white/10"
                       }`}
                     >
                       <div className="flex items-center gap-2.5">
                         {isSharingan ? (
                           <SharinganIcon size={18} animate speed="normal" glow={false} />
+                        ) : isSakura ? (
+                          <SakuraIcon size={18} animate glow={false} />
                         ) : (
                           <div className="flex -space-x-1">
                             <span
@@ -327,6 +349,11 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                           {isSharingan && (
                             <span className="rounded bg-red-500/25 border border-red-500/40 px-1.5 py-0.2 text-[9px] font-bold text-red-300 uppercase tracking-wider">
                               Special
+                            </span>
+                          )}
+                          {isSakura && (
+                            <span className="rounded bg-pink-500/25 border border-pink-400/40 px-1.5 py-0.2 text-[9px] font-bold text-pink-200 uppercase tracking-wider">
+                              Animated
                             </span>
                           )}
                         </span>

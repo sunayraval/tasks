@@ -7,6 +7,7 @@ export type ThemeName =
   | "mint_sunray"
   | "rose_nebula"
   | "sharingan"
+  | "sakura"
   | "custom";
 
 export type VideoPresetName =
@@ -651,6 +652,18 @@ export const THEME_OPTIONS: Array<{
       accent: "#4a080f",
       primary: "#ff1f38",
       highlight: "#ff8c9b",
+    },
+  },
+  {
+    id: "sakura",
+    name: "Sakura Blossom",
+    subtitle: "Animated cherry blossom tree, drifting petals & twilight sakura glow",
+    colors: {
+      bgBase: "#12070d",
+      surface: "#28111d",
+      accent: "#59213c",
+      primary: "#ff7eb6",
+      highlight: "#ffd6e7",
     },
   },
   {

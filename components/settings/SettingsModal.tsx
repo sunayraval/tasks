@@ -28,6 +28,7 @@ import {
   clearCustomVideoFromIDB,
 } from "@/components/background/VideoBackground";
 import { SharinganIcon } from "@/components/ui/SharinganIcon";
+import { SakuraIcon } from "@/components/ui/SakuraIcon";
 import {
   AlertCircle,
   Bot,
@@ -852,6 +853,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       profile.theme === t.id &&
                       !workspaceConfig.customThemeColors;
                     const isSharingan = t.id === "sharingan";
+                    const isSakura = t.id === "sakura";
                     return (
                       <button
                         key={t.id}
@@ -867,9 +869,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           selected
                             ? isSharingan
                               ? "border-red-500 bg-red-950/25 shadow-[0_0_24px_rgba(255,31,56,0.35)]"
+                              : isSakura
+                              ? "border-pink-400 bg-pink-950/25 shadow-[0_0_24px_rgba(255,126,182,0.35)]"
                               : "border-primary bg-primary/15 shadow-neon"
                             : isSharingan
                             ? "border-red-500/30 bg-red-950/10 hover:bg-red-950/20 hover:border-red-500/50"
+                            : isSakura
+                            ? "border-pink-400/30 bg-pink-950/10 hover:bg-pink-950/20 hover:border-pink-400/50"
                             : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]"
                         }`}
                       >
@@ -878,6 +884,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <span>{t.name}</span>
                             {isSharingan && (
                               <span className="rounded bg-red-500/25 border border-red-500/40 px-1.5 py-0.2 text-[9px] font-bold text-red-300 uppercase tracking-wider">
+                                Animated
+                              </span>
+                            )}
+                            {isSakura && (
+                              <span className="rounded bg-pink-500/25 border border-pink-400/40 px-1.5 py-0.2 text-[9px] font-bold text-pink-200 uppercase tracking-wider">
                                 Animated
                               </span>
                             )}
@@ -890,7 +901,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           </div>
                         </div>
 
-                        {/* Swatches / Sharingan Eye */}
+                        {/* Swatches / Sharingan Eye / Sakura Blossom */}
                         <div className="flex items-center gap-2 shrink-0">
                           {isSharingan && (
                             <SharinganIcon
@@ -900,6 +911,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               glow={selected}
                               interactive
                             />
+                          )}
+                          {isSakura && (
+                            <SakuraIcon size={28} animate glow={selected} />
                           )}
                           <div className="flex items-center -space-x-1.5 shrink-0">
                             {Object.values(t.colors).map((hex, i) => (

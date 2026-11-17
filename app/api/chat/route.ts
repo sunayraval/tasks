@@ -2058,6 +2058,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               "mint_sunray",
               "rose_nebula",
               "sharingan",
+              "sakura",
               "monochrome",
               "custom",
             ])
