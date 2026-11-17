@@ -1331,13 +1331,15 @@ You have direct, live read/write control over the user's entire workspace via yo
    - Save, update, or remove persistent memory notes of events, exams, classes, personal milestones, ongoing goals, and preferences so you remember them across sessions without cluttering their actionable task list.
 
 GUIDELINES FOR THOUGHTFUL EXECUTION:
-- MANDATORY WORKSPACE PERSISTENCE RULE: When the user asks you to plan their day, organize their schedule, allocate time blocks, or auto-arrange tasks (e.g. "plan my day", "schedule my tasks from 2:30 to 6pm", "organize my day"), you MUST invoke \`manage_my_day_schedule\` (with action: "auto_arrange" or "set_blocks"). DO NOT merely print an unpersisted Markdown table or text list of times! Invoking \`manage_my_day_schedule\` commits the blocks to their real workspace and automatically renders the interactive live status banner & schedule widget directly inside the chat UI.
+- MANDATORY TOOL EXECUTION RULE (CRITICAL — NEVER FAKE MUTATIONS):
+  * Whenever the user asks you to add, create, edit, complete, delete, move, or sort tasks (e.g. "add X to the list", "put Y on my tasks", "mark Z done", "delete W"), or plan/schedule their day:
+    -> You MUST actually invoke the corresponding tool (\`add_tasks\`, \`update_tasks\`, \`delete_tasks\`, \`move_and_reorder_tasks\`, or \`manage_my_day_schedule\`)!
+    -> NEVER just print the task list in chat with the item appended in text! Printing a list in chat DOES NOT save anything to the user's real database or task table.
+    -> NEVER claim "Added X to your list" or "Updated your list" unless you actually called the tool and received \`success: true\` in the tool result!
 - Execute clear user requests directly using the appropriate tools—do NOT ask for permission first unless using \`prompt_user_qa\` for underspecified planning/empty-list day discovery. You can chain multiple tools in one turn!
 - TASK ADDITION & TIME WINDOW CLARIFICATION RULE:
-  * When the user asks you to add a task (e.g. "add physics homework", "put in math review", "add essay") and HAS NOT specified an estimated duration / time window, due date, or important details:
-    -> DO NOT guess random numbers and insert it silently without asking!
-    -> Instead, ask the user quickly for it (e.g. "Got it! How much time do you expect this task to take, and when is it due or scheduled for?"). Keep your clarification prompt quick and direct.
-  * If the user ALREADY provided a duration or timeframe (e.g. "add 30m physics hw due tomorrow", "schedule study bio from 3 to 4pm", "add 15 min quick review"), immediately call \`add_tasks\` and confirm without asking!
+  * If the user explicitly says "add [task] to the list" / "put [task] in" and gives ANY context (or says "just add it", "add it now", or specifies a duration/due date), call \`add_tasks\` immediately (defaulting \`estimated_minutes\` to 30 if omitted).
+  * Only ask a quick clarifying question if the user gave a completely bare task name with zero timeframe AND you genuinely need to ask when it's due—never pretend you added it to the list if you didn't call \`add_tasks\`.
 - AUTOMATIC LIFE CONTEXT LEARNING RULE:
   * Whenever the user mentions important events in their life, recurring milestones, classes, exams, ongoing goals, or general life preferences (e.g. "I have a Linear Algebra midterm next Thursday", "I'm applying to colleges for CS", "I prefer studying in the early morning", "My dog is named Buster"):
     -> Call \`manage_user_memory\` (action: "add") to remember it!
@@ -3288,12 +3290,19 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
       const backupModel =
         primaryModel !== "nvidia/nemotron-3.5-lightning-30b-a3b"
           ? "nvidia/nemotron-3.5-lightning-30b-a3b"
-          : "deepseek-ai/deepseek-v4.1-flash";
+          : "google/gemma-4-31b-it";
 
       const candidates = [primaryModel, backupModel];
       const candidateTimeoutMs = qaSubmission ? 65000 : 55000;
 
-      for (const candidate of candidates) {
+      const isExplicitMutationIntent =
+        !isGreeting &&
+        /\b(add|create|put|insert|append|delete|remove|drop|mark|complete|finish|update|edit|change|rename|move|sort|reorder|shift|reschedule|schedule|plan\s+my\s+day|switch\s+theme|sync\s+canvas)\b/i.test(
+          userMessage
+        );
+
+      for (let cIdx = 0; cIdx < candidates.length; cIdx++) {
+        const candidate = candidates[cIdx];
         const candStart = Date.now();
         try {
           const timeoutPromise = new Promise<never>((_, reject) =>
@@ -3309,23 +3318,49 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               system: systemPrompt,
               messages: conversationMessages,
               tools: effectiveTools,
+              // On backup retry after a faked text mutation, force tool_choice = required
+              ...(cIdx > 0 && isExplicitMutationIntent && !qaState.prompt
+                ? { toolChoice: "required" as const }
+                : {}),
               maxSteps: isGreeting ? 1 : qaSubmission ? 6 : 5,
               maxTokens: 3500,
             }),
             timeoutPromise,
           ]);
 
-          usedModel = candidate;
           const stepTexts = (result.steps || [])
             .map((s) => (s.text || "").trim())
             .filter(Boolean);
-          replyText =
+          const candidateText =
             (result.text || "").trim() || stepTexts.join("\n\n").trim();
+
+          // Guard against small models (e.g. Nemotron Bolt) hallucinating a task list update in text without invoking any tool!
+          const looksLikeClarifyingQuestion =
+            candidateText.includes("?") &&
+            !/\b(added|updated|removed|deleted|scheduled|here is your updated|appended)\b/i.test(
+              candidateText
+            );
+
+          if (
+            cIdx < candidates.length - 1 &&
+            isExplicitMutationIntent &&
+            executedActions.length === 0 &&
+            !qaState.prompt &&
+            !looksLikeClarifyingQuestion
+          ) {
+            console.warn(
+              `[NVIDIA NIM] Model "${candidate}" returned text without invoking any tool on a mutation request; failing over to "${candidates[cIdx + 1]}" with toolChoice=required.`
+            );
+            continue;
+          }
+
+          usedModel = candidate;
+          replyText = candidateText;
           succeeded = true;
           console.log(
             `[NVIDIA NIM] Model "${candidate}" generated response in ${
               Date.now() - candStart
-            }ms`
+            }ms (actions: ${executedActions.length})`
           );
           return true;
         } catch (err) {
