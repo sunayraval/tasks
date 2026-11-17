@@ -1050,6 +1050,10 @@ export async function POST(request: Request) {
     // =========================================================================
     if (mode === "generate_syllabus") {
       const topicInput: string = (body.topicInput || "").trim();
+      const academicLevel = body.academicLevel || "College level";
+      const studyStyle = body.studyStyle || "syllabus";
+      const referenceNotes: string = (body.referenceNotes || "").trim();
+
       if (!topicInput) {
         return NextResponse.json(
           {
@@ -1060,15 +1064,15 @@ export async function POST(request: Request) {
         );
       }
 
-      const syllabusPrompt = `Break the following user study topic(s), syllabus notes, or exam focus areas into an ordered, hyper-organized JSON curriculum:
+      const syllabusPrompt = `Break the following user study topic(s), syllabus notes, or exam focus areas into an ordered, hyper-organized JSON curriculum tailored for "${academicLevel}" (mode: "${studyStyle}"):
 
 USER INPUT TOPICS:
 """
-${topicInput}
+${topicInput}${referenceNotes ? `\n\nADDITIONAL REFERENCE NOTES:\n${referenceNotes}` : ""}
 """
 
 REQUIREMENTS:
-1. Ensure 100% coverage of EVERY topic the user entered.
+1. Ensure 100% coverage of EVERY topic the user entered, calibrated to ${academicLevel}.
 2. Group into 2 to 4 logical "modules" (Major Topics).
 3. Break each module into 2 to 4 concrete, bite-sized "subtopics" (Micro-Lessons) ordered logically from foundational concepts/notation to problem-solving & applications.
 4. Keep titles and descriptions crisp so generation is instant.
@@ -1168,6 +1172,9 @@ REQUIREMENTS:
                 typeof parsed.overview === "string" && parsed.overview.trim()
                   ? parsed.overview.trim()
                   : `Interactive micro-lesson curriculum covering ${topicInput}.`,
+              academicLevel,
+              studyStyle,
+              referenceNotes: referenceNotes || undefined,
               modules: builtModules,
               createdAt: nowISO,
               updatedAt: nowISO,
@@ -1181,7 +1188,12 @@ REQUIREMENTS:
         }
       }
 
-      const fallbackSyllabus = buildDeterministicSyllabus(topicInput);
+      const fallbackSyllabus = {
+        ...buildDeterministicSyllabus(topicInput),
+        academicLevel,
+        studyStyle,
+        referenceNotes: referenceNotes || undefined,
+      };
       return NextResponse.json({
         syllabus: fallbackSyllabus,
         modelUsed: requestedNvidiaModel,

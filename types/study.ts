@@ -4,6 +4,18 @@ export type StudySubtopicState =
   | "mastered"
   | "skipped_known";
 
+export type StudyModeStyle =
+  | "syllabus"
+  | "full_course"
+  | "textbook"
+  | "practice_quiz";
+
+export type StudyAcademicLevel =
+  | "College level"
+  | "High School / AP"
+  | "Graduate level"
+  | "Beginner friendly";
+
 export interface StudySubtopic {
   id: string;
   title: string;
@@ -24,6 +36,9 @@ export interface StudySyllabus {
   topicQuery: string;
   title: string;
   overview: string;
+  academicLevel?: StudyAcademicLevel;
+  studyStyle?: StudyModeStyle;
+  referenceNotes?: string;
   modules: StudyModule[];
   createdAt: string;
   updatedAt: string;
@@ -115,10 +130,19 @@ export interface StudyLessonTurn {
   modelUsed?: string;
 }
 
+export interface SavedStudyCourse {
+  id: string;
+  syllabus: StudySyllabus;
+  turns: StudyLessonTurn[];
+  sessionStarted: boolean;
+  updatedAt: string;
+}
+
 export interface StudySessionState {
   syllabus: StudySyllabus | null;
   turns: StudyLessonTurn[];
   sessionStarted: boolean;
+  savedCourses?: SavedStudyCourse[];
   updatedAt: string;
 }
 
@@ -147,7 +171,6 @@ export function normalizeSyllabusStates(
 ): StudySyllabus {
   let assignedInProgress = false;
 
-  // Check if preferredSubtopicId exists and can be active
   let canUsePreferred = false;
   if (preferredSubtopicId) {
     for (const mod of syllabus.modules) {
@@ -164,7 +187,6 @@ export function normalizeSyllabusStates(
     }
   }
 
-  // If no preferredSubtopicId, check if there is already a valid in_progress subtopic
   let existingInProgressId: string | null = null;
   if (!canUsePreferred) {
     for (const mod of syllabus.modules) {
@@ -198,7 +220,6 @@ export function normalizeSyllabusStates(
     }),
   }));
 
-  // Second pass: if targetActiveId wasn't matched for some reason, promote the very first locked subtopic
   if (!assignedInProgress) {
     for (const mod of updatedModules) {
       for (let i = 0; i < mod.subtopics.length; i++) {
@@ -274,7 +295,6 @@ export function computeSyllabusProgress(
     }
   }
 
-  // Fallback if no subtopic had state === "in_progress" but locked ones exist
   if (!activeSubtopic && lockedCount > 0) {
     let fallbackIdx = 0;
     for (const mod of syllabus.modules) {

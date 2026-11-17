@@ -220,7 +220,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                   activeTab === "study" ? "text-primary" : "text-white/50"
                 }`}
               />
-              <span>Study Mode</span>
+              <span>flo</span>
               {workspaceConfig.studySession?.syllabus && (
                 <span
                   className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
