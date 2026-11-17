@@ -224,6 +224,9 @@ export interface UserMemoryNote {
   source?: "agent" | "user";
 }
 
+import type { StudySessionState } from "@/types/study";
+export * from "@/types/study";
+
 export interface WorkspaceConfig {
   workspaceTitle: string;
   workspaceSubtitle: string;
@@ -243,9 +246,10 @@ export interface WorkspaceConfig {
   customThemeColors?: ThemeColors | null;
   myDaySchedule?: MyDaySchedule | null;
   memoryNotes?: UserMemoryNote[];
+  studySession?: StudySessionState | null;
 }
 
-export type WorkspaceTab = "chat" | "tasks" | "my_day";
+export type WorkspaceTab = "chat" | "tasks" | "my_day" | "study";
 
 export type AIModelChoice = "flash" | "pro";
 
@@ -716,6 +720,7 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
   customThemeColors: null,
   myDaySchedule: null,
   memoryNotes: [],
+  studySession: null,
 };
 
 export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
@@ -805,5 +810,6 @@ export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
         ? raw.myDaySchedule
         : null,
     memoryNotes: Array.isArray(raw.memoryNotes) ? raw.memoryNotes : [],
+    studySession: raw.studySession || null,
   };
 }

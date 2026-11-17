@@ -3005,10 +3005,10 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               "Set true when user asks to sync, import, or refresh Canvas assignments so the assignment selection UI opens for them"
             ),
           switch_to_tab: z
-            .enum(["chat", "tasks", "my_day"])
+            .enum(["chat", "tasks", "my_day", "study"])
             .optional()
             .describe(
-              "Set to 'tasks' or 'my_day' only when the user explicitly asks to switch to or open that tab"
+              "Set to 'tasks', 'my_day', or 'study' (Study Mode / flo study) when the user explicitly asks to switch to or open that tab"
             ),
         }),
         execute: async ({ sync_canvas, switch_to_tab }) => {

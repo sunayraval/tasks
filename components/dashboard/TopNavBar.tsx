@@ -7,11 +7,13 @@ import {
   UserProfile,
   WorkspaceConfig,
   WorkspaceTab,
+  computeSyllabusProgress,
 } from "@/types/taskit";
 import {
   CalendarClock,
   Check,
   ChevronDown,
+  GraduationCap,
   LogIn,
   LogOut,
   Palette,
@@ -198,6 +200,41 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                   }`}
                 >
                   {workspaceConfig.myDaySchedule?.blocks.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "study"}
+              onClick={() => onSelectTab("study")}
+              className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-all ${
+                activeTab === "study"
+                  ? "bg-white/15 text-white shadow-sm border border-white/15"
+                  : "text-white/60 hover:text-white border border-transparent"
+              }`}
+            >
+              <GraduationCap
+                className={`w-3.5 h-3.5 ${
+                  activeTab === "study" ? "text-primary" : "text-white/50"
+                }`}
+              />
+              <span>Study Mode</span>
+              {workspaceConfig.studySession?.syllabus && (
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
+                    activeTab === "study"
+                      ? "bg-primary/25 text-highlight"
+                      : "bg-white/10 text-white/65"
+                  }`}
+                >
+                  {
+                    computeSyllabusProgress(
+                      workspaceConfig.studySession.syllabus
+                    ).percentage
+                  }
+                  %
                 </span>
               )}
             </button>

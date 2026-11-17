@@ -26,6 +26,7 @@ import { TaskTable } from "@/components/tasks/TaskTable";
 import { GeminiHeroChat } from "@/components/ai/GeminiHeroChat";
 import { GeminiSetupModal } from "@/components/ai/GeminiSetupModal";
 import { MyDayView } from "@/components/myday/MyDayView";
+import { StudyModeView } from "@/components/study/StudyModeView";
 import { EnrichedMyDayBlock } from "@/utils/myDayUtils";
 import { KiteMarketingPage } from "@/components/marketing/KiteMarketingPage";
 import { KiteFlyingLoader } from "@/components/ui/KiteBrand";
@@ -1651,6 +1652,17 @@ export default function KiteWorkspacePage() {
                       text: "Help me plan my day",
                     });
                   }}
+                />
+              ) : effectiveTab === "study" ? (
+                /* STUDY MODE (flo study) Tab: Editable Curriculum + Bite-Sized Teaching + Visuals + Checkpoints */
+                <StudyModeView
+                  profile={profile}
+                  workspaceConfig={workspaceConfig}
+                  hasApiKey={hasGeminiApiKey}
+                  effectiveApiKey={effectiveApiKey}
+                  onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
+                  onOpenApiKeySetup={() => setIsGeminiSetupOpen(true)}
+                  onShowToast={showToast}
                 />
               ) : (
                 /* Tasks Tab: Telemetry Header + Document-Style Resizable Task Table */
