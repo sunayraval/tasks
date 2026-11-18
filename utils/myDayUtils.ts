@@ -520,6 +520,152 @@ export function smartHeuristicArrange(params: {
   return { blocks, summary };
 }
 
+export function stripSectionHeaderDecorations(title: string): string {
+  return (title || "")
+    .replace(/^[—\-=\s✨🔥🌅🎓📅🧠📌🚀⚡🎯]+/, "")
+    .replace(/[—\-=\s✨🔥🌅🎓📅🧠📌🚀⚡🎯]+$/, "")
+    .trim();
+}
+
+export function resolveSectionGroupFromHeaderTitle(
+  headerTitle: string,
+  fallbackSectionGroup = "TODAY"
+): string {
+  const cleanLabel = stripSectionHeaderDecorations(headerTitle).toUpperCase();
+  if (cleanLabel.includes("TODAY")) return "TODAY";
+  if (cleanLabel.includes("TOMORROW") || cleanLabel.includes("TMR")) return "TMR";
+  if (cleanLabel.includes("COLLEGE")) return "COLLEGE";
+  if (cleanLabel.includes("SOON")) return "SOON";
+  if (cleanLabel.includes("REMEMBER")) return "REMEMBER";
+  return (
+    cleanLabel.replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "") ||
+    fallbackSectionGroup ||
+    "TODAY"
+  );
+}
+
+/**
+ * Ensures 100% consistency between TaskTable, page state, MyDayView, and the AI Chat route:
+ * 1. Filters out stale past-due uncompleted tasks (due_date < startOfTodayMs) that TaskTable hides.
+ * 2. Optionally filters out completed tasks when showCompletedTasks is false.
+ * 3. Walks top-to-bottom and assigns every task's `section_group` from the movable header row above it.
+ */
+export function syncTasksWithHeadersAndFilter(
+  rawTasks: TaskItem[],
+  options?: {
+    filterPastDue?: boolean;
+    hideCompleted?: boolean;
+    startOfTodayMs?: number;
+    defaultSectionGroup?: string;
+  }
+): TaskItem[] {
+  const filterPastDue = options?.filterPastDue ?? true;
+  const hideCompleted = options?.hideCompleted ?? false;
+  const now = new Date();
+  const startOfTodayMs =
+    options?.startOfTodayMs ??
+    new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  const filtered = rawTasks.filter((t) => {
+    const isHeader = Boolean(t.custom_properties?.is_header);
+    if (isHeader) return true;
+
+    const completed = isTaskDoneStatus(t);
+    if (hideCompleted && completed) {
+      return false;
+    }
+
+    if (filterPastDue && !completed && t.due_date) {
+      const dueTime = new Date(t.due_date).getTime();
+      if (!isNaN(dueTime) && dueTime < startOfTodayMs) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  let currentSectionGroup = options?.defaultSectionGroup || "TODAY";
+  return filtered.map((item, idx) => {
+    const isHeader = Boolean(item.custom_properties?.is_header);
+    if (isHeader) {
+      currentSectionGroup = resolveSectionGroupFromHeaderTitle(
+        item.title,
+        item.section_group || currentSectionGroup
+      );
+      return {
+        ...item,
+        section_group: currentSectionGroup,
+        order_index: idx,
+      };
+    }
+    return {
+      ...item,
+      section_group: currentSectionGroup,
+      order_index: idx,
+    };
+  });
+}
+
+/**
+ * Prunes orphan blocks from myDaySchedule that no longer exist on the active task list
+ * (or are from a previous date) and syncs titles/priorities/completion with live tasks.
+ */
+export function pruneAndSyncMyDaySchedule(
+  schedule: MyDaySchedule | null | undefined,
+  tasks: TaskItem[],
+  todayDateYMD?: string
+): MyDaySchedule | null {
+  if (!schedule) return null;
+
+  // If schedule is from a past day, reset blocks so yesterday's tasks never bleed into today
+  if (todayDateYMD && schedule.date && schedule.date !== todayDateYMD) {
+    return {
+      ...schedule,
+      date: todayDateYMD,
+      blocks: [],
+    };
+  }
+
+  const realTasks = tasks.filter((t) => !t.custom_properties?.is_header);
+  const rawBlocks = schedule.blocks || [];
+  if (rawBlocks.length === 0) return schedule;
+
+  const syncedTaskBlocks: MyDayBlock[] = [];
+  for (const b of rawBlocks) {
+    if (b.isBreak) {
+      syncedTaskBlocks.push(b);
+      continue;
+    }
+    const cleanBlockTitle = (b.title || "").trim().toLowerCase();
+    const matched =
+      (b.taskId ? realTasks.find((t) => t.id === b.taskId) : undefined) ||
+      realTasks.find((t) => t.title.trim().toLowerCase() === cleanBlockTitle);
+
+    if (!matched) {
+      // Task no longer exists on the user's Task List -> drop orphan schedule block
+      continue;
+    }
+
+    syncedTaskBlocks.push({
+      ...b,
+      taskId: matched.id,
+      title: matched.title,
+      category: matched.type || b.category,
+      priority: matched.priority || b.priority,
+      completed: isTaskDoneStatus(matched),
+    });
+  }
+
+  // If no non-break task blocks remain, clear break-only schedule
+  const hasAnyRealTaskBlock = syncedTaskBlocks.some((b) => !b.isBreak);
+  const finalBlocks = hasAnyRealTaskBlock ? syncedTaskBlocks : [];
+
+  return {
+    ...schedule,
+    blocks: finalBlocks,
+  };
+}
+
 /**
  * Computes real-time clock telemetry, Current Task status bar %, Overall Day Schedule %,
  * and rich logistics for both the MY DAY hero centerpiece and the Gemini Chat tool.
@@ -529,7 +675,8 @@ export function computeMyDayLiveTelemetry(
   tasks: TaskItem[],
   nowMinutesOfDay: number
 ): MyDayLiveTelemetry {
-  const rawBlocks = schedule?.blocks || [];
+  const syncedSchedule = pruneAndSyncMyDaySchedule(schedule, tasks);
+  const rawBlocks = syncedSchedule?.blocks || [];
   if (rawBlocks.length === 0) {
     return {
       hasSchedule: false,

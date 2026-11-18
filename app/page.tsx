@@ -27,7 +27,13 @@ import { GeminiHeroChat } from "@/components/ai/GeminiHeroChat";
 import { GeminiSetupModal } from "@/components/ai/GeminiSetupModal";
 import { MyDayView } from "@/components/myday/MyDayView";
 import { StudyModeView } from "@/components/study/StudyModeView";
-import { EnrichedMyDayBlock } from "@/utils/myDayUtils";
+import {
+  EnrichedMyDayBlock,
+  getLocalDateYMD,
+  isTaskDoneStatus,
+  pruneAndSyncMyDaySchedule,
+  syncTasksWithHeadersAndFilter,
+} from "@/utils/myDayUtils";
 import { KiteMarketingPage } from "@/components/marketing/KiteMarketingPage";
 import { KiteFlyingLoader } from "@/components/ui/KiteBrand";
 import {
@@ -204,14 +210,36 @@ export default function KiteWorkspacePage() {
 
   const hasGeminiApiKey = effectiveApiKey.length >= 15;
 
+  // Master synced task list: filters out stale past-due uncompleted tasks (matching TaskTable)
+  // and recomputes section_group from the movable header rows above each task
+  const syncedTasks = useMemo(
+    () =>
+      syncTasksWithHeadersAndFilter(tasks, {
+        filterPastDue: true,
+        hideCompleted: false,
+        defaultSectionGroup: workspaceConfig.sections[0]?.id || "TODAY",
+      }),
+    [tasks, workspaceConfig.sections]
+  );
+
+  // Exact visible task list on the active board (passed to AI Chat & MyDayView so they 100% match the Task Table)
+  const visibleBoardTasks = useMemo(
+    () =>
+      syncTasksWithHeadersAndFilter(tasks, {
+        filterPastDue: true,
+        hideCompleted: !workspaceConfig.showCompletedTasks,
+        defaultSectionGroup: workspaceConfig.sections[0]?.id || "TODAY",
+      }),
+    [tasks, workspaceConfig.showCompletedTasks, workspaceConfig.sections]
+  );
+
   const activeTaskCount = useMemo(
     () =>
-      tasks.filter((t) => {
+      syncedTasks.filter((t) => {
         if (t.custom_properties?.is_header) return false;
-        const s = (t.status || "").toLowerCase();
-        return s !== "done" && s !== "completed";
+        return !isTaskDoneStatus(t);
       }).length,
-    [tasks]
+    [syncedTasks]
   );
 
   const showToast = useCallback((msg: string) => {
@@ -385,16 +413,56 @@ export default function KiteWorkspacePage() {
             }));
           }
 
-          // 2. Fetch Tasks (preserve ALL tasks without destructive due-date filtering)
+          // 2. Fetch Tasks & synchronize with movable section headers + filter stale past-due items
           const { data: dbTasks } = await supabase
             .from("tasks")
             .select("*")
             .eq("user_id", user.id)
             .order("order_index", { ascending: true });
 
-          const loadedTasks = ((dbTasks || []) as TaskItem[]).filter((t) => {
+          const rawLoadedTasks = ((dbTasks || []) as TaskItem[]).filter((t) => {
             if (deletedTaskIdsRef.current.has(t.id)) return false;
             return true;
+          });
+
+          const now = new Date();
+          const startOfTodayMs = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate()
+          ).getTime();
+
+          // Identify stale past-due uncompleted tasks that TaskTable hides so we purge them cleanly
+          const stalePastIds: string[] = [];
+          for (const t of rawLoadedTasks) {
+            if (
+              !t.custom_properties?.is_header &&
+              !isTaskDoneStatus(t) &&
+              t.due_date
+            ) {
+              const dueTime = new Date(t.due_date).getTime();
+              if (!isNaN(dueTime) && dueTime < startOfTodayMs) {
+                stalePastIds.push(t.id);
+                deletedTaskIdsRef.current.add(t.id);
+              }
+            }
+          }
+          if (stalePastIds.length > 0) {
+            const uuidStale = stalePastIds.filter((id) => UUID_REGEX.test(id));
+            if (uuidStale.length > 0) {
+              supabase.from("tasks").delete().in("id", uuidStale).then();
+            }
+          }
+
+          const activeSections =
+            getWorkspaceConfig(dbProfile || DEFAULT_PROFILE).sections ||
+            DEFAULT_WORKSPACE_CONFIG.sections;
+
+          const loadedTasks = syncTasksWithHeadersAndFilter(rawLoadedTasks, {
+            filterPastDue: true,
+            hideCompleted: false,
+            startOfTodayMs,
+            defaultSectionGroup: activeSections[0]?.id || "TODAY",
           });
 
           const hasAnyHeaderRow = loadedTasks.some((t) =>
@@ -412,10 +480,6 @@ export default function KiteWorkspacePage() {
                 "true"
               );
             }
-
-            const activeSections =
-              getWorkspaceConfig(dbProfile || DEFAULT_PROFILE).sections ||
-              DEFAULT_WORKSPACE_CONFIG.sections;
 
             const { combined, createdHeaders } = buildDefaultHeaderRowsForTasks(
               user.id,
@@ -450,7 +514,10 @@ export default function KiteWorkspacePage() {
                 if (!createdHeaders.some((h) => h.id === item.id)) {
                   supabase
                     .from("tasks")
-                    .update({ order_index: item.order_index })
+                    .update({
+                      order_index: item.order_index,
+                      section_group: item.section_group,
+                    })
                     .eq("id", item.id)
                     .then();
                 }
@@ -845,17 +912,21 @@ export default function KiteWorkspacePage() {
         updated_at: nowISO,
       };
 
-      let nextList: TaskItem[] = [];
+      const rawCopy = [...tasks];
       if (afterIdx !== -1) {
-        const copy = [...tasks];
-        copy.splice(afterIdx + 1, 0, created);
-        nextList = copy.map((item, idx) => ({ ...item, order_index: idx }));
+        rawCopy.splice(afterIdx + 1, 0, created);
       } else {
-        nextList = [...tasks, created].map((item, idx) => ({
-          ...item,
-          order_index: idx,
-        }));
+        rawCopy.push(created);
       }
+
+      const nextList = syncTasksWithHeadersAndFilter(rawCopy, {
+        filterPastDue: true,
+        hideCompleted: false,
+        defaultSectionGroup: workspaceConfig.sections[0]?.id || "TODAY",
+      });
+
+      const syncedCreated =
+        nextList.find((item) => item.id === newUuid) || created;
 
       setTasks(nextList);
 
@@ -870,20 +941,20 @@ export default function KiteWorkspacePage() {
               .insert({
                 id: newUuid,
                 user_id: targetUserId,
-                title: created.title,
-                content: created.content,
-                status: created.status,
-                type: created.type,
-                priority: created.priority,
-                due_date: created.due_date,
-                estimated_minutes: created.estimated_minutes,
-                tags: created.tags,
-                notes: created.notes,
-                is_canvas_assignment: created.is_canvas_assignment,
-                canvas_course_code: created.canvas_course_code,
+                title: syncedCreated.title,
+                content: syncedCreated.content,
+                status: syncedCreated.status,
+                type: syncedCreated.type,
+                priority: syncedCreated.priority,
+                due_date: syncedCreated.due_date,
+                estimated_minutes: syncedCreated.estimated_minutes,
+                tags: syncedCreated.tags,
+                notes: syncedCreated.notes,
+                is_canvas_assignment: syncedCreated.is_canvas_assignment,
+                canvas_course_code: syncedCreated.canvas_course_code,
                 custom_properties: {},
-                section_group: created.section_group,
-                order_index: insertOrderIndex,
+                section_group: syncedCreated.section_group,
+                order_index: syncedCreated.order_index,
               })
               .then();
           }
@@ -932,17 +1003,21 @@ export default function KiteWorkspacePage() {
         updated_at: nowISO,
       };
 
-      let nextList: TaskItem[] = [];
+      const rawCopy = [...tasks];
       if (afterIdx !== -1) {
-        const copy = [...tasks];
-        copy.splice(afterIdx + 1, 0, createdHeader);
-        nextList = copy.map((item, idx) => ({ ...item, order_index: idx }));
+        rawCopy.splice(afterIdx + 1, 0, createdHeader);
       } else {
-        nextList = [...tasks, createdHeader].map((item, idx) => ({
-          ...item,
-          order_index: idx,
-        }));
+        rawCopy.push(createdHeader);
       }
+
+      const nextList = syncTasksWithHeadersAndFilter(rawCopy, {
+        filterPastDue: true,
+        hideCompleted: false,
+        defaultSectionGroup: workspaceConfig.sections[0]?.id || "TODAY",
+      });
+
+      const syncedHeader =
+        nextList.find((item) => item.id === newUuid) || createdHeader;
 
       setTasks(nextList);
 
@@ -957,11 +1032,11 @@ export default function KiteWorkspacePage() {
               .insert({
                 id: newUuid,
                 user_id: targetUserId,
-                title: createdHeader.title,
+                title: syncedHeader.title,
                 content: "",
-                status: createdHeader.status,
-                type: createdHeader.type,
-                priority: createdHeader.priority,
+                status: syncedHeader.status,
+                type: syncedHeader.type,
+                priority: syncedHeader.priority,
                 due_date: null,
                 estimated_minutes: 0,
                 tags: [],
@@ -969,8 +1044,8 @@ export default function KiteWorkspacePage() {
                 is_canvas_assignment: false,
                 canvas_course_code: null,
                 custom_properties: { is_header: true },
-                section_group: createdHeader.section_group,
-                order_index: insertOrderIndex,
+                section_group: syncedHeader.section_group,
+                order_index: syncedHeader.order_index,
               })
               .then();
           }
@@ -979,21 +1054,50 @@ export default function KiteWorkspacePage() {
 
       return newUuid;
     },
-    [profile.id, tasks, isAuthenticated]
+    [profile.id, tasks, isAuthenticated, workspaceConfig.sections]
   );
 
-  // 7. Update Task or Header Row
+  // 7. Update Task or Header Row (and keep myDaySchedule synced!)
   const handleUpdateTask = useCallback(
     async (taskId: string, updates: Partial<TaskItem>) => {
       // Do not update or resurrect a deleted row
       if (deletedTaskIdsRef.current.has(taskId)) return;
 
       const nowISO = new Date().toISOString();
-      setTasks((prev) =>
-        prev.map((t) =>
+      let updatedSnapshot: TaskItem[] = [];
+      setTasks((prev) => {
+        const mapped = prev.map((t) =>
           t.id === taskId ? { ...t, ...updates, updated_at: nowISO } : t
-        )
-      );
+        );
+        updatedSnapshot = syncTasksWithHeadersAndFilter(mapped, {
+          filterPastDue: true,
+          hideCompleted: false,
+          defaultSectionGroup: workspaceConfig.sections[0]?.id || "TODAY",
+        });
+        return updatedSnapshot;
+      });
+
+      // Keep myDaySchedule blocks synchronized whenever a task's title, priority, type, or status changes
+      if (workspaceConfig.myDaySchedule?.blocks?.length) {
+        const activeVisible = updatedSnapshot.filter(
+          (t) =>
+            !t.custom_properties?.is_header &&
+            (workspaceConfig.showCompletedTasks || !isTaskDoneStatus(t))
+        );
+        const syncedSched = pruneAndSyncMyDaySchedule(
+          workspaceConfig.myDaySchedule,
+          activeVisible,
+          getLocalDateYMD()
+        );
+        if (syncedSched) {
+          handleUpdateWorkspaceConfig({
+            myDaySchedule: {
+              ...syncedSched,
+              updatedAt: nowISO,
+            },
+          });
+        }
+      }
 
       if (isSupabaseConfigured() && isAuthenticated) {
         try {
@@ -1005,22 +1109,63 @@ export default function KiteWorkspacePage() {
         } catch {}
       }
     },
-    [isAuthenticated]
+    [
+      isAuthenticated,
+      workspaceConfig.sections,
+      workspaceConfig.myDaySchedule,
+      workspaceConfig.showCompletedTasks,
+      handleUpdateWorkspaceConfig,
+    ]
   );
 
-  // 8. Delete Task or Header Row - flicker-free and permanent
+  // 8. Delete Task or Header Row - flicker-free, permanent, and synced with myDaySchedule
   const handleDeleteTask = useCallback(
     async (taskId: string) => {
       // Instantly track in deleted set so no real-time or sync payload brings it back
       deletedTaskIdsRef.current.add(taskId);
 
       const target = tasks.find((t) => t.id === taskId);
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      const remaining = syncTasksWithHeadersAndFilter(
+        tasks.filter((t) => t.id !== taskId),
+        {
+          filterPastDue: true,
+          hideCompleted: false,
+          defaultSectionGroup: workspaceConfig.sections[0]?.id || "TODAY",
+        }
+      );
+      setTasks(remaining);
+
       if (selectedTaskId === taskId) {
         setSelectedTaskId(null);
       }
       if (target) {
         showToast(`Deleted "${target.title}"`);
+      }
+
+      // Immediately prune deleted task from myDaySchedule so it never lingers
+      if (workspaceConfig.myDaySchedule?.blocks?.length) {
+        const activeRemaining = remaining.filter(
+          (t) =>
+            !t.custom_properties?.is_header &&
+            (workspaceConfig.showCompletedTasks || !isTaskDoneStatus(t))
+        );
+        const syncedSched = pruneAndSyncMyDaySchedule(
+          workspaceConfig.myDaySchedule,
+          activeRemaining,
+          getLocalDateYMD()
+        );
+        if (
+          syncedSched &&
+          syncedSched.blocks.length !==
+            workspaceConfig.myDaySchedule.blocks.length
+        ) {
+          handleUpdateWorkspaceConfig({
+            myDaySchedule: {
+              ...syncedSched,
+              updatedAt: new Date().toISOString(),
+            },
+          });
+        }
       }
 
       if (isSupabaseConfigured() && isAuthenticated) {
@@ -1047,16 +1192,27 @@ export default function KiteWorkspacePage() {
         }
       }
     },
-    [tasks, selectedTaskId, showToast, isAuthenticated, profile.id]
+    [
+      tasks,
+      selectedTaskId,
+      showToast,
+      isAuthenticated,
+      profile.id,
+      workspaceConfig.sections,
+      workspaceConfig.myDaySchedule,
+      workspaceConfig.showCompletedTasks,
+      handleUpdateWorkspaceConfig,
+    ]
   );
 
-  // 9. Reorder Tasks & Movable Headers (persists order_index to Supabase)
+  // 9. Reorder Tasks & Movable Headers (persists BOTH order_index AND section_group to Supabase)
   const handleReorderTasks = useCallback(
     (newTasks: TaskItem[]) => {
-      const indexed = newTasks.map((item, idx) => ({
-        ...item,
-        order_index: idx,
-      }));
+      const indexed = syncTasksWithHeadersAndFilter(newTasks, {
+        filterPastDue: true,
+        hideCompleted: false,
+        defaultSectionGroup: workspaceConfig.sections[0]?.id || "TODAY",
+      });
       setTasks(indexed);
 
       if (isSupabaseConfigured() && isAuthenticated) {
@@ -1069,14 +1225,17 @@ export default function KiteWorkspacePage() {
           if (isUuid) {
             supabase
               .from("tasks")
-              .update({ order_index: item.order_index })
+              .update({
+                order_index: item.order_index,
+                section_group: item.section_group,
+              })
               .eq("id", item.id)
               .then();
           }
         }
       }
     },
-    [isAuthenticated]
+    [isAuthenticated, workspaceConfig.sections]
   );
 
   // 10. Canvas Assignment Sync with User Selection Modal
@@ -1670,7 +1829,7 @@ export default function KiteWorkspacePage() {
               {effectiveTab === "chat" ? (
                 /* Hero Homepage: "What's on your mind?" + Autonomous Workspace Agent */
                 <GeminiHeroChat
-                  tasks={tasks}
+                  tasks={visibleBoardTasks}
                   profile={profile}
                   workspaceConfig={workspaceConfig}
                   messages={heroMessages}
@@ -1701,7 +1860,7 @@ export default function KiteWorkspacePage() {
               ) : effectiveTab === "my_day" ? (
                 /* MY DAY Tab: Live Centered Clock + Dual Status Bars + Manual & AI Auto-Arrange Builder */
                 <MyDayView
-                  tasks={tasks}
+                  tasks={visibleBoardTasks}
                   profile={profile}
                   workspaceConfig={workspaceConfig}
                   hasApiKey={hasGeminiApiKey}
@@ -1734,14 +1893,14 @@ export default function KiteWorkspacePage() {
                 /* Tasks Tab: Telemetry Header + Document-Style Resizable Task Table */
                 <div className="space-y-5">
                   <CircularProgress
-                    tasks={tasks}
+                    tasks={syncedTasks}
                     workspaceConfig={workspaceConfig}
                     onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
                     streakDays={1}
                   />
 
                   <TaskTable
-                    tasks={tasks}
+                    tasks={syncedTasks}
                     selectedTaskId={selectedTaskId}
                     viewMode={profile.view_mode}
                     workspaceConfig={workspaceConfig}
@@ -1789,7 +1948,7 @@ export default function KiteWorkspacePage() {
           onClose={() => setIsSettingsOpen(false)}
           profile={profile}
           workspaceConfig={workspaceConfig}
-          tasks={tasks}
+          tasks={syncedTasks}
           aiTemporarilyDisabled={aiTemporarilyDisabled}
           effectiveApiKey={effectiveApiKey}
           onSetAiTemporarilyDisabled={handleSetAiTemporarilyDisabled}
@@ -1807,7 +1966,7 @@ export default function KiteWorkspacePage() {
         isOpen={isCanvasSyncModalOpen}
         onClose={handleCloseCanvasSyncModal}
         feedUrl={profile.canvas_feed_url || ""}
-        existingTasks={tasks}
+        existingTasks={syncedTasks}
         onCommitSelected={handleCommitCanvasSelected}
         isCommitting={isCommittingCanvas}
       />

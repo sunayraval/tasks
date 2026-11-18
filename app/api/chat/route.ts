@@ -40,10 +40,12 @@ import {
   minutesToTimeString,
   normalizeTimeString,
   parseTimeToMinutes,
+  pruneAndSyncMyDaySchedule,
   recommendTaskMinutes,
   shiftScheduleBlocks,
   smartHeuristicArrange,
   swapScheduleBlocks,
+  syncTasksWithHeadersAndFilter,
 } from "@/utils/myDayUtils";
 
 export const maxDuration = 120;
@@ -863,14 +865,13 @@ ${taskLines}`;
       localClockRef.getUTCMonth() + 1
     ).padStart(2, "0")}-${String(localClockRef.getUTCDate()).padStart(2, "0")}`;
 
-    // Mutable working copies across multi-step tool calls in this turn
-    let workingTasks: TaskItem[] = incomingTasks
-      .map((t) => ({
-        ...t,
-        tags: Array.isArray(t.tags) ? [...t.tags] : [],
-        custom_properties: { ...(t.custom_properties || {}) },
-      }))
-      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+    const clientStartOfTodayUtcMs = Date.UTC(
+      localClockRef.getUTCFullYear(),
+      localClockRef.getUTCMonth(),
+      localClockRef.getUTCDate()
+    );
+    const clientStartOfTodayMs =
+      clientStartOfTodayUtcMs + tzOffsetMinutes * 60 * 1000;
 
     let workingConfig: WorkspaceConfig = {
       ...incomingConfig,
@@ -890,6 +891,25 @@ ${taskLines}`;
           }
         : null,
     };
+
+    // Mutable working copies across multi-step tool calls in this turn.
+    // Synchronized with TaskTable visibility rules (filters past-due hidden tasks, respects showCompletedTasks,
+    // and assigns each task's section_group from the movable header row above it).
+    let workingTasks: TaskItem[] = syncTasksWithHeadersAndFilter(
+      incomingTasks
+        .map((t) => ({
+          ...t,
+          tags: Array.isArray(t.tags) ? [...t.tags] : [],
+          custom_properties: { ...(t.custom_properties || {}) },
+        }))
+        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)),
+      {
+        filterPastDue: true,
+        hideCompleted: !workingConfig.showCompletedTasks,
+        startOfTodayMs: clientStartOfTodayMs,
+        defaultSectionGroup: workingConfig.sections[0]?.id || "TODAY",
+      }
+    );
 
     const activeRealTasks = workingTasks.filter(
       (t) => !isHeaderRow(t) && !isDoneStatus(t.status)
@@ -951,34 +971,46 @@ ${taskLines}`;
       });
     };
 
-    const reindexWorkingTasks = () => {
-      let currentSectionGroup = workingConfig.sections[0]?.id || "TODAY";
-      workingTasks = workingTasks.map((item, idx) => {
-        if (isHeaderRow(item)) {
-          const cleanLabel = stripHeaderDecorations(item.title).toUpperCase();
-          if (cleanLabel.includes("TODAY")) currentSectionGroup = "TODAY";
-          else if (cleanLabel.includes("TOMORROW") || cleanLabel.includes("TMR"))
-            currentSectionGroup = "TMR";
-          else if (cleanLabel.includes("COLLEGE"))
-            currentSectionGroup = "COLLEGE";
-          else if (cleanLabel.includes("SOON")) currentSectionGroup = "SOON";
-          else if (cleanLabel.includes("REMEMBER"))
-            currentSectionGroup = "REMEMBER";
-          else if (item.section_group) currentSectionGroup = item.section_group;
-
-          return {
-            ...item,
-            section_group: currentSectionGroup,
-            order_index: idx,
+    const syncScheduleWithWorkingTasks = () => {
+      if (!workingConfig.myDaySchedule) return;
+      const prevBlocksJson = JSON.stringify(
+        workingConfig.myDaySchedule.blocks || []
+      );
+      const prevDate = workingConfig.myDaySchedule.date;
+      const activeForSchedule = workingTasks.filter(
+        (t) =>
+          !isHeaderRow(t) &&
+          (workingConfig.showCompletedTasks || !isDoneStatus(t.status))
+      );
+      const synced = pruneAndSyncMyDaySchedule(
+        workingConfig.myDaySchedule,
+        activeForSchedule,
+        clientLocalDateYMD
+      );
+      if (synced) {
+        const nextBlocksJson = JSON.stringify(synced.blocks || []);
+        if (nextBlocksJson !== prevBlocksJson || synced.date !== prevDate) {
+          workingConfig.myDaySchedule = {
+            ...synced,
+            updatedAt: new Date().toISOString(),
           };
+          configTouched = true;
         }
-        return {
-          ...item,
-          section_group: currentSectionGroup,
-          order_index: idx,
-        };
-      });
+      }
     };
+
+    const reindexWorkingTasks = () => {
+      workingTasks = syncTasksWithHeadersAndFilter(workingTasks, {
+        filterPastDue: true,
+        hideCompleted: !workingConfig.showCompletedTasks,
+        startOfTodayMs: clientStartOfTodayMs,
+        defaultSectionGroup: workingConfig.sections[0]?.id || "TODAY",
+      });
+      syncScheduleWithWorkingTasks();
+    };
+
+    // Immediately sync myDaySchedule with the current active task list
+    syncScheduleWithWorkingTasks();
 
     const findItem = (
       idOrTitle: string,
@@ -1221,19 +1253,8 @@ ${taskLines}`;
       }
     }
 
-    // Prune any orphan myDaySchedule blocks whose taskId was deleted from the task list
-    if (workingConfig.myDaySchedule?.blocks) {
-      const validTaskIdSet = new Set(workingTasks.map((t) => t.id));
-      const filteredBlocks = workingConfig.myDaySchedule.blocks.filter(
-        (b) => !b.taskId || validTaskIdSet.has(b.taskId)
-      );
-      if (filteredBlocks.length !== workingConfig.myDaySchedule.blocks.length) {
-        workingConfig.myDaySchedule = {
-          ...workingConfig.myDaySchedule,
-          blocks: filteredBlocks,
-        };
-      }
-    }
+    // Ensure myDaySchedule is strictly pruned and synced with active workingTasks
+    syncScheduleWithWorkingTasks();
 
     // Build compact, single-line board snapshot for system prompt (drastically reduces input tokens and latency)
     const serializedBoard = workingTasks
@@ -1256,6 +1277,48 @@ ${taskLines}`;
         return fields.join(" • ");
       })
       .join("\n");
+
+    // Build explicit per-section breakdown so the AI knows with 100% accuracy which tasks are in TODAY, TMR, COLLEGE, SOON, REMEMBER
+    const buildSectionsBreakdown = (): string => {
+      const sectionOrder: string[] = [];
+      const sectionMap = new Map<string, TaskItem[]>();
+
+      for (const sec of workingConfig.sections) {
+        if (!sectionMap.has(sec.id)) {
+          sectionOrder.push(sec.id);
+          sectionMap.set(sec.id, []);
+        }
+      }
+
+      for (const item of workingTasks) {
+        const secId = item.section_group || "TODAY";
+        if (!sectionMap.has(secId)) {
+          sectionOrder.push(secId);
+          sectionMap.set(secId, []);
+        }
+        if (!isHeaderRow(item) && !isDoneStatus(item.status)) {
+          sectionMap.get(secId)!.push(item);
+        }
+      }
+
+      return sectionOrder
+        .map((secId) => {
+          const items = sectionMap.get(secId) || [];
+          if (items.length === 0) {
+            return `• SECTION "${secId}" (0 active tasks): (Empty)`;
+          }
+          const rows = items
+            .map(
+              (t) =>
+                `  - "${t.title}" (${t.priority} Priority, ${t.estimated_minutes || 30}m, Status: ${t.status}, Category: ${t.type}) [ID="${t.id}"]`
+            )
+            .join("\n");
+          return `• SECTION "${secId}" (${items.length} active task${items.length === 1 ? "" : "s"}):\n${rows}`;
+        })
+        .join("\n");
+    };
+
+    const serializedSectionsBreakdown = buildSectionsBreakdown();
 
     const initialTelemetry = computeMyDayLiveTelemetry(
       workingConfig.myDaySchedule,
@@ -1315,6 +1378,10 @@ The user explicitly toggled on Cursing Mode for fun and laughs!
 ===========================================================================`
       : "";
 
+    const liveActiveTasksCount = workingTasks.filter(
+      (t) => !isHeaderRow(t) && !isDoneStatus(t.status)
+    ).length;
+
     const systemPrompt = `You are the Gemini Workspace Agent for "${workingConfig.brandName}" (${workingConfig.workspaceTitle}).
 ${TONE_PROMPTS[tone]}${cursingDirective}
 
@@ -1350,9 +1417,10 @@ GUIDELINES FOR THOUGHTFUL EXECUTION:
     -> You MUST actually invoke the corresponding tool (\`add_tasks\`, \`update_tasks\`, \`delete_tasks\`, \`move_and_reorder_tasks\`, or \`manage_my_day_schedule\`)!
     -> NEVER just print the task list in chat with the item appended in text! Printing a list in chat DOES NOT save anything to the user's real database or task table.
     -> NEVER claim "Added X to your list" or "Updated your list" unless you actually called the tool and received \`success: true\` in the tool result!
-- GROUND TRUTH RULE (CRITICAL — IGNORE STALE CHAT HISTORY):
-  * Earlier messages in chat history may contain OLD task titles, OLD task IDs, or deleted tasks!
-  * ALWAYS rely EXCLUSIVELY on the LIVE CURRENT BOARD and CURRENT MY DAY SCHEDULE below—never assume a task from chat history still exists if it is not in CURRENT BOARD!
+- GROUND TRUTH RULE (CRITICAL — 100% SYNC WITH LIVE TASK LIST, NEVER PULL PAST TASKS):
+  * Earlier messages in chat history may contain OLD task titles (e.g. from yesterday or deleted tasks) or OLD task IDs!
+  * NEVER list or reference any task from earlier chat turns that is not present in LIVE TASK LIST GROUPED BY SECTION below!
+  * When the user asks for their TODAY list (or any section's list, or their full task list), pull EXCLUSIVELY from LIVE TASK LIST GROUPED BY SECTION below!
 - Execute clear user requests directly using the appropriate tools—do NOT ask for permission first unless using \`prompt_user_qa\` for underspecified planning/empty-list day discovery. You can chain multiple tools in one turn!
 - TASK ADDITION & TIME WINDOW CLARIFICATION RULE:
   * If the user explicitly says "add [task] to the list" / "put [task] in" and gives ANY context (or says "just add it", "add it now", or specifies a duration/due date), call \`add_tasks\` immediately (defaulting \`estimated_minutes\` to 30 if omitted).
@@ -1392,13 +1460,11 @@ ${serializedMyDay}
 ACTIVE USER LIFE CONTEXT & MEMORY NOTES:
 ${serializedMemory}
 
+LIVE TASK LIST GROUPED BY SECTION (100% Ground Truth — ${liveActiveTasksCount} active task${liveActiveTasksCount === 1 ? "" : "s"} total):
+${serializedSectionsBreakdown}
+
 CURRENT BOARD (${workingTasks.length} rows in exact top-to-bottom table order):
 ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective}`;
-
-    const liveActiveTasksSnapshot = workingTasks
-      .filter((t) => !isHeaderRow(t) && !isDoneStatus(t.status))
-      .map((t) => `- ID="${t.id}" | "${t.title}" (${t.status}, ${t.priority})`)
-      .join("\n");
 
     // Assemble multi-turn conversation messages + live ground truth snapshot right before latest user message
     const conversationMessages: CoreMessage[] = [
@@ -1407,13 +1473,14 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
         .filter((m) => m.content && m.content.trim().length > 0)
         .map((m) => ({
           role: m.role as "user" | "assistant",
-          content: m.content,
+          content:
+            m.role === "assistant"
+              ? `[HISTORICAL ASSISTANT TURN — DO NOT REUSE ANY TASK NAMES OR LISTS FROM THIS OLD MESSAGE; REFER ONLY TO LIVE GROUND TRUTH BELOW]\n${m.content}`
+              : m.content,
         })),
       {
         role: "system",
-        content: `[LIVE GROUND TRUTH — IGNORE ANY OLD TASK LISTS OR IDS IN EARLIER CHAT HISTORY]\nCurrent Active Tasks on Board (${activeRealTasks.length}):\n${
-          liveActiveTasksSnapshot || "(None)"
-        }`,
+        content: `[LIVE GROUND TRUTH — STRICTLY ENFORCED]\nThe user's Task List currently has ONLY the ${liveActiveTasksCount} active task(s) listed below. Any other tasks mentioned in earlier chat messages (such as deleted, completed, or past tasks) NO LONGER EXIST on the Task List and MUST NOT be mentioned or listed!\n\nLive Task List by Section:\n${serializedSectionsBreakdown}`,
       },
       { role: "user", content: userMessage },
     ];
