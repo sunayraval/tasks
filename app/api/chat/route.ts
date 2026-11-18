@@ -1221,6 +1221,20 @@ ${taskLines}`;
       }
     }
 
+    // Prune any orphan myDaySchedule blocks whose taskId was deleted from the task list
+    if (workingConfig.myDaySchedule?.blocks) {
+      const validTaskIdSet = new Set(workingTasks.map((t) => t.id));
+      const filteredBlocks = workingConfig.myDaySchedule.blocks.filter(
+        (b) => !b.taskId || validTaskIdSet.has(b.taskId)
+      );
+      if (filteredBlocks.length !== workingConfig.myDaySchedule.blocks.length) {
+        workingConfig.myDaySchedule = {
+          ...workingConfig.myDaySchedule,
+          blocks: filteredBlocks,
+        };
+      }
+    }
+
     // Build compact, single-line board snapshot for system prompt (drastically reduces input tokens and latency)
     const serializedBoard = workingTasks
       .map((t, index) => {
@@ -1336,6 +1350,9 @@ GUIDELINES FOR THOUGHTFUL EXECUTION:
     -> You MUST actually invoke the corresponding tool (\`add_tasks\`, \`update_tasks\`, \`delete_tasks\`, \`move_and_reorder_tasks\`, or \`manage_my_day_schedule\`)!
     -> NEVER just print the task list in chat with the item appended in text! Printing a list in chat DOES NOT save anything to the user's real database or task table.
     -> NEVER claim "Added X to your list" or "Updated your list" unless you actually called the tool and received \`success: true\` in the tool result!
+- GROUND TRUTH RULE (CRITICAL — IGNORE STALE CHAT HISTORY):
+  * Earlier messages in chat history may contain OLD task titles, OLD task IDs, or deleted tasks!
+  * ALWAYS rely EXCLUSIVELY on the LIVE CURRENT BOARD and CURRENT MY DAY SCHEDULE below—never assume a task from chat history still exists if it is not in CURRENT BOARD!
 - Execute clear user requests directly using the appropriate tools—do NOT ask for permission first unless using \`prompt_user_qa\` for underspecified planning/empty-list day discovery. You can chain multiple tools in one turn!
 - TASK ADDITION & TIME WINDOW CLARIFICATION RULE:
   * If the user explicitly says "add [task] to the list" / "put [task] in" and gives ANY context (or says "just add it", "add it now", or specifies a duration/due date), call \`add_tasks\` immediately (defaulting \`estimated_minutes\` to 30 if omitted).
@@ -1378,7 +1395,12 @@ ${serializedMemory}
 CURRENT BOARD (${workingTasks.length} rows in exact top-to-bottom table order):
 ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective}`;
 
-    // Assemble multi-turn conversation messages (last 6 turns for instant context ingestion)
+    const liveActiveTasksSnapshot = workingTasks
+      .filter((t) => !isHeaderRow(t) && !isDoneStatus(t.status))
+      .map((t) => `- ID="${t.id}" | "${t.title}" (${t.status}, ${t.priority})`)
+      .join("\n");
+
+    // Assemble multi-turn conversation messages + live ground truth snapshot right before latest user message
     const conversationMessages: CoreMessage[] = [
       ...history
         .slice(-6)
@@ -1387,6 +1409,12 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
           role: m.role as "user" | "assistant",
           content: m.content,
         })),
+      {
+        role: "system",
+        content: `[LIVE GROUND TRUTH — IGNORE ANY OLD TASK LISTS OR IDS IN EARLIER CHAT HISTORY]\nCurrent Active Tasks on Board (${activeRealTasks.length}):\n${
+          liveActiveTasksSnapshot || "(None)"
+        }`,
+      },
       { role: "user", content: userMessage },
     ];
 
@@ -2274,19 +2302,17 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               .map((b) => b.taskId)
               .filter(Boolean) as string[]
           );
-          const unscheduledActive = include_unscheduled_summary
-            ? workingTasks
-                .filter(
-                  (t) =>
-                    !isHeaderRow(t) &&
-                    !isDoneStatus(t.status) &&
-                    !scheduledIds.has(t.id)
-                )
-                .map((t) => ({
-                  title: t.title,
-                  priority: t.priority,
-                  estimated_minutes: recommendTaskMinutes(t),
-                }))
+          const currentActiveTasksOnBoard = workingTasks
+            .filter((t) => !isHeaderRow(t) && !isDoneStatus(t.status))
+            .map((t) => ({
+              id: t.id,
+              title: t.title,
+              priority: t.priority,
+              estimated_minutes: recommendTaskMinutes(t),
+            }));
+
+          const activeTasksNotScheduledInMyDay = include_unscheduled_summary
+            ? currentActiveTasksOnBoard.filter((t) => !scheduledIds.has(t.id))
             : undefined;
 
           return {
@@ -2352,7 +2378,8 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               completed: b.isCompleted,
               isBreak: Boolean(b.isBreak),
             })),
-            unscheduledActiveTasks: unscheduledActive,
+            currentActiveTasksOnBoard,
+            activeTasksNotScheduledInMyDay,
           };
         },
       }),
