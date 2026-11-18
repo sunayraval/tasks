@@ -120,6 +120,19 @@
   --panel-border: rgba(255, 126, 182, 0.3);
 }
 
+/* 9. Sky Blue Ocean (Breezy Azure Horizon & Seafoam Sky) */
+[data-theme="sky_ocean"] {
+  color-scheme: dark;
+  --bg-base: #041526;
+  --surface: #0b2847;
+  --accent: #164b78;
+  --primary: #38bdf8;
+  --highlight: #e0f2fe;
+  --panel-bg: rgba(7, 29, 52, 0.84);
+  --panel-header: rgba(11, 40, 71, 0.92);
+  --panel-border: rgba(56, 189, 248, 0.3);
+}
+
 * {
   box-sizing: border-box;
 }

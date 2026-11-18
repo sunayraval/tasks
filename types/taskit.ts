@@ -8,6 +8,7 @@ export type ThemeName =
   | "rose_nebula"
   | "sharingan"
   | "sakura"
+  | "sky_ocean"
   | "custom";
 
 export type VideoPresetName =
@@ -664,6 +665,18 @@ export const THEME_OPTIONS: Array<{
       accent: "#59213c",
       primary: "#ff7eb6",
       highlight: "#ffd6e7",
+    },
+  },
+  {
+    id: "sky_ocean",
+    name: "Sky Blue Ocean",
+    subtitle: "Breezy azure horizon, coastal cobalt & crisp seafoam sky blue",
+    colors: {
+      bgBase: "#041526",
+      surface: "#0b2847",
+      accent: "#164b78",
+      primary: "#38bdf8",
+      highlight: "#e0f2fe",
     },
   },
   {
