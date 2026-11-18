@@ -120,17 +120,17 @@
   --panel-border: rgba(255, 126, 182, 0.3);
 }
 
-/* 9. Sky Blue Ocean (Breezy Azure Horizon & Seafoam Sky) */
+/* 9. Sky Blue Ocean (Animated Pastel Sky Blue & Rolling Waves) */
 [data-theme="sky_ocean"] {
   color-scheme: dark;
-  --bg-base: #041526;
-  --surface: #0b2847;
-  --accent: #164b78;
-  --primary: #38bdf8;
-  --highlight: #e0f2fe;
-  --panel-bg: rgba(7, 29, 52, 0.84);
-  --panel-header: rgba(11, 40, 71, 0.92);
-  --panel-border: rgba(56, 189, 248, 0.3);
+  --bg-base: #4aa3e5;
+  --surface: #3689cc;
+  --accent: #7ec8fc;
+  --primary: #bae6fd;
+  --highlight: #ffffff;
+  --panel-bg: rgba(20, 78, 128, 0.58);
+  --panel-header: rgba(18, 70, 118, 0.68);
+  --panel-border: rgba(255, 255, 255, 0.36);
 }
 
 * {
@@ -612,6 +612,22 @@ progress.taskit-progress::-moz-progress-bar {
 
 [data-theme="sakura"] .sakura-ambient-backdrop {
   opacity: 1;
+}
+
+[data-theme="sky_ocean"] .sky-ocean-ambient-backdrop {
+  opacity: 1;
+}
+
+[data-theme="sky_ocean"] .theme-panel {
+  box-shadow: 0 12px 35px -5px rgba(8, 47, 73, 0.38),
+    0 0 24px -4px rgba(186, 230, 253, 0.28),
+    0 0 0 1px var(--panel-border);
+}
+
+[data-theme="sky_ocean"] .theme-popover {
+  background-color: rgba(16, 66, 110, 0.88);
+  box-shadow: 0 18px 45px -4px rgba(8, 47, 73, 0.55),
+    0 0 0 1px var(--panel-border);
 }
 
 @media (prefers-reduced-motion: reduce) {

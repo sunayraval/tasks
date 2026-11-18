@@ -6,6 +6,7 @@ import { normalizeVideoPreset, VideoPresetName } from "@/types/taskit";
 import { BatteryCharging, PauseCircle } from "lucide-react";
 import { SharinganIcon } from "@/components/ui/SharinganIcon";
 import { SakuraTreeScene } from "@/components/background/SakuraTreeScene";
+import { SkyOceanScene } from "@/components/background/SkyOceanScene";
 
 export const IDB_VIDEO_KEY = "custom_video_bg";
 
@@ -346,6 +347,9 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({
 
       {/* Animated Sakura Cherry Blossom Tree & Drifting Petals (Visually enabled under [data-theme="sakura"]) */}
       <SakuraTreeScene paused={isPausedBySaver} />
+
+      {/* Animated Pastel Sky Blue Ocean & Rolling Waves (Visually enabled under [data-theme="sky_ocean"]) */}
+      <SkyOceanScene paused={isPausedBySaver} />
 
       {/* Fullscreen fixed HTML5 Video element for IndexedDB custom uploads */}
       {videoSrc && (

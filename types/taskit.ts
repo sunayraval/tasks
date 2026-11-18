@@ -670,13 +670,13 @@ export const THEME_OPTIONS: Array<{
   {
     id: "sky_ocean",
     name: "Sky Blue Ocean",
-    subtitle: "Breezy azure horizon, coastal cobalt & crisp seafoam sky blue",
+    subtitle: "Animated pastel sky blue clouds, rolling ocean waves & seafoam glow",
     colors: {
-      bgBase: "#041526",
-      surface: "#0b2847",
-      accent: "#164b78",
-      primary: "#38bdf8",
-      highlight: "#e0f2fe",
+      bgBase: "#7cc8ff",
+      surface: "#52b2f8",
+      accent: "#9ad8ff",
+      primary: "#bae6fd",
+      highlight: "#ffffff",
     },
   },
   {

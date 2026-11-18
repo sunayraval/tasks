@@ -103,21 +103,14 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           <span className="text-xl font-extrabold tracking-tight text-white leading-none">
             kite
           </span>
-          {profile.theme === "sharingan" ? (
-            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-red-500/60 bg-red-950/40 px-2.5 py-0.5 text-xs font-mono font-bold text-red-400 shadow-[0_0_12px_rgba(255,31,56,0.45)] leading-none">
-              <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping" />
-              UCHIHA 2.0
-            </span>
-          ) : profile.theme === "sakura" ? (
-            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-pink-400/60 bg-pink-950/40 px-2.5 py-0.5 text-xs font-mono font-bold text-pink-200 shadow-[0_0_12px_rgba(255,126,182,0.4)] leading-none">
-              <span className="h-1.5 w-1.5 rounded-full bg-pink-400 animate-pulse" />
-              SAKURA 2.0
-            </span>
-          ) : (
-            <span className="hidden sm:inline-flex items-center rounded-full border border-white px-2.5 py-0.5 text-xs font-mono font-medium text-yellow-300 leading-none">
-              2.0
-            </span>
-          )}
+          <a
+            href="https://sunayraval.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center rounded-full border border-white/25 bg-white/10 hover:bg-white/20 hover:border-white/45 px-2.5 py-0.5 text-xs font-mono font-medium text-white/90 hover:text-white transition-all leading-none"
+          >
+            by sunayraval
+          </a>
         </div>
 
         {/* Center: Workspace Mode Switcher (Chat hidden when user opts out of AI; Tasks & my day always available) */}
