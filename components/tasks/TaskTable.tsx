@@ -29,6 +29,7 @@ import {
   BADGE_COLOR_KEYS,
   BADGE_COLOR_MAP,
   getBadgeClasses,
+  SubTask,
 } from "@/types/taskit";
 import {
   ArrowUpDown,
@@ -39,6 +40,7 @@ import {
   Plus,
   Search,
   ChevronDown,
+  ChevronRight,
   Filter,
   AlertCircle,
   Trash2,
@@ -50,6 +52,8 @@ import {
   ArrowUp,
   ArrowDown,
   RotateCcw,
+  CornerDownRight,
+  CheckSquare,
 } from "lucide-react";
 import { TaskDocumentEditor } from "@/components/editor/TaskDocumentEditor";
 
@@ -810,6 +814,143 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState<BadgeColorKey>("cyan");
 
+  // Subtasks dropdown expand state & inline drafts
+  const [expandedSubtaskTaskIds, setExpandedSubtaskTaskIds] = useState<
+    Set<string>
+  >(new Set());
+  const [newSubtaskTitles, setNewSubtaskTitles] = useState<
+    Record<string, string>
+  >({});
+
+  const toggleSubtasksExpanded = (taskId: string) => {
+    setExpandedSubtaskTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
+  const handleAddSubtask = (taskId: string, title?: string) => {
+    const rawTitle = (
+      title !== undefined ? title : newSubtaskTitles[taskId] || ""
+    ).trim();
+    if (!rawTitle) return;
+
+    const target = tasks.find((t) => t.id === taskId);
+    if (!target) return;
+
+    const existingSubtasks: SubTask[] =
+      (target.subtasks && Array.isArray(target.subtasks)
+        ? target.subtasks
+        : (Array.isArray(target.custom_properties?.subtasks)
+            ? (target.custom_properties.subtasks as SubTask[])
+            : [])) || [];
+
+    const newSubtask: SubTask = {
+      id:
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `sub-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+      title: rawTitle,
+      completed: false,
+      created_at: new Date().toISOString(),
+    };
+
+    const nextSubtasks = [...existingSubtasks, newSubtask];
+
+    onUpdateTask(taskId, {
+      subtasks: nextSubtasks,
+      custom_properties: {
+        ...(target.custom_properties || {}),
+        subtasks: nextSubtasks,
+      },
+    });
+
+    setNewSubtaskTitles((prev) => ({ ...prev, [taskId]: "" }));
+    setExpandedSubtaskTaskIds((prev) => new Set(prev).add(taskId));
+  };
+
+  const handleToggleSubtask = (taskId: string, subtaskId: string) => {
+    const target = tasks.find((t) => t.id === taskId);
+    if (!target) return;
+
+    const existingSubtasks: SubTask[] =
+      (target.subtasks && Array.isArray(target.subtasks)
+        ? target.subtasks
+        : (Array.isArray(target.custom_properties?.subtasks)
+            ? (target.custom_properties.subtasks as SubTask[])
+            : [])) || [];
+
+    const nextSubtasks = existingSubtasks.map((st) =>
+      st.id === subtaskId ? { ...st, completed: !st.completed } : st
+    );
+
+    onUpdateTask(taskId, {
+      subtasks: nextSubtasks,
+      custom_properties: {
+        ...(target.custom_properties || {}),
+        subtasks: nextSubtasks,
+      },
+    });
+  };
+
+  const handleUpdateSubtaskTitle = (
+    taskId: string,
+    subtaskId: string,
+    nextTitle: string
+  ) => {
+    const target = tasks.find((t) => t.id === taskId);
+    if (!target) return;
+
+    const existingSubtasks: SubTask[] =
+      (target.subtasks && Array.isArray(target.subtasks)
+        ? target.subtasks
+        : (Array.isArray(target.custom_properties?.subtasks)
+            ? (target.custom_properties.subtasks as SubTask[])
+            : [])) || [];
+
+    const cleanTitle = nextTitle.trim();
+    if (!cleanTitle) return;
+
+    const nextSubtasks = existingSubtasks.map((st) =>
+      st.id === subtaskId ? { ...st, title: cleanTitle } : st
+    );
+
+    onUpdateTask(taskId, {
+      subtasks: nextSubtasks,
+      custom_properties: {
+        ...(target.custom_properties || {}),
+        subtasks: nextSubtasks,
+      },
+    });
+  };
+
+  const handleDeleteSubtask = (taskId: string, subtaskId: string) => {
+    const target = tasks.find((t) => t.id === taskId);
+    if (!target) return;
+
+    const existingSubtasks: SubTask[] =
+      (target.subtasks && Array.isArray(target.subtasks)
+        ? target.subtasks
+        : (Array.isArray(target.custom_properties?.subtasks)
+            ? (target.custom_properties.subtasks as SubTask[])
+            : [])) || [];
+
+    const nextSubtasks = existingSubtasks.filter((st) => st.id !== subtaskId);
+
+    onUpdateTask(taskId, {
+      subtasks: nextSubtasks,
+      custom_properties: {
+        ...(target.custom_properties || {}),
+        subtasks: nextSubtasks,
+      },
+    });
+  };
+
   const sensors = useSensors(
     useSensor(SmartPointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
@@ -1543,6 +1684,17 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     // Normal Task Row
                     const t = rowItem;
                     const isDone = isTaskCompleted(t);
+                    const taskSubtasks: SubTask[] =
+                      (t.subtasks && Array.isArray(t.subtasks)
+                        ? t.subtasks
+                        : (Array.isArray(t.custom_properties?.subtasks)
+                            ? (t.custom_properties.subtasks as SubTask[])
+                            : [])) || [];
+                    const hasSubtasks = taskSubtasks.length > 0;
+                    const completedSubtasksCount = taskSubtasks.filter(
+                      (st) => st.completed
+                    ).length;
+                    const isSubtasksExpanded = expandedSubtaskTaskIds.has(t.id);
                     const isTagMenuOpen = openTagDropdownTaskId === t.id;
                     const {
                       label: dueLabel,
@@ -1611,9 +1763,41 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                 </button>
                               </td>
 
-                              {/* 1. Task Title + Complete Toggle + Doc Drawer Button */}
+                              {/* 1. Task Title + Subtasks Arrow + Complete Toggle + Doc Drawer Button */}
                               <td className="px-3 py-2 align-middle">
-                                <div className="flex items-center gap-2 w-full min-w-0">
+                                <div className="flex items-center gap-1.5 w-full min-w-0">
+                                  {/* Dropdown Arrow for Subtasks */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleSubtasksExpanded(t.id);
+                                    }}
+                                    className={`shrink-0 p-1 -ml-1 rounded transition-all ${
+                                      isSubtasksExpanded
+                                        ? "text-primary bg-primary/15"
+                                        : hasSubtasks
+                                        ? "text-primary hover:text-primary hover:bg-white/10"
+                                        : "text-white/35 hover:text-white hover:bg-white/10 opacity-60 group-hover:opacity-100"
+                                    }`}
+                                    title={
+                                      isSubtasksExpanded
+                                        ? "Collapse subtasks dropdown"
+                                        : hasSubtasks
+                                        ? `Expand subtasks (${completedSubtasksCount}/${taskSubtasks.length} done)`
+                                        : "Add / show subtasks dropdown"
+                                    }
+                                  >
+                                    <ChevronRight
+                                      className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                                        isSubtasksExpanded
+                                          ? "rotate-90 text-primary"
+                                          : ""
+                                      }`}
+                                    />
+                                  </button>
+
+                                  {/* Complete Checkbox */}
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -1660,6 +1844,54 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                       className="font-medium"
                                     />
                                   </div>
+
+                                  {/* Subtasks Count Badge (if subtasks exist) */}
+                                  {hasSubtasks && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleSubtasksExpanded(t.id);
+                                      }}
+                                      className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold transition-colors shrink-0 ${
+                                        completedSubtasksCount ===
+                                        taskSubtasks.length
+                                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                          : "bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25"
+                                      }`}
+                                      title={`${completedSubtasksCount} of ${taskSubtasks.length} subtasks completed (Click to toggle)`}
+                                    >
+                                      <CheckSquare className="w-2.5 h-2.5" />
+                                      <span>
+                                        {completedSubtasksCount}/
+                                        {taskSubtasks.length}
+                                      </span>
+                                    </button>
+                                  )}
+
+                                  {/* Quick Add Subtask Button */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (!isSubtasksExpanded) {
+                                        toggleSubtasksExpanded(t.id);
+                                      }
+                                      setTimeout(() => {
+                                        const el = document.getElementById(
+                                          `new-subtask-input-${t.id}`
+                                        );
+                                        el?.focus();
+                                      }, 60);
+                                    }}
+                                    className="inline-flex items-center gap-0.5 rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/60 hover:border-primary/60 hover:text-highlight transition-all shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                    title="Add subtask"
+                                  >
+                                    <Plus className="w-3 h-3 text-primary" />
+                                    <span className="hidden xl:inline">
+                                      Subtask
+                                    </span>
+                                  </button>
 
                                   <button
                                     type="button"
@@ -2014,6 +2246,180 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                             </>
                           )}
                         </SortableDocumentRow>
+
+                        {/* Subtasks dropdown expanded row */}
+                        {isSubtasksExpanded && (
+                          <tr className="bg-black/45 border-b border-primary/20 backdrop-blur-md transition-all animate-in fade-in duration-150">
+                            <td className="w-10 pl-3 pr-1 py-2.5 align-top text-center">
+                              <div className="flex justify-center pt-2 text-primary/60">
+                                <CornerDownRight className="w-4 h-4" />
+                              </div>
+                            </td>
+                            <td colSpan={9} className="px-3 py-3 align-top">
+                              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 shadow-inner">
+                                {/* Subtask Header Bar */}
+                                <div className="flex items-center justify-between gap-3 mb-2.5 pb-2 border-b border-white/10">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-highlight/90 flex items-center gap-1.5">
+                                      <CheckSquare className="w-3.5 h-3.5 text-primary" />
+                                      Subtasks
+                                    </span>
+                                    {taskSubtasks.length > 0 && (
+                                      <span className="text-[11px] text-white/60 font-medium">
+                                        ({completedSubtasksCount} of{" "}
+                                        {taskSubtasks.length} completed)
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {taskSubtasks.length > 0 && (
+                                    <div className="flex items-center gap-2 w-32 sm:w-44">
+                                      <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                        <div
+                                          className="h-full bg-primary transition-all duration-300"
+                                          style={{
+                                            width: `${Math.round(
+                                              (completedSubtasksCount /
+                                                taskSubtasks.length) *
+                                                100
+                                            )}%`,
+                                          }}
+                                        />
+                                      </div>
+                                      <span className="text-[10px] text-white/50 shrink-0 font-mono">
+                                        {Math.round(
+                                          (completedSubtasksCount /
+                                            taskSubtasks.length) *
+                                            100
+                                        )}
+                                        %
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* List of Existing Subtasks */}
+                                {taskSubtasks.length > 0 ? (
+                                  <div className="space-y-1.5 mb-2.5">
+                                    {taskSubtasks.map((st, sIdx) => {
+                                      return (
+                                        <div
+                                          key={st.id || `st-${sIdx}`}
+                                          className="group/st flex items-center gap-2.5 rounded-lg bg-black/35 border border-white/5 px-2.5 py-1.5 hover:border-white/15 transition-all"
+                                        >
+                                          {/* Subtask Checkbox */}
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleToggleSubtask(t.id, st.id)
+                                            }
+                                            className="shrink-0 text-white/45 hover:text-primary transition-colors"
+                                            title={
+                                              st.completed
+                                                ? "Mark subtask incomplete"
+                                                : "Mark subtask complete"
+                                            }
+                                          >
+                                            {st.completed ? (
+                                              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                            ) : (
+                                              <Circle className="w-4 h-4 hover:text-primary" />
+                                            )}
+                                          </button>
+
+                                          {/* Inline editable subtask title */}
+                                          <div className="flex-1 min-w-0">
+                                            <input
+                                              type="text"
+                                              defaultValue={st.title}
+                                              key={
+                                                st.id +
+                                                "_" +
+                                                st.title +
+                                                "_" +
+                                                st.completed
+                                              }
+                                              onBlur={(e) =>
+                                                handleUpdateSubtaskTitle(
+                                                  t.id,
+                                                  st.id,
+                                                  e.target.value
+                                                )
+                                              }
+                                              onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                  e.currentTarget.blur();
+                                                }
+                                              }}
+                                              className={`w-full rounded bg-transparent px-1.5 py-0.5 text-xs text-white placeholder-white/30 focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-primary/60 transition-all ${
+                                                st.completed
+                                                  ? "line-through text-white/40"
+                                                  : "text-white/90"
+                                              }`}
+                                              placeholder="Subtask description..."
+                                            />
+                                          </div>
+
+                                          {/* Delete Subtask Button */}
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleDeleteSubtask(t.id, st.id)
+                                            }
+                                            className="opacity-0 group-hover/st:opacity-100 p-1 rounded text-white/30 hover:text-red-400 hover:bg-red-950/30 transition-all shrink-0"
+                                            title="Delete subtask"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div className="text-[11px] text-white/40 italic py-1 px-1">
+                                    No subtasks yet. Type a subtask below and
+                                    press Enter to add.
+                                  </div>
+                                )}
+
+                                {/* Add Subtask Quick Input Form */}
+                                <form
+                                  onSubmit={(e) => {
+                                    e.preventDefault();
+                                    handleAddSubtask(t.id);
+                                  }}
+                                  className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5"
+                                >
+                                  <div className="relative flex-1">
+                                    <input
+                                      id={`new-subtask-input-${t.id}`}
+                                      type="text"
+                                      value={newSubtaskTitles[t.id] || ""}
+                                      onChange={(e) =>
+                                        setNewSubtaskTitles((prev) => ({
+                                          ...prev,
+                                          [t.id]: e.target.value,
+                                        }))
+                                      }
+                                      placeholder="Add a subtask (press Enter)..."
+                                      className="w-full rounded-lg bg-black/50 border border-white/10 px-3 py-1.5 text-xs text-white placeholder-white/35 focus:border-primary/70 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+                                    />
+                                  </div>
+                                  <button
+                                    type="submit"
+                                    disabled={
+                                      !(newSubtaskTitles[t.id] || "").trim()
+                                    }
+                                    className="inline-flex items-center gap-1 rounded-lg bg-primary/20 border border-primary/40 px-3 py-1.5 text-xs font-semibold text-highlight hover:bg-primary/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>Add Subtask</span>
+                                  </button>
+                                </form>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
 
                         {/* Inline Rich-Text Editor if viewMode === inline */}
                         {viewMode === "inline" &&

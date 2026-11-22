@@ -17,6 +17,7 @@ import {
   WorkspaceConfig,
   DEFAULT_WORKSPACE_CONFIG,
   getBadgeClasses,
+  SubTask,
 } from "@/types/taskit";
 import {
   Bold,
@@ -35,6 +36,9 @@ import {
   Trash2,
   Check,
   BookOpen,
+  Plus,
+  Circle,
+  CheckCircle2,
 } from "lucide-react";
 
 interface TaskDocumentEditorProps {
@@ -57,6 +61,7 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
   const [title, setTitle] = useState(task?.title || "");
   const [notes, setNotes] = useState(task?.notes || "");
   const [newTag, setNewTag] = useState("");
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [saveIndicator, setSaveIndicator] = useState<"saved" | "saving">(
     "saved"
   );
@@ -151,6 +156,67 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
         tags: [...task.tags, tagLabel],
       });
     }
+  };
+
+  const getSubtasks = (): SubTask[] => {
+    return (
+      (task.subtasks && Array.isArray(task.subtasks)
+        ? task.subtasks
+        : (Array.isArray(task.custom_properties?.subtasks)
+            ? (task.custom_properties.subtasks as SubTask[])
+            : [])) || []
+    );
+  };
+
+  const handleToggleSubtask = (subtaskId: string) => {
+    const list = getSubtasks();
+    const nextList = list.map((st) =>
+      st.id === subtaskId ? { ...st, completed: !st.completed } : st
+    );
+    onUpdateTask(task.id, {
+      subtasks: nextList,
+      custom_properties: {
+        ...(task.custom_properties || {}),
+        subtasks: nextList,
+      },
+    });
+  };
+
+  const handleAddSubtask = (e: React.FormEvent) => {
+    e.preventDefault();
+    const raw = newSubtaskTitle.trim();
+    if (!raw) return;
+    const list = getSubtasks();
+    const newSt: SubTask = {
+      id:
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `sub-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      title: raw,
+      completed: false,
+      created_at: new Date().toISOString(),
+    };
+    const nextList = [...list, newSt];
+    onUpdateTask(task.id, {
+      subtasks: nextList,
+      custom_properties: {
+        ...(task.custom_properties || {}),
+        subtasks: nextList,
+      },
+    });
+    setNewSubtaskTitle("");
+  };
+
+  const handleDeleteSubtask = (subtaskId: string) => {
+    const list = getSubtasks();
+    const nextList = list.filter((st) => st.id !== subtaskId);
+    onUpdateTask(task.id, {
+      subtasks: nextList,
+      custom_properties: {
+        ...(task.custom_properties || {}),
+        subtasks: nextList,
+      },
+    });
   };
 
   const innerContent = (
@@ -394,6 +460,74 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
               placeholder="Quick summary note (displayed in table row)..."
               className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-white/85 placeholder-white/35 focus:border-primary focus:outline-none"
             />
+          </div>
+
+          {/* Subtasks Section */}
+          <div className="rounded-xl border border-white/10 bg-black/30 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-highlight flex items-center gap-1.5">
+                <CheckSquare className="w-3.5 h-3.5 text-primary" />
+                Subtasks ({getSubtasks().filter((s) => s.completed).length} /{" "}
+                {getSubtasks().length})
+              </span>
+            </div>
+
+            {getSubtasks().length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                {getSubtasks().map((st) => (
+                  <div
+                    key={st.id}
+                    className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.02] border border-white/5 px-2.5 py-1 text-xs"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleToggleSubtask(st.id)}
+                      className="flex items-center gap-2 flex-1 text-left min-w-0"
+                    >
+                      {st.completed ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      ) : (
+                        <Circle className="w-3.5 h-3.5 text-white/40 hover:text-primary shrink-0" />
+                      )}
+                      <span
+                        className={`truncate ${
+                          st.completed
+                            ? "line-through text-white/40"
+                            : "text-white/90"
+                        }`}
+                      >
+                        {st.title}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteSubtask(st.id)}
+                      className="p-1 rounded text-white/30 hover:text-red-400 hover:bg-red-950/20 transition-all shrink-0"
+                      title="Delete subtask"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <form onSubmit={handleAddSubtask} className="flex gap-2 pt-1">
+              <input
+                type="text"
+                value={newSubtaskTitle}
+                onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                placeholder="+ Add a subtask (press Enter)..."
+                className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs text-white placeholder-white/35 focus:border-primary focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!newSubtaskTitle.trim()}
+                className="rounded-lg bg-primary/20 border border-primary/40 px-3 py-1 text-xs font-medium text-highlight hover:bg-primary/30 disabled:opacity-40 transition-all shrink-0"
+              >
+                Add
+              </button>
+            </form>
           </div>
         </div>
 

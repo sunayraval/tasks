@@ -281,6 +281,14 @@ export interface UserProfile {
   created_at?: string;
 }
 
+export interface SubTask {
+  id: string;
+  title: string;
+  completed: boolean;
+  due_date?: string | null;
+  created_at?: string;
+}
+
 export interface TaskItem {
   id: string;
   user_id: string;
@@ -301,6 +309,7 @@ export interface TaskItem {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  subtasks?: SubTask[];
 }
 
 export interface ActionChangeItem {

@@ -11,6 +11,7 @@ import {
   HeroChatMessage,
   normalizeVideoPreset,
   SectionGroup,
+  SubTask,
   TaskItem,
   UserProfile,
   WorkspaceConfig,
@@ -420,10 +421,19 @@ export default function KiteWorkspacePage() {
             .eq("user_id", user.id)
             .order("order_index", { ascending: true });
 
-          const rawLoadedTasks = ((dbTasks || []) as TaskItem[]).filter((t) => {
-            if (deletedTaskIdsRef.current.has(t.id)) return false;
-            return true;
-          });
+          const rawLoadedTasks = ((dbTasks || []) as TaskItem[])
+            .map((t) => ({
+              ...t,
+              subtasks: Array.isArray(t.subtasks)
+                ? t.subtasks
+                : Array.isArray(t.custom_properties?.subtasks)
+                ? (t.custom_properties.subtasks as SubTask[])
+                : [],
+            }))
+            .filter((t) => {
+              if (deletedTaskIdsRef.current.has(t.id)) return false;
+              return true;
+            });
 
           const now = new Date();
           const startOfTodayMs = new Date(
@@ -910,6 +920,7 @@ export default function KiteWorkspacePage() {
         completed_at: null,
         created_at: nowISO,
         updated_at: nowISO,
+        subtasks: [],
       };
 
       const rawCopy = [...tasks];
@@ -1001,6 +1012,7 @@ export default function KiteWorkspacePage() {
         completed_at: null,
         created_at: nowISO,
         updated_at: nowISO,
+        subtasks: [],
       };
 
       const rawCopy = [...tasks];
@@ -1102,10 +1114,32 @@ export default function KiteWorkspacePage() {
       if (isSupabaseConfigured() && isAuthenticated) {
         try {
           const supabase = createClient();
-          await supabase
-            .from("tasks")
-            .update({ ...updates, updated_at: nowISO })
-            .eq("id", taskId);
+          const dbPayload: Record<string, unknown> = {
+            ...updates,
+            updated_at: nowISO,
+          };
+          if (updates.subtasks !== undefined) {
+            const curr = tasks.find((t) => t.id === taskId);
+            dbPayload.custom_properties = {
+              ...(curr?.custom_properties || {}),
+              ...(updates.custom_properties || {}),
+              subtasks: updates.subtasks,
+            };
+          }
+          try {
+            await supabase
+              .from("tasks")
+              .update(dbPayload)
+              .eq("id", taskId);
+          } catch {
+            if (dbPayload.subtasks !== undefined) {
+              const { subtasks: _, ...fallbackPayload } = dbPayload;
+              await supabase
+                .from("tasks")
+                .update(fallbackPayload)
+                .eq("id", taskId);
+            }
+          }
         } catch {}
       }
     },

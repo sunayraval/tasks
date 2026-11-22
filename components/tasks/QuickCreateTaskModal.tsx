@@ -70,6 +70,7 @@ export const QuickCreateTaskModal: React.FC<QuickCreateTaskModalProps> = ({
       section_group: sectionGroup,
       order_index: 0,
       completed_at: null,
+      subtasks: [],
     });
 
     setTitle("");
