@@ -951,6 +951,19 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
       <button
         type="button"
         role="tab"
+        aria-selected={activeTab === "stats"}
+        onClick={() => onSelectTab("stats")}
+        className={`inline-flex items-center gap-1.5 rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-colors ${
+          activeTab === "stats"
+            ? "bg-[#282a2f]/95 border border-white/[0.14] text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
+            : "border border-transparent text-white/60 hover:text-white hover:bg-white/[0.06]"
+        }`}
+      >
+        <span>my stats</span>
+      </button>
+      <button
+        type="button"
+        role="tab"
         aria-selected={activeTab === "study"}
         onClick={() => onSelectTab("study")}
         className={`inline-flex items-center gap-1.5 rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-colors ${

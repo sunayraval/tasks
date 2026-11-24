@@ -66,6 +66,11 @@ const MyJourneyView = dynamic(
   { ssr: false, loading: TabLoader }
 );
 
+const MyStatsView = dynamic(
+  () => import("@/components/stats/MyStatsView").then((m) => m.MyStatsView),
+  { ssr: false, loading: TabLoader }
+);
+
 const StudyModeView = dynamic(
   () =>
     import("@/components/study/StudyModeView").then((m) => m.StudyModeView),
@@ -634,8 +639,16 @@ export default function KiteWorkspacePage() {
                 },
                 (payload) => {
                   if (payload.eventType === "INSERT") {
-                    const newTask = payload.new as TaskItem;
-                    if (deletedTaskIdsRef.current.has(newTask.id)) return;
+                    const rawNew = payload.new as TaskItem;
+                    if (deletedTaskIdsRef.current.has(rawNew.id)) return;
+                    const newTask: TaskItem = {
+                      ...rawNew,
+                      subtasks: Array.isArray(rawNew.subtasks)
+                        ? rawNew.subtasks
+                        : Array.isArray(rawNew.custom_properties?.subtasks)
+                        ? (rawNew.custom_properties.subtasks as SubTask[])
+                        : [],
+                    };
                     setTasks((prev) => {
                       if (prev.some((t) => t.id === newTask.id)) return prev;
                       const next = [...prev, newTask];
@@ -644,17 +657,37 @@ export default function KiteWorkspacePage() {
                       );
                     });
                   } else if (payload.eventType === "UPDATE") {
-                    const updated = payload.new as TaskItem;
-                    if (deletedTaskIdsRef.current.has(updated.id)) return;
+                    const rawUpdated = payload.new as TaskItem;
+                    if (deletedTaskIdsRef.current.has(rawUpdated.id)) return;
+                    const normalizedSubtasks = Array.isArray(rawUpdated.subtasks)
+                      ? rawUpdated.subtasks
+                      : Array.isArray(rawUpdated.custom_properties?.subtasks)
+                      ? (rawUpdated.custom_properties.subtasks as SubTask[])
+                      : undefined;
                     setTasks((prev) => {
-                      const exists = prev.some((t) => t.id === updated.id);
+                      const exists = prev.some((t) => t.id === rawUpdated.id);
                       if (!exists) {
-                        return [...prev, updated].sort(
+                        return [
+                          ...prev,
+                          {
+                            ...rawUpdated,
+                            subtasks: normalizedSubtasks ?? [],
+                          },
+                        ].sort(
                           (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
                         );
                       }
                       return prev.map((t) =>
-                        t.id === updated.id ? { ...t, ...updated } : t
+                        t.id === rawUpdated.id
+                          ? {
+                              ...t,
+                              ...rawUpdated,
+                              subtasks:
+                                normalizedSubtasks !== undefined
+                                  ? normalizedSubtasks
+                                  : t.subtasks || [],
+                            }
+                          : t
                       );
                     });
                   } else if (payload.eventType === "DELETE") {
@@ -990,6 +1023,12 @@ export default function KiteWorkspacePage() {
           const targetUserId =
             user?.id || (profile.id !== "user-default" ? profile.id : null);
           if (targetUserId) {
+            const insertCustomProps: Record<string, unknown> = {
+              ...(syncedCreated.custom_properties || {}),
+              ...(syncedCreated.subtasks?.length
+                ? { subtasks: syncedCreated.subtasks }
+                : {}),
+            };
             await supabase.from("tasks").insert({
               id: newUuid,
               user_id: targetUserId,
@@ -1004,7 +1043,7 @@ export default function KiteWorkspacePage() {
               notes: syncedCreated.notes,
               is_canvas_assignment: syncedCreated.is_canvas_assignment,
               canvas_course_code: syncedCreated.canvas_course_code,
-              custom_properties: syncedCreated.custom_properties || {},
+              custom_properties: insertCustomProps,
               section_group: syncedCreated.section_group,
               order_index: syncedCreated.order_index,
             });
@@ -1248,33 +1287,34 @@ export default function KiteWorkspacePage() {
       if (isSupabaseConfigured() && isAuthenticated) {
         try {
           const supabase = createClient();
+          const { subtasks: updatedSubtasks, ...restUpdates } = updates;
           const dbPayload: Record<string, unknown> = {
-            ...updates,
+            ...restUpdates,
             updated_at: nowISO,
           };
-          if (updates.subtasks !== undefined) {
-            const curr = tasks.find((t) => t.id === taskId);
+          if (
+            updatedSubtasks !== undefined ||
+            updates.custom_properties !== undefined
+          ) {
+            const curr = tasksRef.current.find((t) => t.id === taskId);
             dbPayload.custom_properties = {
               ...(curr?.custom_properties || {}),
               ...(updates.custom_properties || {}),
-              subtasks: updates.subtasks,
+              ...(updatedSubtasks !== undefined
+                ? { subtasks: updatedSubtasks }
+                : {}),
             };
           }
-          try {
-            await supabase
-              .from("tasks")
-              .update(dbPayload)
-              .eq("id", taskId);
-          } catch {
-            if (dbPayload.subtasks !== undefined) {
-              const { subtasks: _, ...fallbackPayload } = dbPayload;
-              await supabase
-                .from("tasks")
-                .update(fallbackPayload)
-                .eq("id", taskId);
-            }
+          const { error: updateErr } = await supabase
+            .from("tasks")
+            .update(dbPayload)
+            .eq("id", taskId);
+          if (updateErr) {
+            console.warn("Task update error:", updateErr.message);
           }
-        } catch {}
+        } catch (err) {
+          console.warn("Task update exception:", err);
+        }
       }
     },
     [
@@ -2108,6 +2148,13 @@ export default function KiteWorkspacePage() {
                   onOpenApiKeySetup={handleOpenApiKeySetup}
                   onShowToast={showToast}
                   onPushMilestoneToTasks={handlePushMilestoneToTasks}
+                />
+              ) : effectiveTab === "stats" ? (
+                /* my stats: Full Progress, Growth & Productivity Intelligence Dashboard */
+                <MyStatsView
+                  tasks={tasks}
+                  workspaceConfig={workspaceConfig}
+                  onSelectTab={setActiveTab}
                 />
               ) : effectiveTab === "study" ? (
                 /* my flo: Editable Curriculum + Bite-Sized Teaching + Visuals + Checkpoints */

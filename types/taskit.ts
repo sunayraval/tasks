@@ -263,7 +263,7 @@ export interface WorkspaceConfig {
   cursingMode?: boolean;
 }
 
-export type WorkspaceTab = "chat" | "tasks" | "my_day" | "journey" | "study";
+export type WorkspaceTab = "chat" | "tasks" | "my_day" | "journey" | "stats" | "study";
 
 export type AIModelChoice = "flash" | "pro";
 

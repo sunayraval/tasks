@@ -11,6 +11,7 @@ import {
   computeSyllabusProgress,
 } from "@/types/taskit";
 import {
+  BarChart3,
   CalendarClock,
   Check,
   ChevronDown,
@@ -250,6 +251,25 @@ export const TopNavBar: React.FC<TopNavBarProps> = React.memo(({
                 </button>
               );
             })()}
+
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "stats"}
+              onClick={() => onSelectTab("stats")}
+              className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-colors ${
+                activeTab === "stats"
+                  ? "bg-white/15 text-white shadow-sm border border-white/15"
+                  : "text-white/60 hover:text-white border border-transparent"
+              }`}
+            >
+              <BarChart3
+                className={`w-3.5 h-3.5 ${
+                  activeTab === "stats" ? "text-primary" : "text-white/50"
+                }`}
+              />
+              <span className="whitespace-nowrap">my stats</span>
+            </button>
 
             <button
               type="button"
