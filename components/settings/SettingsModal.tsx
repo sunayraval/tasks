@@ -513,86 +513,230 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     THEME_OPTIONS.find((t) => t.id === profile.theme)?.colors ||
     THEME_OPTIONS[0].colors;
 
+  const SETTINGS_GROUPS: Array<{
+    group: string;
+    items: Array<{
+      id: SettingsTabId;
+      label: string;
+      shortLabel: string;
+      desc: string;
+      icon: typeof Tags;
+    }>;
+  }> = [
+    {
+      group: "Look & Feel",
+      items: [
+        {
+          id: "view",
+          label: "Layout & View",
+          shortLabel: "Layout",
+          desc: "Sidebar position, doc view & completed rows",
+          icon: LayoutPanelLeft,
+        },
+        {
+          id: "appearance",
+          label: "Themes & Backdrop",
+          shortLabel: "Themes",
+          desc: "Color palettes, animated scenes & dimming",
+          icon: Palette,
+        },
+      ],
+    },
+    {
+      group: "Workspace",
+      items: [
+        {
+          id: "customize",
+          label: "Board & Labels",
+          shortLabel: "Board",
+          desc: "Tags, categories, statuses & column names",
+          icon: Tags,
+        },
+        {
+          id: "integrations",
+          label: "Canvas & Calendars",
+          shortLabel: "Sync",
+          desc: "Canvas LMS feed, Google & Apple Calendar",
+          icon: Calendar,
+        },
+      ],
+    },
+    {
+      group: "Intelligence",
+      items: [
+        {
+          id: "ai",
+          label: "AI & API Keys",
+          shortLabel: "AI",
+          desc: "Model provider, coaching tone & keys",
+          icon: Bot,
+        },
+        {
+          id: "memory",
+          label: "Memory & Context",
+          shortLabel: "Memory",
+          desc: "Persistent life notes & preferences",
+          icon: Brain,
+        },
+      ],
+    },
+  ];
+
+  const allNavItems = SETTINGS_GROUPS.flatMap((g) => g.items);
+  const currentTabMeta =
+    allNavItems.find((item) => item.id === activeTab) || allNavItems[0];
+  const CurrentTabIcon = currentTabMeta.icon;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-2 sm:p-4"
       onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
     >
       <div
-        className="relative w-full max-w-4xl max-h-[94vh] sm:max-h-[90vh] rounded-2xl border theme-panel shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-full max-w-5xl h-[92vh] sm:h-[85vh] max-h-[820px] rounded-2xl border theme-panel shadow-2xl flex flex-col md:flex-row overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-white/10 px-4 sm:px-6 py-3 sm:py-4 theme-header-bg shrink-0">
-          <div className="flex items-center gap-2.5">
-            <Sliders className="w-5 h-5 text-primary shrink-0" />
-            <div>
-              <h2 className="text-sm sm:text-base font-bold text-white">
-                Workspace Customization &amp; Settings
+        {/* Desktop Left Sidebar Navigation (Claude / Linear Style) */}
+        <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-white/10 bg-black/35 select-none">
+          <div className="flex items-center gap-2.5 px-4 py-4 border-b border-white/10">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/15 border border-primary/30 text-primary shrink-0">
+              <Sliders className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-white leading-tight">
+                Settings
               </h2>
-              <p className="text-[11px] sm:text-xs text-white/60 line-clamp-1 sm:line-clamp-none">
-                Customize tags, statuses, categories, table headers, themes &amp;
-                integrations
+              <p className="text-[11px] text-white/50 truncate">
+                Workspace preferences
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-white/60 hover:bg-white/10 hover:text-white transition-colors shrink-0"
+
+          <nav
+            aria-label="Settings Sections"
+            className="flex-1 overflow-y-auto px-2.5 py-3.5 space-y-5"
           >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+            {SETTINGS_GROUPS.map((section) => (
+              <div key={section.group} className="space-y-1">
+                <div className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-widest text-white/40">
+                  {section.group}
+                </div>
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setActiveTab(item.id)}
+                      className={`w-full flex items-start gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors ${
+                        isActive
+                          ? "bg-primary/15 border border-primary/40 text-white"
+                          : "border border-transparent text-white/70 hover:text-white hover:bg-white/[0.06]"
+                      }`}
+                    >
+                      <Icon
+                        className={`w-4 h-4 mt-0.5 shrink-0 ${
+                          isActive ? "text-primary" : "text-white/50"
+                        }`}
+                      />
+                      <div className="min-w-0">
+                        <div
+                          className={`text-xs leading-tight ${
+                            isActive ? "font-bold text-white" : "font-medium"
+                          }`}
+                        >
+                          {item.label}
+                        </div>
+                        <div className="text-[10px] text-white/45 truncate mt-0.5">
+                          {item.desc}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
 
-        {/* Navigation Tabs - Spacious Tactile Pill Buttons with Generous Click Targets & Margins */}
-        <div className="flex items-center border-b border-white/10 bg-black/40 px-3 sm:px-6 py-2.5 gap-2 sm:gap-2.5 overflow-x-auto scroll-smooth no-scrollbar scroll-px-3 shrink-0">
-          {[
-            {
-              id: "customize",
-              label: "1. Tags, Types & Headers",
-              icon: Tags,
-            },
-            {
-              id: "appearance",
-              label: "2. Themes & Background",
-              icon: Palette,
-            },
-            { id: "view", label: "3. Layout & View Mode", icon: LayoutPanelLeft },
-            { id: "ai", label: "4. AI Agent & API Key", icon: Bot },
-            { id: "memory", label: "5. Life Context & Memory", icon: Brain },
-            {
-              id: "integrations",
-              label: "6. Canvas & Calendars",
-              icon: Calendar,
-            },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id as SettingsTabId)}
-                className={`flex items-center gap-2 py-2.5 px-3.5 sm:px-4 text-xs font-semibold whitespace-nowrap rounded-xl transition-all shrink-0 cursor-pointer touch-manipulation select-none active:scale-[0.98] ${
-                  isActive
-                    ? "bg-primary/20 text-highlight border border-primary/50 shadow-neon font-bold"
-                    : "bg-white/[0.04] text-white/70 hover:text-white hover:bg-white/[0.08] border border-white/10"
-                }`}
-              >
-                <Icon
-                  className={`w-4 h-4 shrink-0 ${
-                    isActive ? "text-primary" : "text-white/60"
+          <div className="border-t border-white/10 px-4 py-3 text-[11px] text-white/45">
+            Changes auto-save &amp; sync
+          </div>
+        </aside>
+
+        {/* Mobile Header + Clean Compact Pill Strip */}
+        <div className="md:hidden shrink-0 border-b border-white/10 theme-header-bg">
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-primary" />
+              <h2 className="text-sm font-bold text-white">Settings</h2>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+              aria-label="Close settings"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 pb-2.5 overflow-x-auto no-scrollbar">
+            {allNavItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveTab(item.id)}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap shrink-0 transition-colors ${
+                    isActive
+                      ? "bg-primary/20 text-highlight border border-primary/45"
+                      : "bg-white/[0.05] text-white/65 border border-white/10 hover:text-white"
                   }`}
-                />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+                >
+                  <Icon
+                    className={`w-3.5 h-3.5 ${
+                      isActive ? "text-primary" : "text-white/50"
+                    }`}
+                  />
+                  <span>{item.shortLabel}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Tab Content Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6 text-white">
+        {/* Right Content Pane */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+          {/* Desktop Section Header */}
+          <div className="hidden md:flex items-center justify-between border-b border-white/10 px-6 py-4 theme-header-bg shrink-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <CurrentTabIcon className="w-4 h-4 text-primary shrink-0" />
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-white leading-tight">
+                  {currentTabMeta.label}
+                </h3>
+                <p className="text-xs text-white/55 truncate">
+                  {currentTabMeta.desc}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-white/60 hover:bg-white/10 hover:text-white transition-colors shrink-0"
+              aria-label="Close settings"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Tab Content Body */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6 text-white">
           {/* TAB 1: TAGS, TYPES, STATUSES, PRIORITIES & HEADERS */}
           {activeTab === "customize" && (
             <div className="space-y-6">
@@ -2214,15 +2358,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-between border-t border-white/10 theme-header-bg px-6 py-3.5 text-xs text-white/60">
-          <span>All customizations auto-save &amp; sync to Supabase</span>
+        <div className="flex items-center justify-between border-t border-white/10 theme-header-bg px-4 sm:px-6 py-3 text-xs text-white/60 shrink-0">
+          <span className="truncate">All customizations auto-save &amp; sync</span>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-primary px-4 py-1.5 font-bold text-black hover:brightness-110 transition-all shadow-neon"
+            className="rounded-xl bg-primary px-4 py-1.5 font-bold text-black hover:brightness-110 transition-all shadow-neon shrink-0"
           >
             Done
           </button>
+        </div>
         </div>
       </div>
     </div>

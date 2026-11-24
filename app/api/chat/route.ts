@@ -890,6 +890,7 @@ ${taskLines}`;
             blocks: incomingConfig.myDaySchedule.blocks.map((b) => ({ ...b })),
           }
         : null,
+      journeyState: incomingConfig.journeyState || null,
     };
 
     // Mutable working copies across multi-step tool calls in this turn.
@@ -1350,6 +1351,70 @@ ${taskLines}`;
             .join("\n")
         : "(No memory notes recorded yet)";
 
+    const journeyList = workingConfig.journeyState?.journeys || [];
+    const activeJourney =
+      journeyList.find(
+        (j) => j.id === workingConfig.journeyState?.activeJourneyId
+      ) ||
+      journeyList[0] ||
+      null;
+
+    const formatJourneyBlock = (
+      j: (typeof journeyList)[number],
+      isActive: boolean
+    ): string => {
+      const sorted = [...(j.milestones || [])].sort(
+        (a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
+      );
+      const completedCount = sorted.filter(
+        (m) => m.status === "completed"
+      ).length;
+      const inProgress = sorted.filter((m) => m.status === "in_progress");
+      const nextUpcoming =
+        inProgress[0] || sorted.find((m) => m.status === "upcoming") || null;
+
+      const header = `${isActive ? "★ ACTIVE JOURNEY" : "OTHER JOURNEY"}: "${
+        j.title
+      }" (${completedCount}/${sorted.length} milestones completed)${
+        j.vision ? ` — Vision: ${j.vision}` : ""
+      }`;
+
+      const nextLine = nextUpcoming
+        ? `   -> NEXT / CURRENT MILESTONE: "${nextUpcoming.title}" [Status: ${nextUpcoming.status.toUpperCase()}, Timeframe: ${nextUpcoming.timeframe || "TBD"}, Category: ${nextUpcoming.category}]${
+            nextUpcoming.description ? ` — ${nextUpcoming.description}` : ""
+          }`
+        : sorted.length > 0
+        ? "   -> ALL MILESTONES COMPLETED!"
+        : "   -> (No milestones added to this journey yet)";
+
+      const rows = sorted.map((m, idx) => {
+        const checkpoints = Array.isArray(m.checkpoints) ? m.checkpoints : [];
+        const checkpointsSummary =
+          checkpoints.length > 0
+            ? ` | Checkpoints (${
+                checkpoints.filter((c) => c.completed).length
+              }/${checkpoints.length}): ${checkpoints
+                .map((c) => `${c.completed ? "[x]" : "[ ]"} ${c.title}`)
+                .join("; ")}`
+            : "";
+        return `   ${idx + 1}. [${m.status.toUpperCase()}] "${m.title}" (${
+          m.timeframe || "No timeframe"
+        }, ${m.category})${m.description ? ` — ${m.description}` : ""}${checkpointsSummary}`;
+      });
+
+      return [header, nextLine, ...rows].join("\n");
+    };
+
+    const serializedJourney =
+      journeyList.length > 0
+        ? [
+            ...(activeJourney ? [formatJourneyBlock(activeJourney, true)] : []),
+            ...journeyList
+              .filter((j) => j.id !== activeJourney?.id)
+              .map((j) => formatJourneyBlock(j, false)),
+          ].join("\n\n")
+        : "(No journeys or milestones created in my journey yet)";
+
     const qaSubmissionDirective = qaSubmission
       ? `
 ===========================================================================
@@ -1460,6 +1525,9 @@ ${serializedMyDay}
 ACTIVE USER LIFE CONTEXT & MEMORY NOTES:
 ${serializedMemory}
 
+CURRENT MY JOURNEY MILESTONE ROADMAPS (100% Live Ground Truth — ALWAYS reference this when the user asks about my journey, milestones, roadmaps, or next milestone!):
+${serializedJourney}
+
 LIVE TASK LIST GROUPED BY SECTION (100% Ground Truth — ${liveActiveTasksCount} active task${liveActiveTasksCount === 1 ? "" : "s"} total):
 ${serializedSectionsBreakdown}
 
@@ -1480,7 +1548,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
         })),
       {
         role: "system",
-        content: `[LIVE GROUND TRUTH — STRICTLY ENFORCED]\nThe user's Task List currently has ONLY the ${liveActiveTasksCount} active task(s) listed below. Any other tasks mentioned in earlier chat messages (such as deleted, completed, or past tasks) NO LONGER EXIST on the Task List and MUST NOT be mentioned or listed!\n\nLive Task List by Section:\n${serializedSectionsBreakdown}`,
+        content: `[LIVE GROUND TRUTH — STRICTLY ENFORCED]\nThe user's Task List currently has ONLY the ${liveActiveTasksCount} active task(s) listed below. Any other tasks mentioned in earlier chat messages (such as deleted, completed, or past tasks) NO LONGER EXIST on the Task List and MUST NOT be mentioned or listed!\n\nLive Task List by Section:\n${serializedSectionsBreakdown}\n\nLive MY JOURNEY Roadmaps & Milestones (use this exact data whenever asked about my journey or next milestone — NEVER say my journey is empty if milestones are listed here!):\n${serializedJourney}`,
       },
       { role: "user", content: userMessage },
     ];

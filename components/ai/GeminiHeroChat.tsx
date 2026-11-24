@@ -714,6 +714,37 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
 
     try {
       const now = new Date();
+      let resolvedJourneyState = workspaceConfig.journeyState || null;
+      if (typeof window !== "undefined") {
+        try {
+          const rawJourney = localStorage.getItem("kite_my_journey_v1");
+          if (rawJourney) {
+            const localJourney = JSON.parse(rawJourney);
+            if (
+              localJourney &&
+              Array.isArray(localJourney.journeys) &&
+              localJourney.journeys.length > 0
+            ) {
+              const remoteJourneys = resolvedJourneyState?.journeys || [];
+              const localTs = localJourney.updatedAt
+                ? new Date(localJourney.updatedAt).getTime()
+                : 0;
+              const remoteTs = resolvedJourneyState?.updatedAt
+                ? new Date(resolvedJourneyState.updatedAt).getTime()
+                : 0;
+              if (remoteJourneys.length === 0 || localTs >= remoteTs) {
+                resolvedJourneyState = localJourney;
+              }
+            }
+          }
+        } catch {}
+      }
+
+      const syncedWorkspaceConfig = {
+        ...workspaceConfig,
+        journeyState: resolvedJourneyState,
+      };
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -733,7 +764,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           videoDim: profile.video_bg_dim,
           videoBlur: profile.video_bg_blur,
           viewMode: profile.view_mode,
-          workspaceConfig,
+          workspaceConfig: syncedWorkspaceConfig,
           customApiKey: effectiveApiKey,
           clientISO: now.toISOString(),
           clientTimezoneOffset: now.getTimezoneOffset(),

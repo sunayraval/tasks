@@ -2026,7 +2026,7 @@ export default function KiteWorkspacePage() {
   }, []);
 
   const handleOpenCustomizeSettings = useCallback(() => {
-    setSettingsTab("customize");
+    setSettingsTab("view");
     setIsSettingsOpen(true);
   }, []);
 
