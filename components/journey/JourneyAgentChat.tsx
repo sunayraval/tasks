@@ -24,7 +24,6 @@ import {
   RotateCcw,
   Sparkles,
 } from "lucide-react";
-import { Badge, Button, Card, Text, Title } from "@/components/tailus-ui";
 
 interface JourneyAgentChatProps {
   messages: JourneyChatMessage[];
@@ -129,15 +128,15 @@ const AgentTraceCard: React.FC<{
   const allDone = doneCount === trace.length;
 
   return (
-    <Card variant="soft" className="mb-2.5 border border-[--ui-border-color] p-2.5 backdrop-blur-md">
-      <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-[--ui-border-color]">
+    <div className="mb-2.5 rounded-xl border border-white/12 bg-black/40 p-2.5 backdrop-blur-md">
+      <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-white/10">
         <div className="flex items-center gap-1.5 text-[11px] font-semibold">
           {allDone ? (
-            <CheckCircle2 className="size-3.5 text-success-400 shrink-0" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
           ) : (
-            <Loader2 className="size-3.5 text-primary-400 animate-spin shrink-0" />
+            <Loader2 className="w-3.5 h-3.5 text-primary animate-spin shrink-0" />
           )}
-          <span className={allDone ? "text-success-300" : "text-primary-300"}>
+          <span className={allDone ? "text-emerald-300" : "text-highlight"}>
             {allDone
               ? `Agent sequence complete (${doneCount}/${trace.length})`
               : activeStep
@@ -147,19 +146,15 @@ const AgentTraceCard: React.FC<{
         </div>
 
         {isExecuting && !allDone && (
-          <Button.Root
-            variant="outlined"
-            intent="gray"
-            size="xs"
+          <button
+            type="button"
             onClick={onSkip}
-            className="h-5 px-1.5 text-[10px]"
+            className="inline-flex items-center gap-1 rounded-md border border-white/12 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-white/65 hover:text-white hover:bg-white/10 transition-colors"
             title="Apply remaining steps immediately"
           >
-            <Button.Icon type="leading" size="xs">
-              <FastForward />
-            </Button.Icon>
-            <Button.Label>Instant</Button.Label>
-          </Button.Root>
+            <FastForward className="w-2.5 h-2.5" />
+            Instant
+          </button>
         )}
       </div>
 
@@ -177,33 +172,33 @@ const AgentTraceCard: React.FC<{
                     onFocusMilestone(step.milestoneId);
                   }
                 }}
-                className={`flex items-start gap-2 rounded-[--btn-radius] px-2 py-1 text-[11.5px] transition-all ${
+                className={`flex items-start gap-2 rounded-lg px-2 py-1 text-[11.5px] transition-all ${
                   isRunning
-                    ? "bg-primary-500/15 border border-primary-500/40 text-title"
+                    ? "bg-primary/15 border border-primary/40 text-white"
                     : isDone
-                    ? `text-body ${
+                    ? `text-white/80 ${
                         clickable
-                          ? "hover:bg-[--ui-bg] cursor-pointer"
+                          ? "hover:bg-white/10 cursor-pointer"
                           : ""
                       }`
-                    : "text-caption/60"
+                    : "text-white/35"
                 }`}
               >
                 <span className="mt-0.5 shrink-0">
                   {isDone ? (
-                    <span className="flex size-3.5 items-center justify-center rounded-full bg-success-500/20 text-success-400">
-                      <Check className="size-2.5" strokeWidth={3} />
+                    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
+                      <Check className="w-2.5 h-2.5" strokeWidth={3} />
                     </span>
                   ) : isRunning ? (
-                    <Loader2 className="size-3.5 text-primary-400 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
                   ) : (
-                    <Circle className="size-3 text-gray-600" />
+                    <Circle className="w-3 h-3 text-white/25" />
                   )}
                 </span>
                 <div className="min-w-0 flex-1 leading-snug">
                   <div className="font-medium truncate">{step.label}</div>
                   {step.detail && (
-                    <div className="text-[10.5px] text-caption truncate">
+                    <div className="text-[10.5px] text-white/45 truncate">
                       {step.detail}
                     </div>
                   )}
@@ -213,7 +208,7 @@ const AgentTraceCard: React.FC<{
           );
         })}
       </ul>
-    </Card>
+    </div>
   );
 };
 
@@ -298,23 +293,21 @@ export const JourneyAgentChat: React.FC<JourneyAgentChatProps> = ({
   };
 
   return (
-    <Card
-      variant="mixed"
-      fancy
+    <aside
       aria-label="Journey Agent Chat"
-      className="p-0 flex flex-col backdrop-blur-md overflow-hidden lg:sticky lg:top-[76px] h-[540px] lg:h-[calc(100vh-100px)]"
+      className="flex flex-col rounded-2xl border theme-panel backdrop-blur-md overflow-hidden lg:sticky lg:top-[76px] h-[540px] lg:h-[calc(100vh-100px)]"
     >
       {/* Agent Chat Header */}
-      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-[--ui-border-color] bg-[--ui-soft-bg]/60 shrink-0">
+      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-white/10 bg-black/25 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-[--btn-radius] bg-primary-500/15 border border-primary-500/35 text-primary-400">
-            <Sparkles className="size-4" />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/20 border border-primary/40 text-primary shadow-sm">
+            <Sparkles className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <Title as="h2" size="base" weight="semibold" className="text-sm leading-tight truncate">
+            <h2 className="text-sm font-bold text-white leading-tight truncate">
               Journey Agent
-            </Title>
-            <p className="text-[11px] text-caption truncate">
+            </h2>
+            <p className="text-[11px] text-white/50 truncate">
               Builds milestones sequentially
             </p>
           </div>
@@ -323,30 +316,20 @@ export const JourneyAgentChat: React.FC<JourneyAgentChatProps> = ({
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Model Selector Dropdown */}
           <div className="relative" ref={modelMenuRef}>
-            <Button.Root
-              variant="outlined"
-              intent="gray"
-              size="xs"
+            <button
+              type="button"
               onClick={() => setModelMenuOpen((v) => !v)}
-              className="h-7 px-2 gap-1 text-[11px] max-w-[144px]"
+              className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 px-2 py-1 text-[11px] font-medium text-white/85 transition-colors max-w-[138px]"
               title="Choose AI model for Journey Agent"
             >
-              <Button.Icon type="leading" size="xs">
-                <Cpu className="text-primary-400" />
-              </Button.Icon>
-              <Button.Label className="truncate">{activeModelLabel}</Button.Label>
-              <Button.Icon type="trailing" size="xs">
-                <ChevronDown className="text-caption" />
-              </Button.Icon>
-            </Button.Root>
+              <Cpu className="w-3 h-3 text-primary shrink-0" />
+              <span className="truncate">{activeModelLabel}</span>
+              <ChevronDown className="w-3 h-3 text-white/50 shrink-0" />
+            </button>
 
             {modelMenuOpen && (
-              <Card
-                variant="elevated"
-                fancy
-                className="absolute right-0 mt-1.5 w-64 p-1.5 shadow-2xl z-50 max-h-72 overflow-y-auto backdrop-blur-2xl"
-              >
-                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-caption">
+              <div className="absolute right-0 mt-1.5 w-64 rounded-xl border theme-popover p-1.5 shadow-2xl z-50 max-h-72 overflow-y-auto">
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/45">
                   NVIDIA NIM Models
                 </div>
                 {NVIDIA_MODEL_OPTIONS.map((m) => {
@@ -363,21 +346,21 @@ export const JourneyAgentChat: React.FC<JourneyAgentChatProps> = ({
                         });
                         setModelMenuOpen(false);
                       }}
-                      className={`w-full flex items-center justify-between gap-2 rounded-[--btn-radius] px-2 py-1.5 text-left text-xs transition-colors ${
+                      className={`w-full flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-colors ${
                         selected
-                          ? "bg-primary-500/15 text-primary-300 font-semibold"
-                          : "text-body hover:text-title hover:bg-[--ui-soft-bg]"
+                          ? "bg-primary/20 text-highlight font-semibold border border-primary/40"
+                          : "text-white/75 hover:text-white hover:bg-white/10"
                       }`}
                     >
                       <span className="truncate">{m.shortName}</span>
-                      <Badge variant="soft" intent="gray" size="xs" className="font-mono shrink-0">
+                      <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-mono text-white/70 shrink-0">
                         {m.badge}
-                      </Badge>
+                      </span>
                     </button>
                   );
                 })}
-                <div className="my-1 border-t border-[--ui-border-color]" />
-                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-caption">
+                <div className="my-1 border-t border-white/10" />
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/45">
                   Google Gemini
                 </div>
                 {(["flash", "pro"] as const).map((tier) => {
@@ -392,38 +375,35 @@ export const JourneyAgentChat: React.FC<JourneyAgentChatProps> = ({
                         onChangeGeminiTier(tier);
                         setModelMenuOpen(false);
                       }}
-                      className={`w-full flex items-center justify-between gap-2 rounded-[--btn-radius] px-2 py-1.5 text-left text-xs transition-colors ${
+                      className={`w-full flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-colors ${
                         selected
-                          ? "bg-primary-500/15 text-primary-300 font-semibold"
-                          : "text-body hover:text-title hover:bg-[--ui-soft-bg]"
+                          ? "bg-primary/20 text-highlight font-semibold border border-primary/40"
+                          : "text-white/75 hover:text-white hover:bg-white/10"
                       }`}
                     >
                       <span>
                         {tier === "pro" ? "Gemini 1.5 Pro" : "Gemini 2.0 Flash"}
                       </span>
-                      <Badge variant="soft" intent="gray" size="xs" className="font-mono">
+                      <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-mono text-white/70">
                         {tier === "pro" ? "Deep" : "Fast"}
-                      </Badge>
+                      </span>
                     </button>
                   );
                 })}
-              </Card>
+              </div>
             )}
           </div>
 
           {messages.length > 0 && (
-            <Button.Root
-              variant="ghost"
-              intent="gray"
-              size="xs"
+            <button
+              type="button"
               onClick={onClearChat}
               disabled={isThinking || isExecutingSequence}
               title="Clear chat history"
+              className="rounded-lg p-1.5 text-white/45 hover:text-white hover:bg-white/10 disabled:opacity-35 transition-colors"
             >
-              <Button.Icon type="only" size="xs">
-                <RotateCcw />
-              </Button.Icon>
-            </Button.Root>
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
           )}
         </div>
       </div>
@@ -432,29 +412,27 @@ export const JourneyAgentChat: React.FC<JourneyAgentChatProps> = ({
       <div className="flex-1 overflow-y-auto px-3.5 py-3.5 space-y-3.5">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-3 py-6">
-            <div className="flex size-11 items-center justify-center rounded-[--card-radius] border border-primary-500/35 bg-primary-500/15 text-primary-400 mb-3">
-              <Compass className="size-5" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/35 bg-primary/10 text-primary mb-3">
+              <Compass className="w-5 h-5" />
             </div>
-            <Title as="div" size="base" weight="semibold" className="text-sm mb-1">
+            <p className="text-sm font-semibold text-white mb-1">
               Tell me what you want to achieve
-            </Title>
-            <Text size="sm" align="center" className="text-caption leading-relaxed max-w-[260px] mb-5">
+            </p>
+            <p className="text-xs text-white/55 leading-relaxed max-w-[260px] mb-5">
               Give me your big goals, target dates, or rough ideas — I&apos;ll map
               each milestone onto your journey sequentially.
-            </Text>
+            </p>
             <div className="w-full space-y-1.5">
               {STARTER_CHIPS.map((prompt) => (
-                <Button.Root
+                <button
                   key={prompt}
-                  variant="outlined"
-                  intent="gray"
-                  size="sm"
+                  type="button"
                   disabled={!hasApiKey}
                   onClick={() => onSendMessage(prompt)}
-                  className="w-full h-auto justify-start text-left py-2 px-3 text-xs font-normal whitespace-normal"
+                  className="w-full text-left rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.09] hover:border-primary/40 px-3 py-2 text-xs text-white/80 hover:text-white transition-all disabled:opacity-45"
                 >
-                  <Button.Label>&ldquo;{prompt}&rdquo;</Button.Label>
-                </Button.Root>
+                  &ldquo;{prompt}&rdquo;
+                </button>
               ))}
             </div>
           </div>
@@ -473,17 +451,11 @@ export const JourneyAgentChat: React.FC<JourneyAgentChatProps> = ({
                   }`}
                 >
                   {isUser ? (
-                    <Card
-                      variant="soft"
-                      className="max-w-[88%] rounded-2xl rounded-br-sm border border-primary-500/35 bg-primary-500/15 px-3.5 py-2 text-[13px] text-title leading-relaxed"
-                    >
+                    <div className="max-w-[88%] rounded-2xl rounded-br-sm border border-primary/40 bg-primary/20 px-3.5 py-2 text-[13px] text-white leading-relaxed shadow-sm">
                       {msg.content}
-                    </Card>
+                    </div>
                   ) : (
-                    <Card
-                      variant="soft"
-                      className="w-full rounded-2xl rounded-bl-sm border border-[--ui-border-color] px-3.5 py-2.5"
-                    >
+                    <div className="w-full rounded-2xl rounded-bl-sm border border-white/10 bg-white/[0.04] px-3.5 py-2.5">
                       {msg.trace && msg.trace.length > 0 && (
                         <AgentTraceCard
                           trace={msg.trace}
@@ -493,7 +465,7 @@ export const JourneyAgentChat: React.FC<JourneyAgentChatProps> = ({
                         />
                       )}
                       {msg.content && <CompactMarkdown content={msg.content} />}
-                    </Card>
+                    </div>
                   )}
                 </motion.div>
               );
@@ -506,14 +478,14 @@ export const JourneyAgentChat: React.FC<JourneyAgentChatProps> = ({
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2.5 rounded-[--btn-radius] border border-primary-500/30 bg-primary-500/10 px-3 py-2.5 text-xs text-primary-300"
+            className="flex items-center gap-2.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2.5 text-xs text-highlight"
           >
-            <Loader2 className="size-3.5 text-primary-400 animate-spin shrink-0" />
+            <Loader2 className="w-3.5 h-3.5 text-primary animate-spin shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="font-semibold">
                 Planning milestone sequence...
               </div>
-              <div className="text-[10.5px] text-caption font-mono">
+              <div className="text-[10.5px] text-white/55 font-mono">
                 {activeModelLabel} · {thinkingSeconds}s
               </div>
             </div>
@@ -524,29 +496,22 @@ export const JourneyAgentChat: React.FC<JourneyAgentChatProps> = ({
       </div>
 
       {/* API Key Missing Banner OR Composer */}
-      <div className="p-3 border-t border-[--ui-border-color] bg-[--ui-soft-bg]/50 shrink-0">
+      <div className="p-3 border-t border-white/10 bg-black/25 shrink-0">
         {!hasApiKey ? (
-          <Card
-            variant="outlined"
-            className="border-warning-500/35 bg-warning-500/10 p-3 text-center space-y-2"
-          >
-            <p className="text-xs text-warning-200 leading-snug">
+          <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 p-3 text-center space-y-2">
+            <p className="text-xs text-amber-100/90 leading-snug">
               Connect an AI API key to build milestones with the Journey Agent —
               or set milestones manually on the left anytime.
             </p>
-            <Button.Root
-              variant="solid"
-              intent="primary"
-              size="xs"
+            <button
+              type="button"
               onClick={onOpenApiKeySetup}
-              className="font-semibold"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-zinc-950 hover:opacity-90 transition-opacity"
             >
-              <Button.Icon type="leading" size="xs">
-                <KeyRound />
-              </Button.Icon>
-              <Button.Label>Connect API Key</Button.Label>
-            </Button.Root>
-          </Card>
+              <KeyRound className="w-3.5 h-3.5" />
+              Connect API Key
+            </button>
+          </div>
         ) : (
           <form onSubmit={handleSubmit} className="relative">
             <textarea
@@ -561,28 +526,23 @@ export const JourneyAgentChat: React.FC<JourneyAgentChatProps> = ({
                   ? "Agent is adding milestones sequentially..."
                   : "Ask agent to add, edit, or map milestones..."
               }
-              className="w-full rounded-[--btn-radius] border border-[--ui-border-color] bg-[--ui-bg] pl-3.5 pr-11 py-2.5 text-[13px] text-title placeholder:text-placeholder focus:border-primary-500 focus:outline-none resize-none leading-snug disabled:opacity-60"
+              className="w-full rounded-xl border theme-input pl-3.5 pr-11 py-2.5 text-[13px] placeholder:text-white/35 focus:outline-none resize-none leading-snug disabled:opacity-60"
             />
-            <Button.Root
+            <button
               type="submit"
-              variant="solid"
-              intent="primary"
-              size="xs"
               disabled={!draft.trim() || isThinking || isExecutingSequence}
               aria-label="Send to Journey Agent"
-              className="absolute right-2 bottom-2"
+              className="absolute right-2 bottom-2 flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-zinc-950 hover:opacity-90 disabled:opacity-30 transition-all"
             >
-              <Button.Icon type="only" size="xs">
-                {isThinking || isExecutingSequence ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
-                  <ArrowUp className="stroke-[2.5]" />
-                )}
-              </Button.Icon>
-            </Button.Root>
+              {isThinking || isExecutingSequence ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
+              )}
+            </button>
           </form>
         )}
       </div>
-    </Card>
+    </aside>
   );
 };

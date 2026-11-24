@@ -3,14 +3,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { TaskItem } from "@/types/taskit";
 import {
-  Badge,
-  Button,
-  Caption,
-  Card,
-  Dialog,
-  Input,
-} from "@/components/tailus-ui";
-import {
   Calendar,
   Check,
   CheckCheck,
@@ -205,346 +197,315 @@ export const CanvasSyncModal: React.FC<CanvasSyncModalProps> = ({
     })} at ${timeStr}`;
   };
 
-  const getPriorityBadgeIntent = (
-    priority: string
-  ): "danger" | "warning" | "gray" => {
+  const getPriorityBadge = (priority: string) => {
     const p = priority.toLowerCase();
-    if (p === "urgent") return "danger";
-    if (p === "high" || p === "medium") return "warning";
-    return "gray";
+    if (p === "urgent") {
+      return "border-red-500/40 bg-red-500/15 text-red-300";
+    }
+    if (p === "high") {
+      return "border-orange-500/40 bg-orange-500/15 text-orange-300";
+    }
+    if (p === "low") {
+      return "border-slate-500/40 bg-slate-500/15 text-slate-300";
+    }
+    return "border-amber-500/40 bg-amber-500/15 text-amber-300";
   };
 
+  if (!isOpen) return null;
+
   return (
-    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="z-[60] bg-black/80 backdrop-blur-md" />
-        <Dialog.Content
-          fancy
-          className="z-[60] w-[calc(100vw-1rem)] max-w-2xl p-0 shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col max-h-[92vh] sm:max-h-[88vh] overflow-hidden backdrop-blur-2xl"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[--ui-border-color] bg-[--ui-soft-bg]">
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-[--card-radius] bg-primary-500/20 text-primary-400 border border-primary-500/40 shadow-neon">
-                <GraduationCap className="w-5 h-5" />
-              </span>
-              <div>
-                <div className="flex items-center gap-2">
-                  <Dialog.Title size="base" weight="bold" className="tracking-wide">
-                    Sync Canvas Assignments
-                  </Dialog.Title>
-                  <Badge
-                    variant="soft"
-                    intent={usedDemoFeed ? "warning" : "success"}
-                    size="xs"
-                    className="font-semibold"
-                  >
-                    {usedDemoFeed ? "Sample Feed" : "Live Feed"}
-                  </Badge>
-                </div>
-                <Dialog.Description size="sm" className="mt-0.5 text-caption">
-                  Select which upcoming assignments you want to add to your
-                  workspace.
-                </Dialog.Description>
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 animate-in fade-in duration-150"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl rounded-2xl sm:rounded-3xl border border-white/20 bg-[#0d1017]/95 backdrop-blur-2xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col max-h-[92vh] sm:max-h-[88vh] overflow-hidden animate-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-white/10 bg-white/[0.02]">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-primary/20 text-primary border border-primary/40 shadow-neon">
+              <GraduationCap className="w-5 h-5" />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm sm:text-base font-bold text-white tracking-wide">
+                  Sync Canvas Assignments
+                </h3>
+                <span
+                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                    usedDemoFeed
+                      ? "border-amber-500/40 bg-amber-500/15 text-amber-300"
+                      : "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+                  }`}
+                >
+                  {usedDemoFeed ? "Sample Feed" : "Live Feed"}
+                </span>
               </div>
+              <p className="text-[11px] sm:text-xs text-white/55 mt-0.5">
+                Select which upcoming assignments you want to add to your workspace.
+              </p>
             </div>
-
-            <Dialog.CloseButton
-              type="button"
-              onClick={onClose}
-              className="static"
-              aria-label="Close"
-            >
-              <X className="w-5 h-5" />
-            </Dialog.CloseButton>
           </div>
 
-          {/* Toolbar: Search & Select All */}
-          {!loading && !error && fetchedTasks.length > 0 && (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 px-4 sm:px-6 py-3 border-b border-[--ui-border-color] bg-[--ui-bg]">
-              {/* Search Input */}
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-placeholder pointer-events-none z-10" />
-                <Input
-                  type="text"
-                  variant="soft"
-                  size="sm"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter by course or title..."
-                  className="pl-8 pr-7"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-placeholder hover:text-title"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-              {/* Select All Toggle */}
-              <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
-                <Button.Root
+        {/* Toolbar: Search & Select All */}
+        {!loading && !error && fetchedTasks.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 px-4 sm:px-6 py-3 border-b border-white/10 bg-black/40">
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Filter by course or title..."
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-white/15 bg-white/[0.05] text-xs text-white placeholder-white/40 focus:border-primary focus:outline-none"
+              />
+              {searchQuery && (
+                <button
                   type="button"
-                  variant="soft"
-                  intent="gray"
-                  size="xs"
-                  onClick={handleSelectAll}
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
                 >
-                  <Button.Icon type="leading">
-                    <CheckCheck className="w-3.5 h-3.5 text-primary-400" />
-                  </Button.Icon>
-                  <Button.Label>
-                    {selectedIds.size === filteredTasks.length &&
-                    filteredTasks.length > 0
-                      ? "Deselect All"
-                      : "Select All"}
-                  </Button.Label>
-                </Button.Root>
-
-                <Button.Root
-                  type="button"
-                  variant="soft"
-                  intent="gray"
-                  size="xs"
-                  onClick={fetchPreview}
-                  title="Refresh feed"
-                >
-                  <Button.Icon type="only">
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </Button.Icon>
-                </Button.Root>
-              </div>
-            </div>
-          )}
-
-          {/* Content Body */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-2.5">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-12 space-y-3">
-                <Loader2 className="w-8 h-8 animate-spin text-primary-400" />
-                <Caption>
-                  Fetching upcoming assignments from Canvas LMS...
-                </Caption>
-              </div>
-            ) : error ? (
-              <div className="flex flex-col items-center justify-center py-10 px-4 text-center space-y-3">
-                <AlertCircle className="w-8 h-8 text-danger-400" />
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-danger-300">
-                    Failed to fetch Canvas feed
-                  </p>
-                  <Caption className="max-w-sm block">{error}</Caption>
-                </div>
-                <Button.Root
-                  type="button"
-                  variant="soft"
-                  intent="gray"
-                  size="xs"
-                  onClick={fetchPreview}
-                >
-                  <Button.Icon type="leading">
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </Button.Icon>
-                  <Button.Label>Retry</Button.Label>
-                </Button.Root>
-              </div>
-            ) : filteredTasks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-3">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[--ui-soft-bg] border border-[--ui-border-color] text-placeholder">
-                  <GraduationCap className="w-6 h-6" />
-                </span>
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-title">
-                    {searchQuery
-                      ? "No matching assignments"
-                      : "No upcoming Canvas assignments"}
-                  </p>
-                  <Caption className="max-w-md block">
-                    {searchQuery
-                      ? `No assignments match "${searchQuery}". Clear filter to view all.`
-                      : "No active class assignments due today, tomorrow, or the day after were found in your feed."}
-                  </Caption>
-                </div>
-                {searchQuery && (
-                  <Button.Root
-                    type="button"
-                    variant="ghost"
-                    intent="primary"
-                    size="xs"
-                    onClick={() => setSearchQuery("")}
-                  >
-                    <Button.Label>Clear filter</Button.Label>
-                  </Button.Root>
-                )}
-              </div>
-            ) : (
-              filteredTasks.map((task) => {
-                const isSelected = selectedIds.has(task.id);
-                const onBoard = isAlreadyOnBoard(task);
-
-                return (
-                  <Card
-                    key={task.id}
-                    variant={isSelected ? "outlined" : "soft"}
-                    onClick={() => toggleSelect(task.id)}
-                    className={`group relative flex items-start gap-3 p-3 sm:p-3.5 cursor-pointer transition-all select-none ${
-                      isSelected
-                        ? "border-primary-500/50 bg-primary-500/10 shadow-[0_0_15px_rgba(var(--colors-primary-500),0.12)]"
-                        : "hover:border-primary-500/30"
-                    }`}
-                  >
-                    {/* Custom Styled Checkbox */}
-                    <div className="pt-0.5 shrink-0">
-                      <div
-                        className={`flex h-5 w-5 items-center justify-center rounded-lg border transition-all ${
-                          isSelected
-                            ? "border-primary-500 bg-primary-500 text-white"
-                            : "border-[--ui-border-color] bg-[--ui-bg] group-hover:border-primary-500/50"
-                        }`}
-                      >
-                        {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                      </div>
-                    </div>
-
-                    {/* Task Content */}
-                    <div className="flex-1 min-w-0 space-y-1.5">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {/* Course Code Tag */}
-                        {task.canvas_course_code && (
-                          <Badge
-                            variant="soft"
-                            intent="info"
-                            size="xs"
-                            className="font-bold uppercase tracking-wider"
-                          >
-                            {task.canvas_course_code}
-                          </Badge>
-                        )}
-
-                        {/* Section destination pill */}
-                        {task.section_group && (
-                          <Badge variant="outlined" intent="gray" size="xs">
-                            → {task.section_group}
-                          </Badge>
-                        )}
-
-                        {/* Priority Tag */}
-                        <Badge
-                          variant="soft"
-                          intent={getPriorityBadgeIntent(task.priority)}
-                          size="xs"
-                          className="font-semibold"
-                        >
-                          {task.priority}
-                        </Badge>
-
-                        {/* Already on board indicator */}
-                        {onBoard && (
-                          <Badge
-                            variant="soft"
-                            intent="success"
-                            size="xs"
-                            className="gap-1 font-semibold"
-                          >
-                            <Check className="w-2.5 h-2.5" />
-                            <span>Already on board</span>
-                          </Badge>
-                        )}
-                      </div>
-
-                      {/* Title */}
-                      <h4 className="text-xs sm:text-sm font-semibold text-title leading-snug break-words">
-                        {task.title}
-                      </h4>
-
-                      {/* Meta info: Due date & duration */}
-                      <div className="flex flex-wrap items-center gap-3 text-[11px] text-caption pt-0.5">
-                        <span className="inline-flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-placeholder" />
-                          <span>{formatDueDate(task.due_date)}</span>
-                        </span>
-
-                        {task.estimated_minutes ? (
-                          <span className="inline-flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-placeholder" />
-                            <span>{task.estimated_minutes}m</span>
-                          </span>
-                        ) : null}
-
-                        {onBoard && (
-                          <span className="text-[10px] text-placeholder italic">
-                            {isSelected ? "Will update existing" : "Skipped"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })
-            )}
-          </div>
-
-          {/* Sticky Footer */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-3.5 border-t border-[--ui-border-color] bg-[--ui-bg]/95 backdrop-blur-md">
-            <div className="text-xs text-caption text-center sm:text-left">
-              {!loading && !error && (
-                <span>
-                  <strong className="text-title font-semibold">
-                    {selectedIds.size}
-                  </strong>{" "}
-                  of {filteredTasks.length} assignments selected
-                </span>
+                  <X className="w-3 h-3" />
+                </button>
               )}
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-              <Button.Root
+            {/* Select All Toggle */}
+            <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
+              <button
                 type="button"
-                variant="soft"
-                intent="gray"
-                size="sm"
-                onClick={onClose}
-                disabled={isCommitting}
-                className="flex-1 sm:flex-none"
+                onClick={handleSelectAll}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 px-2.5 py-1.5 text-[11px] font-medium text-white/80 hover:text-white transition-colors"
               >
-                <Button.Label>Cancel</Button.Label>
-              </Button.Root>
+                <CheckCheck className="w-3.5 h-3.5 text-primary" />
+                <span>
+                  {selectedIds.size === filteredTasks.length &&
+                  filteredTasks.length > 0
+                    ? "Deselect All"
+                    : "Select All"}
+                </span>
+              </button>
 
-              <Button.Root
+              <button
                 type="button"
-                variant="solid"
-                intent="primary"
-                size="sm"
-                disabled={selectedIds.size === 0 || isCommitting || loading}
-                onClick={handleConfirm}
-                className="flex-1 sm:flex-none shadow-neon"
+                onClick={fetchPreview}
+                title="Refresh feed"
+                className="rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 p-1.5 text-white/70 hover:text-white transition-colors"
               >
-                {isCommitting ? (
-                  <>
-                    <Button.Icon type="leading">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    </Button.Icon>
-                    <Button.Label>Adding...</Button.Label>
-                  </>
-                ) : (
-                  <>
-                    <Button.Icon type="leading">
-                      <Layers className="w-3.5 h-3.5" />
-                    </Button.Icon>
-                    <Button.Label>
-                      Add Selected ({selectedIds.size})
-                    </Button.Label>
-                  </>
-                )}
-              </Button.Root>
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+        )}
+
+        {/* Content Body */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-2.5">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-12 space-y-3">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-xs text-white/60">
+                Fetching upcoming assignments from Canvas LMS...
+              </p>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-10 px-4 text-center space-y-3">
+              <AlertCircle className="w-8 h-8 text-red-400" />
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-red-300">
+                  Failed to fetch Canvas feed
+                </p>
+                <p className="text-[11px] text-white/50 max-w-sm">{error}</p>
+              </div>
+              <button
+                type="button"
+                onClick={fetchPreview}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/15 px-3 py-1.5 text-xs font-medium text-white transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Retry</span>
+              </button>
+            </div>
+          ) : filteredTasks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-3">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-white/40">
+                <GraduationCap className="w-6 h-6" />
+              </span>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-white">
+                  {searchQuery
+                    ? "No matching assignments"
+                    : "No upcoming Canvas assignments"}
+                </p>
+                <p className="text-xs text-white/50 max-w-md">
+                  {searchQuery
+                    ? `No assignments match "${searchQuery}". Clear filter to view all.`
+                    : "No active class assignments due today, tomorrow, or the day after were found in your feed."}
+                </p>
+              </div>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Clear filter
+                </button>
+              )}
+            </div>
+          ) : (
+            filteredTasks.map((task) => {
+              const isSelected = selectedIds.has(task.id);
+              const onBoard = isAlreadyOnBoard(task);
+
+              return (
+                <div
+                  key={task.id}
+                  onClick={() => toggleSelect(task.id)}
+                  className={`group relative flex items-start gap-3 rounded-2xl border p-3 sm:p-3.5 cursor-pointer transition-all select-none ${
+                    isSelected
+                      ? "border-primary/50 bg-primary/[0.08] shadow-[0_0_15px_rgba(var(--primary-rgb),0.1)]"
+                      : "border-white/10 bg-white/[0.03] hover:border-white/25 hover:bg-white/[0.06]"
+                  }`}
+                >
+                  {/* Custom Styled Checkbox */}
+                  <div className="pt-0.5 shrink-0">
+                    <div
+                      className={`flex h-5 w-5 items-center justify-center rounded-lg border transition-all ${
+                        isSelected
+                          ? "border-primary bg-primary text-black"
+                          : "border-white/30 bg-black/40 group-hover:border-white/50"
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                    </div>
+                  </div>
+
+                  {/* Task Content */}
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {/* Course Code Tag */}
+                      {task.canvas_course_code && (
+                        <span className="inline-flex items-center rounded-md border border-cyan-400/40 bg-cyan-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-cyan-300">
+                          {task.canvas_course_code}
+                        </span>
+                      )}
+
+                      {/* Section destination pill */}
+                      {task.section_group && (
+                        <span className="inline-flex items-center rounded-md border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-white/70">
+                          → {task.section_group}
+                        </span>
+                      )}
+
+                      {/* Priority Tag */}
+                      <span
+                        className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${getPriorityBadge(
+                          task.priority
+                        )}`}
+                      >
+                        {task.priority}
+                      </span>
+
+                      {/* Already on board indicator */}
+                      {onBoard && (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                          <Check className="w-2.5 h-2.5" />
+                          <span>Already on board</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Title */}
+                    <h4 className="text-xs sm:text-sm font-semibold text-white leading-snug break-words">
+                      {task.title}
+                    </h4>
+
+                    {/* Meta info: Due date & duration */}
+                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-white/50 pt-0.5">
+                      <span className="inline-flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-white/40" />
+                        <span>{formatDueDate(task.due_date)}</span>
+                      </span>
+
+                      {task.estimated_minutes ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-white/40" />
+                          <span>{task.estimated_minutes}m</span>
+                        </span>
+                      ) : null}
+
+                      {onBoard && (
+                        <span className="text-[10px] text-white/40 italic">
+                          {isSelected ? "Will update existing" : "Skipped"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Sticky Footer */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-3.5 border-t border-white/10 bg-[#07090e]/95 backdrop-blur-md">
+          <div className="text-xs text-white/60 text-center sm:text-left">
+            {!loading && !error && (
+              <span>
+                <strong className="text-white font-semibold">
+                  {selectedIds.size}
+                </strong>{" "}
+                of {filteredTasks.length} assignments selected
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isCommitting}
+              className="flex-1 sm:flex-none rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 px-4 py-2 text-xs font-semibold text-white/80 hover:text-white transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              disabled={selectedIds.size === 0 || isCommitting || loading}
+              onClick={handleConfirm}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2 text-xs font-bold text-black hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-neon"
+            >
+              {isCommitting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Adding...</span>
+                </>
+              ) : (
+                <>
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>
+                    Add Selected ({selectedIds.size})
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };

@@ -22,15 +22,6 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import {
-  Badge,
-  Button,
-  Card,
-  Input,
-  Progress,
-  Text,
-  Title,
-} from "@/components/tailus-ui";
 
 interface JourneyMilestoneCardProps {
   milestone: JourneyMilestone;
@@ -160,33 +151,26 @@ export const JourneyMilestoneCard: React.FC<JourneyMilestoneCardProps> = React.m
         aria-hidden="true"
       />
 
-      {/* Semantic Milestone Card */}
-      <Card
-        variant="mixed"
-        fancy
-        className={`journey-milestone-card relative flex-1 min-w-0 backdrop-blur-md transition-colors duration-200 ${
+      {/* Semantic Milestone Card (<article>) */}
+      <article
+        className={`journey-milestone-card relative flex-1 min-w-0 rounded-2xl border p-4 sm:p-5 backdrop-blur-md transition-colors duration-200 ${
           isHighlighted
-            ? "border-primary-500/80 ring-1 ring-primary-500/40"
+            ? "theme-panel border-primary/80 shadow-[0_0_32px_-4px_color-mix(in_srgb,var(--primary)_55%,transparent)]"
             : isDone
-            ? "border-success-500/25 opacity-90 hover:opacity-100"
+            ? "theme-panel border-emerald-400/25 opacity-90 hover:opacity-100"
             : isActive
-            ? "border-primary-500/45 shadow-lg"
-            : ""
+            ? "theme-panel border-primary/45 shadow-[0_12px_36px_-8px_rgba(0,0,0,0.5),0_0_22px_-6px_color-mix(in_srgb,var(--primary)_32%,transparent)]"
+            : "theme-panel hover:border-white/25"
         }`}
       >
         {/* Top Metadata & Quick Actions Header */}
         <header className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
           <div className="flex flex-wrap items-center gap-2">
             {/* Target Timeframe Pill */}
-            <Badge
-              variant="outlined"
-              intent="gray"
-              size="xs"
-              className="inline-flex items-center gap-1.5 rounded-full font-mono font-semibold"
-            >
-              <Calendar className="size-3 text-primary-400 shrink-0" />
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/35 px-2.5 py-0.5 text-[11px] font-mono font-semibold text-highlight">
+              <Calendar className="w-3 h-3 text-primary/90 shrink-0" />
               <span>{milestone.timeframe || "Upcoming"}</span>
-            </Badge>
+            </span>
 
             {/* Category Pill */}
             <span
@@ -198,25 +182,27 @@ export const JourneyMilestoneCard: React.FC<JourneyMilestoneCardProps> = React.m
               }}
             >
               <span
-                className="size-1.5 rounded-full shrink-0"
+                className="h-1.5 w-1.5 rounded-full shrink-0"
                 style={{ backgroundColor: catMeta.dotColor }}
               />
               {catMeta.label}
             </span>
 
             {/* Clickable Status Pill */}
-            <Button.Root
-              variant="soft"
-              intent={isDone ? "success" : isActive ? "primary" : "gray"}
-              size="xs"
+            <button
+              type="button"
               onClick={() => onCycleStatus(milestone.id)}
-              className="h-5 rounded-full px-2 text-[10px] font-semibold uppercase tracking-wider"
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                isDone
+                  ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                  : isActive
+                  ? "border-primary/50 bg-primary/15 text-highlight hover:bg-primary/25"
+                  : "border-white/12 bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
+              }`}
               title="Click to cycle milestone status"
             >
-              <Button.Label>
-                {isDone ? "Reached" : isActive ? "In Progress" : "Upcoming"}
-              </Button.Label>
-            </Button.Root>
+              {isDone ? "Reached" : isActive ? "In Progress" : "Upcoming"}
+            </button>
 
             {/* Agent Just-Added/Updated Highlight Badge */}
             <AnimatePresence>
@@ -225,16 +211,10 @@ export const JourneyMilestoneCard: React.FC<JourneyMilestoneCardProps> = React.m
                   initial={{ opacity: 0, scale: 0.85 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.85 }}
+                  className="inline-flex items-center gap-1 rounded-full bg-primary/25 border border-primary/60 px-2 py-0.5 text-[10px] font-semibold text-highlight"
                 >
-                  <Badge
-                    variant="soft"
-                    intent="primary"
-                    size="xs"
-                    className="inline-flex items-center gap-1 rounded-full"
-                  >
-                    <Sparkles className="size-2.5" />
-                    {highlightLabel || "Added by Agent"}
-                  </Badge>
+                  <Sparkles className="w-2.5 h-2.5" />
+                  {highlightLabel || "Added by Agent"}
                 </motion.span>
               )}
             </AnimatePresence>
@@ -242,103 +222,83 @@ export const JourneyMilestoneCard: React.FC<JourneyMilestoneCardProps> = React.m
 
           {/* Hover-revealed clean action toolbar */}
           <div className="flex items-center gap-0.5 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-            <Button.Root
-              variant="ghost"
-              intent="gray"
-              size="xs"
+            <button
+              type="button"
               disabled={index === 0}
               onClick={() => onMove(milestone.id, "up")}
               title="Move earlier"
+              className="rounded-lg p-1.5 text-white/50 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:pointer-events-none transition-colors"
             >
-              <Button.Icon type="only" size="xs">
-                <ArrowUp />
-              </Button.Icon>
-            </Button.Root>
-            <Button.Root
-              variant="ghost"
-              intent="gray"
-              size="xs"
+              <ArrowUp className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
               disabled={index === totalCount - 1}
               onClick={() => onMove(milestone.id, "down")}
               title="Move later"
+              className="rounded-lg p-1.5 text-white/50 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:pointer-events-none transition-colors"
             >
-              <Button.Icon type="only" size="xs">
-                <ArrowDown />
-              </Button.Icon>
-            </Button.Root>
+              <ArrowDown className="w-3.5 h-3.5" />
+            </button>
             {onSendToTasks && !isDone && (
-              <Button.Root
-                variant="ghost"
-                intent="primary"
-                size="xs"
+              <button
+                type="button"
                 onClick={() => onSendToTasks(milestone)}
                 title="Add to my tasks"
+                className="rounded-lg p-1.5 text-white/50 hover:text-primary hover:bg-white/10 transition-colors"
               >
-                <Button.Icon type="only" size="xs">
-                  <ListPlus />
-                </Button.Icon>
-              </Button.Root>
+                <ListPlus className="w-3.5 h-3.5" />
+              </button>
             )}
-            <Button.Root
-              variant="ghost"
-              intent="gray"
-              size="xs"
+            <button
+              type="button"
               onClick={() => onEdit(milestone)}
               title="Edit milestone"
+              className="rounded-lg p-1.5 text-white/50 hover:text-white hover:bg-white/10 transition-colors"
             >
-              <Button.Icon type="only" size="xs">
-                <Pencil />
-              </Button.Icon>
-            </Button.Root>
-            <Button.Root
-              variant="ghost"
-              intent="danger"
-              size="xs"
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
               onClick={() => onDelete(milestone.id)}
               title="Delete milestone"
+              className="rounded-lg p-1.5 text-white/50 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
             >
-              <Button.Icon type="only" size="xs">
-                <Trash2 />
-              </Button.Icon>
-            </Button.Root>
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
           </div>
         </header>
 
         {/* Primary Milestone Title & Outcome */}
         <div className="space-y-1.5">
-          <Title
-            as="h3"
-            size="lg"
-            weight="semibold"
-            className={`tracking-tight leading-snug ${
-              isDone
-                ? "text-caption line-through decoration-success-400/60"
-                : ""
+          <h3
+            className={`text-base sm:text-[17px] font-bold tracking-tight leading-snug ${
+              isDone ? "text-white/75 line-through decoration-emerald-400/60" : "text-white"
             }`}
           >
             {milestone.title}
-          </Title>
+          </h3>
           {milestone.description && (
-            <Text size="sm" className="text-body leading-relaxed">
+            <p className="text-xs sm:text-[13.5px] text-white/70 leading-relaxed">
               {milestone.description}
-            </Text>
+            </p>
           )}
         </div>
 
         {/* Sub-Steps / Checkpoints Section */}
         {(totalSteps > 0 || addingStep) && (
-          <div className="mt-3.5 pt-3 border-t border-[--ui-border-color]">
+          <div className="mt-3.5 pt-3 border-t border-white/10">
             <div className="flex items-center justify-between gap-2 mb-2">
               <button
                 type="button"
                 onClick={() => setStepsExpanded((v) => !v)}
                 aria-expanded={stepsExpanded}
-                className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-caption hover:text-title transition-colors"
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/65 hover:text-white transition-colors"
               >
                 {stepsExpanded ? (
-                  <ChevronUp className="size-3.5" />
+                  <ChevronUp className="w-3.5 h-3.5 text-white/50" />
                 ) : (
-                  <ChevronDown className="size-3.5" />
+                  <ChevronDown className="w-3.5 h-3.5 text-white/50" />
                 )}
                 <span>
                   Key steps ({completedSteps}/{totalSteps})
@@ -347,18 +307,17 @@ export const JourneyMilestoneCard: React.FC<JourneyMilestoneCardProps> = React.m
 
               {totalSteps > 0 && (
                 <div className="flex items-center gap-2">
-                  <Progress.Root
-                    value={stepPct}
-                    size="xs"
-                    variant="soft"
-                    className="w-20"
-                  >
-                    <Progress.Indicator
-                      intent={stepPct === 100 ? "success" : "primary"}
-                      style={{ transform: `translateX(-${100 - stepPct}%)` }}
+                  <div className="h-1.5 w-20 rounded-full bg-white/10 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{
+                        width: `${stepPct}%`,
+                        backgroundColor:
+                          stepPct === 100 ? "#34d399" : "var(--primary)",
+                      }}
                     />
-                  </Progress.Root>
-                  <span className="text-[10px] font-mono text-caption w-7 text-right">
+                  </div>
+                  <span className="text-[10px] font-mono text-white/55 w-7 text-right">
                     {stepPct}%
                   </span>
                 </div>
@@ -378,7 +337,7 @@ export const JourneyMilestoneCard: React.FC<JourneyMilestoneCardProps> = React.m
                     {milestone.checkpoints.map((cp) => (
                       <li
                         key={cp.id}
-                        className="group/step flex items-center justify-between gap-2 rounded-[--btn-radius] px-2 py-1 hover:bg-[--ui-soft-bg]/60 transition-colors"
+                        className="group/step flex items-center justify-between gap-2 rounded-lg px-2 py-1 hover:bg-white/[0.05] transition-colors"
                       >
                         <button
                           type="button"
@@ -388,38 +347,34 @@ export const JourneyMilestoneCard: React.FC<JourneyMilestoneCardProps> = React.m
                           className="flex items-center gap-2.5 text-left flex-1 min-w-0"
                         >
                           <span
-                            className={`flex size-4 shrink-0 items-center justify-center rounded border transition-colors ${
+                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
                               cp.completed
-                                ? "border-success-400/70 bg-success-500/25 text-success-300"
-                                : "border-[--ui-border-color] bg-[--ui-bg] text-transparent hover:border-primary-500/60"
+                                ? "border-emerald-400/70 bg-emerald-500/25 text-emerald-300"
+                                : "border-white/25 bg-black/30 text-transparent hover:border-primary/60"
                             }`}
                           >
-                            <Check className="size-3" strokeWidth={3} />
+                            <Check className="w-3 h-3" strokeWidth={3} />
                           </span>
                           <span
                             className={`text-xs sm:text-[13px] leading-snug truncate ${
                               cp.completed
-                                ? "text-caption line-through"
-                                : "text-title"
+                                ? "text-white/45 line-through"
+                                : "text-white/85"
                             }`}
                           >
                             {cp.title}
                           </span>
                         </button>
-                        <Button.Root
-                          variant="ghost"
-                          intent="danger"
-                          size="xs"
+                        <button
+                          type="button"
                           onClick={() =>
                             onDeleteCheckpoint(milestone.id, cp.id)
                           }
                           title="Remove step"
-                          className="opacity-0 group-hover/step:opacity-100 h-6 w-6"
+                          className="opacity-0 group-hover/step:opacity-100 rounded p-0.5 text-white/35 hover:text-rose-400 transition-all"
                         >
-                          <Button.Icon type="only" size="xs">
-                            <X />
-                          </Button.Icon>
-                        </Button.Root>
+                          <X className="w-3 h-3" />
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -436,58 +391,47 @@ export const JourneyMilestoneCard: React.FC<JourneyMilestoneCardProps> = React.m
               onSubmit={handleSubmitStep}
               className="flex items-center gap-2 w-full"
             >
-              <Input
+              <input
                 type="text"
                 autoFocus
-                variant="outlined"
-                size="sm"
                 value={newStepText}
                 onChange={(e) => setNewStepText(e.target.value)}
                 placeholder="Add a concrete step toward this milestone..."
-                className="flex-1"
+                className="flex-1 rounded-lg border theme-input px-2.5 py-1.5 text-xs placeholder:text-white/35 focus:outline-none"
               />
-              <Button.Root
+              <button
                 type="submit"
-                variant="soft"
-                intent="primary"
-                size="sm"
                 disabled={!newStepText.trim()}
+                className="rounded-lg bg-primary/25 border border-primary/50 px-2.5 py-1.5 text-xs font-semibold text-highlight hover:bg-primary/35 disabled:opacity-40 transition-colors"
               >
-                <Button.Label>Add</Button.Label>
-              </Button.Root>
-              <Button.Root
-                variant="ghost"
-                intent="gray"
-                size="sm"
+                Add
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setAddingStep(false);
                   setNewStepText("");
                 }}
+                className="rounded-lg p-1.5 text-white/45 hover:text-white hover:bg-white/10 transition-colors"
               >
-                <Button.Icon type="only" size="xs">
-                  <X />
-                </Button.Icon>
-              </Button.Root>
+                <X className="w-3.5 h-3.5" />
+              </button>
             </form>
           ) : (
-            <Button.Root
-              variant="ghost"
-              intent="gray"
-              size="xs"
+            <button
+              type="button"
               onClick={() => {
                 setStepsExpanded(true);
                 setAddingStep(true);
               }}
-              className="h-6 px-1.5 text-[11px] text-caption hover:text-primary-300"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-white/40 hover:text-highlight transition-colors"
             >
-              <Button.Icon type="leading" size="xs">
-                <Plus />
-              </Button.Icon>
-              <Button.Label>Add step</Button.Label>
-            </Button.Root>
+              <Plus className="w-3 h-3" />
+              <span>Add step</span>
+            </button>
           )}
         </div>
-      </Card>
+      </article>
     </motion.div>
   );
 });

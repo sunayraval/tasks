@@ -8,12 +8,6 @@ import {
   TaskPriority,
   TaskType,
 } from "@/types/taskit";
-import {
-  Button,
-  Dialog,
-  Input,
-  Label,
-} from "@/components/tailus-ui";
 import { Command, Plus, X } from "lucide-react";
 
 interface QuickCreateTaskModalProps {
@@ -23,9 +17,6 @@ interface QuickCreateTaskModalProps {
   onCreateTask: (newTask: Omit<TaskItem, "id" | "created_at" | "updated_at">) => void;
   userId: string;
 }
-
-const SELECT_CLS =
-  "w-full rounded-[--input-radius] border border-[--ui-border-color] bg-[--ui-soft-bg] px-3 py-2 text-xs text-title focus:border-primary-500 focus:outline-none";
 
 export const QuickCreateTaskModal: React.FC<QuickCreateTaskModalProps> = ({
   isOpen,
@@ -49,6 +40,8 @@ export const QuickCreateTaskModal: React.FC<QuickCreateTaskModalProps> = ({
   useEffect(() => {
     setSectionGroup(defaultSection);
   }, [defaultSection]);
+
+  if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,187 +79,161 @@ export const QuickCreateTaskModal: React.FC<QuickCreateTaskModalProps> = ({
   };
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="bg-black/70 backdrop-blur-sm" />
-        <Dialog.Content
-          fancy
-          className="w-[calc(100vw-1.25rem)] max-w-lg max-h-[94vh] overflow-y-auto p-4 sm:p-6 shadow-neon backdrop-blur-2xl"
-        >
-          <div className="flex items-center justify-between pb-4 border-b border-[--ui-border-color]">
-            <Dialog.Title className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary-300">
-              <Command className="w-4 h-4 text-primary-400" />
-              <span>Quick Command • New Task (⌘K)</span>
-            </Dialog.Title>
-            <Dialog.CloseButton
-              type="button"
-              onClick={onClose}
-              className="static"
-              aria-label="Close quick create modal"
-            >
-              <X className="w-4 h-4" />
-            </Dialog.CloseButton>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-2.5 sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl border border-primary/40 bg-[#061217]/95 backdrop-blur-2xl p-4 sm:p-6 max-h-[94vh] overflow-y-auto shadow-neon animate-in fade-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between pb-4 border-b border-white/10">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-highlight">
+            <Command className="w-4 h-4 text-primary" />
+            <span>Quick Command • New Task (⌘K)</span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-white/50 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <div>
+            <input
+              type="text"
+              autoFocus
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="What needs to get done? (e.g. Complete Calc III Problem Set)"
+              className="w-full rounded-xl border border-white/15 bg-white/[0.05] px-4 py-3 text-sm font-medium text-white placeholder-white/35 focus:border-primary focus:outline-none"
+            />
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
             <div>
-              <Input
-                type="text"
-                autoFocus
-                required
-                variant="soft"
-                size="md"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="What needs to get done? (e.g. Complete Calc III Problem Set)"
-                className="font-medium"
+              <label className="block text-white/50 mb-1">Section</label>
+              <select
+                value={sectionGroup}
+                onChange={(e) =>
+                  setSectionGroup(e.target.value as SectionGroup)
+                }
+                className="w-full rounded-xl border border-white/15 bg-black/70 px-3 py-2 text-white focus:border-primary focus:outline-none"
+              >
+                {SECTION_DIVIDERS.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-white/50 mb-1">Category</label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value as TaskType)}
+                className="w-full rounded-xl border border-white/15 bg-black/70 px-3 py-2 text-white focus:border-primary focus:outline-none"
+              >
+                <option value="College">College</option>
+                <option value="School">School</option>
+                <option value="Personal">Personal</option>
+                <option value="Club">Club</option>
+                <option value="Work">Work</option>
+                <option value="General">General</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-white/50 mb-1">Priority</label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as TaskPriority)}
+                className="w-full rounded-xl border border-white/15 bg-black/70 px-3 py-2 text-white focus:border-primary focus:outline-none"
+              >
+                <option value="Urgent">Urgent</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <label className="block text-white/50 mb-1">Due Date</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full rounded-xl border border-white/15 bg-black/70 px-3 py-2 text-white focus:border-primary focus:outline-none"
               />
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-              <div className="space-y-1">
-                <Label size="sm" className="text-caption">
-                  Section
-                </Label>
-                <select
-                  value={sectionGroup}
-                  onChange={(e) =>
-                    setSectionGroup(e.target.value as SectionGroup)
-                  }
-                  className={SELECT_CLS}
-                >
-                  {SECTION_DIVIDERS.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.id}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <Label size="sm" className="text-caption">
-                  Category
-                </Label>
-                <select
-                  value={type}
-                  onChange={(e) => setType(e.target.value as TaskType)}
-                  className={SELECT_CLS}
-                >
-                  <option value="College">College</option>
-                  <option value="School">School</option>
-                  <option value="Personal">Personal</option>
-                  <option value="Club">Club</option>
-                  <option value="Work">Work</option>
-                  <option value="General">General</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <Label size="sm" className="text-caption">
-                  Priority
-                </Label>
-                <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                  className={SELECT_CLS}
-                >
-                  <option value="Urgent">Urgent</option>
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
-                </select>
-              </div>
+            <div>
+              <label className="block text-white/50 mb-1">
+                Est. Time (Minutes)
+              </label>
+              <input
+                type="number"
+                min={5}
+                max={480}
+                step={5}
+                value={estimatedMinutes}
+                onChange={(e) =>
+                  setEstimatedMinutes(parseInt(e.target.value, 10) || 30)
+                }
+                className="w-full rounded-xl border border-white/15 bg-black/70 px-3 py-2 text-white focus:border-primary focus:outline-none"
+              />
             </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="space-y-1">
-                <Label size="sm" className="text-caption">
-                  Due Date
-                </Label>
-                <Input
-                  type="date"
-                  variant="soft"
-                  size="sm"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label size="sm" className="text-caption">
-                  Est. Time (Minutes)
-                </Label>
-                <Input
-                  type="number"
-                  variant="soft"
-                  size="sm"
-                  min={5}
-                  max={480}
-                  step={5}
-                  value={estimatedMinutes}
-                  onChange={(e) =>
-                    setEstimatedMinutes(parseInt(e.target.value, 10) || 30)
-                  }
-                />
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div>
+              <label className="block text-white/50 mb-1">Tags</label>
+              <input
+                type="text"
+                value={tagsInput}
+                onChange={(e) => setTagsInput(e.target.value)}
+                placeholder="#LinearAlgebra #FBLA"
+                className="w-full rounded-xl border border-white/15 bg-black/70 px-3 py-2 text-white placeholder-white/30 focus:border-primary focus:outline-none"
+              />
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="space-y-1">
-                <Label size="sm" className="text-caption">
-                  Tags
-                </Label>
-                <Input
-                  type="text"
-                  variant="soft"
-                  size="sm"
-                  value={tagsInput}
-                  onChange={(e) => setTagsInput(e.target.value)}
-                  placeholder="#LinearAlgebra #FBLA"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label size="sm" className="text-caption">
-                  Quick Note
-                </Label>
-                <Input
-                  type="text"
-                  variant="soft"
-                  size="sm"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Chapter 4 problems 1-15..."
-                />
-              </div>
+            <div>
+              <label className="block text-white/50 mb-1">Quick Note</label>
+              <input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Chapter 4 problems 1-15..."
+                className="w-full rounded-xl border border-white/15 bg-black/70 px-3 py-2 text-white placeholder-white/30 focus:border-primary focus:outline-none"
+              />
             </div>
+          </div>
 
-            <Dialog.Actions className="pt-3 border-t border-[--ui-border-color] flex items-center justify-end gap-2">
-              <Button.Root
-                type="button"
-                variant="soft"
-                intent="gray"
-                size="sm"
-                onClick={onClose}
-              >
-                <Button.Label>Cancel</Button.Label>
-              </Button.Root>
-              <Button.Root
-                type="submit"
-                variant="solid"
-                intent="primary"
-                size="sm"
-                className="shadow-neon"
-              >
-                <Button.Icon type="leading">
-                  <Plus className="w-4 h-4 stroke-[2.5]" />
-                </Button.Icon>
-                <Button.Label>Create Task</Button.Label>
-              </Button.Root>
-            </Dialog.Actions>
-          </form>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-xs font-medium text-white/75 hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-black shadow-neon hover:brightness-110 transition-all"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>Create Task</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 };
 

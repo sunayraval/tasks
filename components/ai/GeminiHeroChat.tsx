@@ -54,15 +54,6 @@ import { EnrichedMyDayBlock } from "@/utils/myDayUtils";
 import { KiteFlyingLoader, KiteLogoMark } from "@/components/ui/KiteBrand";
 import { SharinganIcon } from "@/components/ui/SharinganIcon";
 import { AgentQACard } from "@/components/ai/AgentQACard";
-import {
-  Badge,
-  Button,
-  Card,
-  Input,
-  Tabs,
-  Text,
-  Title,
-} from "@/components/tailus-ui";
 
 interface GeminiHeroChatProps {
   tasks: TaskItem[];
@@ -297,31 +288,31 @@ const FormattedAgentMarkdown: React.FC<{ content: string }> = ({ content }) => {
       blocks.push(
         <div
           key={`table-${idx}`}
-          className="my-3 overflow-x-auto rounded-[--card-radius] border border-[--ui-border-color] bg-[--ui-bg] shadow-sm backdrop-blur-md"
+          className="my-3 overflow-x-auto rounded-xl border border-white/12 bg-black/45 shadow-lg backdrop-blur-md"
         >
           <table className="w-full border-collapse text-left text-xs sm:text-[13px]">
             <thead>
-              <tr className="border-b border-[--ui-border-color] bg-[--ui-soft-bg]">
+              <tr className="border-b border-white/12 bg-white/[0.05]">
                 {headerCells.map((h, i) => (
                   <th
                     key={i}
-                    className="px-3.5 py-2.5 font-semibold text-title whitespace-nowrap"
+                    className="px-3.5 py-2.5 font-semibold text-white/90 whitespace-nowrap"
                   >
                     {renderInlineFormatting(h)}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[--ui-border-color]/70">
+            <tbody className="divide-y divide-white/[0.07]">
               {rows.map((row, rIdx) => (
                 <tr
                   key={rIdx}
-                  className="hover:bg-[--ui-soft-bg]/60 transition-colors"
+                  className="hover:bg-white/[0.03] transition-colors"
                 >
                   {row.map((cell, cIdx) => (
                     <td
                       key={cIdx}
-                      className="px-3.5 py-2 text-body leading-relaxed font-normal"
+                      className="px-3.5 py-2 text-white/80 leading-relaxed font-normal"
                     >
                       {renderInlineFormatting(cell)}
                     </td>
@@ -884,74 +875,92 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
     }
   };
 
-  // Shared Tailus Tabs Chat | Tasks | MY DAY Switcher Pill
+  // Shared Gemini-styled Chat | Tasks | MY DAY Switcher Pill
   const ModeSwitcherPill = (
-    <Tabs.Root
-      value={activeTab}
-      onValueChange={(val) => {
-        const next = val as WorkspaceTab;
-        onSelectTab(next);
-        if (next === "chat") {
-          setShowConversation(false);
-        }
-      }}
-      className="select-none"
+    <div
+      role="tablist"
+      aria-label="Workspace view mode"
+      className="inline-flex items-center gap-1 rounded-full p-1 select-none"
     >
-      <Tabs.List
-        aria-label="Workspace view mode"
-        variant="soft"
-        triggerVariant="softToSoft"
-        size="md"
-        intent="primary"
-        className="border border-[--ui-border-color] bg-[--ui-soft-bg]/90 p-1 shadow-inner"
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "chat"}
+        onClick={() => {
+          onSelectTab("chat");
+          setShowConversation(false);
+        }}
+        className={`rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-colors ${
+          activeTab === "chat"
+            ? "bg-[#282a2f]/95 border border-white/[0.14] text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
+            : "border border-transparent text-white/60 hover:text-white hover:bg-white/[0.06]"
+        }`}
       >
-        <Tabs.Trigger
-          value="chat"
-          onClick={() => {
-            if (activeTab === "chat") {
-              setShowConversation(false);
-            }
-          }}
-          className="px-3.5 sm:px-4 text-xs sm:text-[13px] font-medium data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
-        >
-          my chat
-        </Tabs.Trigger>
-        <Tabs.Trigger
-          value="tasks"
-          className="gap-1.5 px-3.5 sm:px-4 text-xs sm:text-[13px] font-medium data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
-        >
-          <span>my tasks</span>
-          {activeTaskCount > 0 && (
-            <Badge variant="soft" intent="gray" size="xs" className="px-1.5 py-0 text-[10px]">
-              {activeTaskCount}
-            </Badge>
-          )}
-        </Tabs.Trigger>
-        <Tabs.Trigger
-          value="my_day"
-          className="gap-1.5 px-3.5 sm:px-4 text-xs sm:text-[13px] font-medium data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
-        >
-          <span>my day</span>
-          {(workspaceConfig.myDaySchedule?.blocks.length || 0) > 0 && (
-            <Badge variant="soft" intent="gray" size="xs" className="px-1.5 py-0 text-[10px]">
-              {workspaceConfig.myDaySchedule?.blocks.length}
-            </Badge>
-          )}
-        </Tabs.Trigger>
-        <Tabs.Trigger
-          value="journey"
-          className="px-3.5 sm:px-4 text-xs sm:text-[13px] font-medium data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
-        >
-          my journey
-        </Tabs.Trigger>
-        <Tabs.Trigger
-          value="study"
-          className="px-3.5 sm:px-4 text-xs sm:text-[13px] font-medium data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
-        >
-          my flo
-        </Tabs.Trigger>
-      </Tabs.List>
-    </Tabs.Root>
+        my chat
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "tasks"}
+        onClick={() => onSelectTab("tasks")}
+        className={`inline-flex items-center gap-1.5 rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-colors ${
+          activeTab === "tasks"
+            ? "bg-[#282a2f]/95 border border-white/[0.14] text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
+            : "border border-transparent text-white/60 hover:text-white hover:bg-white/[0.06]"
+        }`}
+      >
+        <span>my tasks</span>
+        {activeTaskCount > 0 && (
+          <span className="rounded-full bg-white/10 px-1.5 py-0.2 text-[10px] font-semibold text-white/75">
+            {activeTaskCount}
+          </span>
+        )}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "my_day"}
+        onClick={() => onSelectTab("my_day")}
+        className={`inline-flex items-center gap-1.5 rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-colors ${
+          activeTab === "my_day"
+            ? "bg-[#282a2f]/95 border border-white/[0.14] text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
+            : "border border-transparent text-white/60 hover:text-white hover:bg-white/[0.06]"
+        }`}
+      >
+        <span>my day</span>
+        {(workspaceConfig.myDaySchedule?.blocks.length || 0) > 0 && (
+          <span className="rounded-full bg-white/10 px-1.5 py-0.2 text-[10px] font-semibold text-white/75">
+            {workspaceConfig.myDaySchedule?.blocks.length}
+          </span>
+        )}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "journey"}
+        onClick={() => onSelectTab("journey")}
+        className={`inline-flex items-center gap-1.5 rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-colors ${
+          activeTab === "journey"
+            ? "bg-[#282a2f]/95 border border-white/[0.14] text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
+            : "border border-transparent text-white/60 hover:text-white hover:bg-white/[0.06]"
+        }`}
+      >
+        <span>my journey</span>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "study"}
+        onClick={() => onSelectTab("study")}
+        className={`inline-flex items-center gap-1.5 rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-colors ${
+          activeTab === "study"
+            ? "bg-[#282a2f]/95 border border-white/[0.14] text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
+            : "border border-transparent text-white/60 hover:text-white hover:bg-white/[0.06]"
+        }`}
+      >
+        <span>my flo</span>
+      </button>
+    </div>
   );
 
   // ---------------------------------------------------------------------------
@@ -960,101 +969,82 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   if (!hasApiKey) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center min-h-[calc(100vh-7rem)] px-4 py-10">
-        <Card
-          variant="mixed"
-          fancy
-          className="w-full max-w-lg backdrop-blur-2xl p-6 sm:p-8 shadow-2xl space-y-5 text-center"
-        >
-          <div className="mx-auto flex size-12 items-center justify-center rounded-[--btn-radius] border border-primary-500/35 bg-primary-500/15 text-primary-400">
-            <KeyRound className="size-5" />
+        <div className="w-full max-w-lg rounded-3xl border border-white/15 bg-[#15161b]/95 backdrop-blur-2xl p-6 sm:p-8 shadow-[0_24px_70px_rgba(0,0,0,0.65)] space-y-5 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/35 bg-primary/15 text-primary shadow-neon">
+            <KeyRound className="w-5 h-5" />
           </div>
 
           <div className="space-y-2">
-            <Title as="h1" size="xl" weight="semibold" align="center">
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">
               Please add your AI API key to use this feature
-            </Title>
-            <Text size="sm" align="center" className="text-caption leading-relaxed">
+            </h1>
+            <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
               Kite pairs free inference on leading models via{" "}
-              <span className="text-title font-medium">NVIDIA NIM</span>{" "}
+              <span className="text-white/90 font-medium">NVIDIA NIM</span>{" "}
               (build.nvidia.com) with{" "}
-              <span className="text-title font-medium">Google Gemini</span>{" "}
+              <span className="text-white/90 font-medium">Google Gemini</span>{" "}
               to manage tasks, plan your day, and customize your workspace.
-            </Text>
+            </p>
           </div>
 
           <form onSubmit={handleInlineKeySubmit} className="space-y-3 text-left">
             <div className="flex flex-col sm:flex-row gap-2">
-              <Input
+              <input
                 type="password"
-                variant="outlined"
-                size="lg"
                 value={inlineKeyDraft}
                 onChange={(e) => {
                   setInlineKeyDraft(e.target.value);
                   if (inlineKeyError) setInlineKeyError(null);
                 }}
                 placeholder="Paste NVIDIA NIM (nvapi-...) or Google AI key here"
-                className="flex-1 font-mono"
+                className="flex-1 rounded-2xl border border-white/15 bg-black/60 px-4 py-2.5 text-xs sm:text-sm font-mono text-white placeholder-white/30 focus:border-primary focus:outline-none"
               />
-              <Button.Root
+              <button
                 type="submit"
-                variant="solid"
-                intent="primary"
-                size="lg"
                 disabled={inlineVerifying || !inlineKeyDraft.trim()}
-                className="shrink-0 font-semibold"
+                className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-primary px-5 py-2.5 text-xs sm:text-sm font-bold text-black shadow-neon hover:brightness-110 disabled:opacity-45 transition-all shrink-0"
               >
-                <Button.Icon type="leading" size="sm">
-                  {inlineVerifying ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <Sparkles />
-                  )}
-                </Button.Icon>
-                <Button.Label>Save Key</Button.Label>
-              </Button.Root>
+                {inlineVerifying ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                <span>Save Key</span>
+              </button>
             </div>
 
             {inlineKeyError && (
-              <p className="text-xs text-danger-400 px-1">{inlineKeyError}</p>
+              <p className="text-xs text-red-300 px-1">{inlineKeyError}</p>
             )}
           </form>
 
-          <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1 text-xs">
-            <Button.Root
-              variant="outlined"
-              intent="gray"
-              size="sm"
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-1 text-xs">
+            <button
+              type="button"
               onClick={onOpenApiKeySetup}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 px-3.5 py-2 font-medium text-highlight transition-colors"
             >
-              <Button.Label>Setup Guide &amp; Model Selector</Button.Label>
-            </Button.Root>
-            <Button.Root
-              variant="soft"
-              intent="gray"
-              size="sm"
+              <span>Setup Guide &amp; Model Selector</span>
+            </button>
+            <a
               href="https://build.nvidia.com/models"
               target="_blank"
               rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] px-3.5 py-2 text-white/75 hover:text-white transition-colors"
             >
-              <Button.Label>Get Free NVIDIA NIM Key</Button.Label>
-              <Button.Icon type="trailing" size="xs">
-                <ExternalLink />
-              </Button.Icon>
-            </Button.Root>
-            <Button.Root
-              variant="ghost"
-              intent="gray"
-              size="sm"
+              <span>Get Free NVIDIA NIM Key</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+            <button
+              type="button"
               onClick={onOptOutTemporary}
+              className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-white/45 hover:text-white/80 transition-colors"
             >
-              <Button.Icon type="leading" size="xs">
-                <Table2 />
-              </Button.Icon>
-              <Button.Label>Hide AI for now</Button.Label>
-            </Button.Root>
+              <Table2 className="w-3.5 h-3.5" />
+              <span>Hide AI for now</span>
+            </button>
           </div>
-        </Card>
+        </div>
 
         <div className="mt-7">{ModeSwitcherPill}</div>
       </div>
@@ -1070,14 +1060,13 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
     <div className="relative w-full max-w-[740px] mx-auto">
       {/* @ Mention Autocomplete Popover */}
       {mentionQuery !== null && mentionCandidates.length > 0 && (
-        <Card
-          variant="elevated"
-          fancy
+        <div
+          style={{ backgroundColor: "rgba(18, 19, 24, 0.94)" }}
           className={`absolute left-1 right-1 sm:left-2 sm:right-2 ${
             isHeroEmpty ? "top-full mt-2" : "bottom-full mb-2"
-          } z-50 backdrop-blur-2xl p-2 shadow-2xl animate-in fade-in duration-150`}
+          } z-50 rounded-2xl border border-white/20 backdrop-blur-xl p-2 shadow-[0_24px_70px_rgba(0,0,0,0.85)] animate-in fade-in duration-150`}
         >
-          <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-caption flex items-center justify-between">
+          <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/40 flex items-center justify-between">
             <span>Connectors, Skills &amp; Live Tasks</span>
             <span>↑↓ Navigate • ↵ Insert</span>
           </div>
@@ -1093,488 +1082,469 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                     applyMentionCandidate(cand);
                   }}
                   onMouseEnter={() => setSelectedMentionIdx(idx)}
-                  className={`w-full flex items-center justify-between gap-3 rounded-[--btn-radius] px-3 py-2 text-left transition-colors ${
+                  className={`w-full flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-left transition-colors ${
                     selected
-                      ? "bg-primary-500/15 text-title"
-                      : "text-body hover:bg-[--ui-soft-bg]"
+                      ? "bg-white/[0.11] text-white"
+                      : "text-white/75 hover:bg-white/[0.06]"
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span
-                      className={`flex size-6 shrink-0 items-center justify-center rounded-md text-xs ${
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs ${
                         cand.kind === "skill"
-                          ? "bg-primary-500/20 text-primary-300"
-                          : "bg-[--ui-soft-bg] text-title"
+                          ? "bg-primary/20 text-highlight"
+                          : "bg-white/10 text-white/80"
                       }`}
                     >
                       {cand.kind === "skill" ? (
-                        <Zap className="size-3.5" />
+                        <Zap className="w-3.5 h-3.5" />
                       ) : (
-                        <CheckCircle2 className="size-3.5" />
+                        <CheckCircle2 className="w-3.5 h-3.5" />
                       )}
                     </span>
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold truncate text-title">
+                      <div className="text-xs font-semibold truncate">
                         {cand.label}
                       </div>
-                      <div className="text-[11px] text-caption truncate">
+                      <div className="text-[11px] text-white/45 truncate">
                         {cand.sublabel}
                       </div>
                     </div>
                   </div>
-                  <CornerDownLeft className="size-3.5 text-caption shrink-0" />
+                  <CornerDownLeft className="w-3.5 h-3.5 text-white/30 shrink-0" />
                 </button>
               );
             })}
           </div>
-        </Card>
+        </div>
       )}
 
-      {/* Main Tailus Pill Input Form */}
-      <Card
-        variant="mixed"
-        fancy
-        className="p-0 rounded-[28px] backdrop-blur-2xl shadow-[0_18px_55px_rgba(0,0,0,0.45)] focus-within:border-primary-500/50 transition-all"
+      {/* Main Pill Input Form */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          sendPrompt();
+        }}
+        className="relative flex items-end gap-1.5 sm:gap-2 rounded-[30px] border border-white/[0.11] bg-[#1c1d21]/95 hover:border-white/[0.18] focus-within:border-white/[0.26] px-2.5 sm:px-4 py-2 sm:py-3 shadow-[0_18px_55px_rgba(0,0,0,0.6)] backdrop-blur-2xl transition-all"
       >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            sendPrompt();
-          }}
-          className="relative flex items-end gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5"
-        >
-          {/* Left + Connector / Quick Skills Button */}
-          <div ref={plusMenuRef} className="relative shrink-0 self-center">
-            <Button.Root
-              variant="ghost"
-              intent="gray"
-              size="sm"
-              onClick={() => setPlusMenuOpen((v) => !v)}
-              aria-label="Open quick actions and connectors"
-              className="rounded-full"
-              title="Quick actions, Canvas sync & skills"
+        {/* Left + Connector / Quick Skills Button */}
+        <div ref={plusMenuRef} className="relative shrink-0 self-center">
+          <button
+            type="button"
+            onClick={() => setPlusMenuOpen((v) => !v)}
+            aria-label="Open quick actions and connectors"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-white/65 hover:bg-white/10 hover:text-white transition-colors"
+            title="Quick actions, Canvas sync & skills"
+          >
+            <Plus className="w-5 h-5 stroke-[1.8]" />
+          </button>
+
+          {plusMenuOpen && (
+            <div
+              style={{ backgroundColor: "rgba(18, 19, 24, 0.94)" }}
+              className={`absolute left-0 ${
+                isHeroEmpty ? "top-full mt-3" : "bottom-full mb-3"
+              } w-[calc(100vw-36px)] max-w-64 rounded-2xl border border-white/20 p-2 shadow-[0_24px_70px_rgba(0,0,0,0.85)] backdrop-blur-xl z-50 space-y-1`}
             >
-              <Button.Icon type="only" size="sm">
-                <Plus />
-              </Button.Icon>
-            </Button.Root>
-
-            {plusMenuOpen && (
-              <Card
-                variant="elevated"
-                fancy
-                className={`absolute left-0 ${
-                  isHeroEmpty ? "top-full mt-3" : "bottom-full mb-3"
-                } w-[calc(100vw-36px)] max-w-64 p-2 shadow-2xl backdrop-blur-2xl z-50 space-y-1`}
+              <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/40">
+                Workspace Connectors &amp; Skills
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlusMenuOpen(false);
+                  setInput((prev) => (prev ? `${prev} @` : "@"));
+                  setMentionStartIndex(input ? input.length + 1 : 0);
+                  setMentionQuery("");
+                  textareaRef.current?.focus();
+                }}
+                className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-white/85 hover:bg-white/10 transition-colors"
               >
-                <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-caption">
-                  Workspace Connectors &amp; Skills
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPlusMenuOpen(false);
-                    setInput((prev) => (prev ? `${prev} @` : "@"));
-                    setMentionStartIndex(input ? input.length + 1 : 0);
-                    setMentionQuery("");
-                    textareaRef.current?.focus();
-                  }}
-                  className="w-full flex items-center gap-2.5 rounded-[--btn-radius] px-3 py-2 text-xs text-body hover:bg-[--ui-soft-bg] hover:text-title transition-colors"
-                >
-                  <Wand2 className="size-3.5 text-primary-400" />
-                  <span>Reference a Task (@mention)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPlusMenuOpen(false);
-                    onQuickSyncCanvas();
-                  }}
-                  className="w-full flex items-center gap-2.5 rounded-[--btn-radius] px-3 py-2 text-xs text-body hover:bg-[--ui-soft-bg] hover:text-title transition-colors"
-                >
-                  <RefreshCw className="size-3.5 text-info-400" />
-                  <span>Sync Canvas Assignments Now</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPlusMenuOpen(false);
-                    sendPrompt("Help me plan my day");
-                  }}
-                  className="w-full flex items-center gap-2.5 rounded-[--btn-radius] px-3 py-2 text-xs text-body hover:bg-[--ui-soft-bg] hover:text-title transition-colors"
-                >
-                  <HelpCircle className="size-3.5 text-primary-400" />
-                  <span>Plan My Day (Guided Q&amp;A)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPlusMenuOpen(false);
-                    sendPrompt(
-                      "Show my current my day schedule, display the live status bar UI, and summarize my schedule logistics."
-                    );
-                  }}
-                  className="w-full flex items-center gap-2.5 rounded-[--btn-radius] px-3 py-2 text-xs text-body hover:bg-[--ui-soft-bg] hover:text-title transition-colors"
-                >
-                  <CalendarClock className="size-3.5 text-primary-400" />
-                  <span>Show My Day &amp; Live Status Bar</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPlusMenuOpen(false);
-                    sendPrompt(
-                      "Give me a tactical daily briefing of my tasks, highlight urgent items, and suggest an execution order for today."
-                    );
-                  }}
-                  className="w-full flex items-center gap-2.5 rounded-[--btn-radius] px-3 py-2 text-xs text-body hover:bg-[--ui-soft-bg] hover:text-title transition-colors"
-                >
-                  <Zap className="size-3.5 text-warning-400" />
-                  <span>Generate Daily Briefing</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPlusMenuOpen(false);
-                    sendPrompt(
-                      "Organize my task board cleanly by sorting tasks by priority and grouping them neatly under section headers."
-                    );
-                  }}
-                  className="w-full flex items-center gap-2.5 rounded-[--btn-radius] px-3 py-2 text-xs text-body hover:bg-[--ui-soft-bg] hover:text-title transition-colors"
-                >
-                  <ArrowUpDown className="size-3.5 text-success-400" />
-                  <span>Auto-Organize &amp; Sort Board</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPlusMenuOpen(false);
-                    onOpenSettings();
-                  }}
-                  className="w-full flex items-center gap-2.5 rounded-[--btn-radius] px-3 py-2 text-xs text-body hover:bg-[--ui-soft-bg] hover:text-title transition-colors"
-                >
-                  <Settings2 className="size-3.5 text-caption" />
-                  <span>Workspace &amp; Theme Settings</span>
-                </button>
-                {messages.length > 0 && !showConversation && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPlusMenuOpen(false);
-                      setShowConversation(true);
-                    }}
-                    className="w-full flex items-center gap-2.5 rounded-[--btn-radius] px-3 py-2 text-xs text-primary-300 hover:bg-[--ui-soft-bg] transition-colors"
-                  >
-                    <MessageSquare className="size-3.5 text-primary-400" />
-                    <span>View Current Chat ({messages.length})</span>
-                  </button>
-                )}
-                {messages.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPlusMenuOpen(false);
-                      setMessages([]);
-                      setShowConversation(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 rounded-[--btn-radius] px-3 py-2 text-xs text-danger-400 hover:bg-danger-500/15 transition-colors border-t border-[--ui-border-color] mt-1 pt-2"
-                  >
-                    <RotateCcw className="size-3.5" />
-                    <span>Reset / Start New Chat</span>
-                  </button>
-                )}
-              </Card>
-            )}
-          </div>
-
-          {/* Auto-growing Textarea with IME-safe Enter handling */}
-          <label htmlFor="gemini-hero-input" className="sr-only">
-            Message Gemini Workspace Agent
-          </label>
-          <textarea
-            id="gemini-hero-input"
-            ref={textareaRef}
-            rows={1}
-            value={input}
-            onChange={(e) =>
-              handleInputChange(
-                e.target.value,
-                e.target.selectionStart ?? e.target.value.length
-              )
-            }
-            onCompositionEnd={(e) => {
-              lastCompositionEndRef.current = e.timeStamp;
-            }}
-            onKeyDown={(e) => {
-              // Handle @ mention keyboard navigation first
-              if (mentionQuery !== null && mentionCandidates.length > 0) {
-                if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  setSelectedMentionIdx(
-                    (prev) => (prev + 1) % mentionCandidates.length
+                <Wand2 className="w-3.5 h-3.5 text-primary" />
+                <span>Reference a Task (@mention)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlusMenuOpen(false);
+                  onQuickSyncCanvas();
+                }}
+                className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-white/85 hover:bg-white/10 transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Sync Canvas Assignments Now</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlusMenuOpen(false);
+                  sendPrompt("Help me plan my day");
+                }}
+                className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-white/85 hover:bg-white/10 transition-colors"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-primary" />
+                <span>Plan My Day (Guided Q&amp;A)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlusMenuOpen(false);
+                  sendPrompt(
+                    "Show my current my day schedule, display the live status bar UI, and summarize my schedule logistics."
                   );
-                  return;
-                }
-                if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  setSelectedMentionIdx(
-                    (prev) =>
-                      (prev - 1 + mentionCandidates.length) %
-                      mentionCandidates.length
+                }}
+                className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-white/85 hover:bg-white/10 transition-colors"
+              >
+                <CalendarClock className="w-3.5 h-3.5 text-primary" />
+                <span>Show My Day &amp; Live Status Bar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlusMenuOpen(false);
+                  sendPrompt(
+                    "Give me a tactical daily briefing of my tasks, highlight urgent items, and suggest an execution order for today."
                   );
-                  return;
-                }
-                if (
-                  (e.key === "Enter" || e.key === "Tab") &&
-                  !e.nativeEvent.isComposing &&
-                  e.keyCode !== 229
-                ) {
-                  e.preventDefault();
-                  applyMentionCandidate(mentionCandidates[selectedMentionIdx]);
-                  return;
-                }
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  setMentionQuery(null);
-                  return;
-                }
-              }
+                }}
+                className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-white/85 hover:bg-white/10 transition-colors"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>Generate Daily Briefing</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlusMenuOpen(false);
+                  sendPrompt(
+                    "Organize my task board cleanly by sorting tasks by priority and grouping them neatly under section headers."
+                  );
+                }}
+                className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-white/85 hover:bg-white/10 transition-colors"
+              >
+                <ArrowUpDown className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Auto-Organize &amp; Sort Board</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlusMenuOpen(false);
+                  onOpenSettings();
+                }}
+                className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-white/85 hover:bg-white/10 transition-colors"
+              >
+                <Settings2 className="w-3.5 h-3.5 text-white/60" />
+                <span>Workspace &amp; Theme Settings</span>
+              </button>
+              {messages.length > 0 && !showConversation && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPlusMenuOpen(false);
+                    setShowConversation(true);
+                  }}
+                  className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-highlight hover:bg-white/10 transition-colors"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-primary" />
+                  <span>View Current Chat ({messages.length})</span>
+                </button>
+              )}
+              {messages.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPlusMenuOpen(false);
+                    setMessages([]);
+                    setShowConversation(false);
+                  }}
+                  className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-rose-300 hover:bg-rose-500/15 transition-colors border-t border-white/10 mt-1 pt-2"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset / Start New Chat</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
-              // IME-safe Enter-to-submit
-              if (e.key === "Enter" && !e.shiftKey) {
+        {/* Auto-growing Textarea with IME-safe Enter handling */}
+        <label htmlFor="gemini-hero-input" className="sr-only">
+          Message Gemini Workspace Agent
+        </label>
+        <textarea
+          id="gemini-hero-input"
+          ref={textareaRef}
+          rows={1}
+          value={input}
+          onChange={(e) =>
+            handleInputChange(
+              e.target.value,
+              e.target.selectionStart ?? e.target.value.length
+            )
+          }
+          onCompositionEnd={(e) => {
+            lastCompositionEndRef.current = e.timeStamp;
+          }}
+          onKeyDown={(e) => {
+            // Handle @ mention keyboard navigation first
+            if (mentionQuery !== null && mentionCandidates.length > 0) {
+              if (e.key === "ArrowDown") {
                 e.preventDefault();
-                if (e.nativeEvent.isComposing || e.keyCode === 229) {
-                  return;
-                }
-                if (
-                  lastCompositionEndRef.current !== null &&
-                  Math.abs(e.timeStamp - lastCompositionEndRef.current) < 50
-                ) {
-                  return;
-                }
-                sendPrompt();
+                setSelectedMentionIdx(
+                  (prev) => (prev + 1) % mentionCandidates.length
+                );
+                return;
               }
-            }}
-            placeholder="Type @ for tasks, skills, themes and more"
-            className="flex-1 resize-none bg-transparent py-2 px-1 text-sm sm:text-[15px] text-title placeholder:text-placeholder focus:outline-none max-h-44 leading-relaxed"
-          />
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setSelectedMentionIdx(
+                  (prev) =>
+                    (prev - 1 + mentionCandidates.length) %
+                    mentionCandidates.length
+                );
+                return;
+              }
+              if (
+                (e.key === "Enter" || e.key === "Tab") &&
+                !e.nativeEvent.isComposing &&
+                e.keyCode !== 229
+              ) {
+                e.preventDefault();
+                applyMentionCandidate(mentionCandidates[selectedMentionIdx]);
+                return;
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setMentionQuery(null);
+                return;
+              }
+            }
 
-          {/* Right Controls: NVIDIA NIM / Gemini Model Selector + Mic + Send */}
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 self-center">
-            {/* Model & Tone Dropdown */}
-            <div ref={modelMenuRef} className="relative">
-              <Button.Root
-                variant="outlined"
-                intent="gray"
-                size="xs"
-                onClick={() => setModelMenuOpen((v) => !v)}
-                className="rounded-full px-2.5 gap-1"
-                title="Select AI model (NVIDIA NIM or Google Gemini) & coaching style"
+            // IME-safe Enter-to-submit
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              if (e.nativeEvent.isComposing || e.keyCode === 229) {
+                return;
+              }
+              if (
+                lastCompositionEndRef.current !== null &&
+                Math.abs(e.timeStamp - lastCompositionEndRef.current) < 50
+              ) {
+                return;
+              }
+              sendPrompt();
+            }
+          }}
+          placeholder="Type @ for tasks, skills, themes and more"
+          className="flex-1 resize-none bg-transparent py-2 px-1 text-sm sm:text-[15px] text-white placeholder-[#7c7f87] focus:outline-none max-h-44 leading-relaxed"
+        />
+
+        {/* Right Controls: NVIDIA NIM / Gemini Model Selector + Mic + Send */}
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 self-center">
+          {/* Model & Tone Dropdown */}
+          <div ref={modelMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setModelMenuOpen((v) => !v)}
+              className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-[12px] font-medium text-white/85 hover:bg-white/10 hover:text-white transition-colors"
+              title="Select AI model (NVIDIA NIM or Google Gemini) & coaching style"
+            >
+              <span className="max-w-[85px] xs:max-w-[115px] sm:max-w-[175px] truncate text-[11px] sm:text-xs">
+                {(workspaceConfig.aiProvider || "nvidia") === "nvidia"
+                  ? NVIDIA_MODEL_OPTIONS.find(
+                      (m) =>
+                        m.id ===
+                        (workspaceConfig.nvidiaModel || DEFAULT_NVIDIA_MODEL)
+                    )?.shortName || "Nemotron 3.5 Super"
+                  : modelChoice === "pro"
+                  ? "Gemini 3.8 Pro"
+                  : "Gemini 3.8 Flash"}
+              </span>
+              <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white/55 shrink-0" />
+            </button>
+
+            {modelMenuOpen && (
+              <div
+                style={{ backgroundColor: "rgba(18, 19, 24, 0.94)" }}
+                className={`absolute right-0 ${
+                  isHeroEmpty ? "top-full mt-3" : "bottom-full mb-3"
+                } w-[calc(100vw-28px)] max-w-[340px] sm:w-[350px] max-h-[480px] overflow-y-auto rounded-2xl border border-white/20 p-3 shadow-[0_24px_70px_rgba(0,0,0,0.85)] backdrop-blur-xl z-50 space-y-3`}
               >
-                <Button.Label className="max-w-[85px] xs:max-w-[115px] sm:max-w-[175px] truncate text-[11px] sm:text-xs font-medium">
-                  {(workspaceConfig.aiProvider || "nvidia") === "nvidia"
-                    ? NVIDIA_MODEL_OPTIONS.find(
-                        (m) =>
-                          m.id ===
-                          (workspaceConfig.nvidiaModel || DEFAULT_NVIDIA_MODEL)
-                      )?.shortName || "Nemotron 3.5 Super"
-                    : modelChoice === "pro"
-                    ? "Gemini 3.8 Pro"
-                    : "Gemini 3.8 Flash"}
-                </Button.Label>
-                <Button.Icon type="trailing" size="xs">
-                  <ChevronDown className="text-caption" />
-                </Button.Icon>
-              </Button.Root>
-
-              {modelMenuOpen && (
-                <Card
-                  variant="elevated"
-                  fancy
-                  className={`absolute right-0 ${
-                    isHeroEmpty ? "top-full mt-3" : "bottom-full mb-3"
-                  } w-[calc(100vw-28px)] max-w-[340px] sm:w-[350px] max-h-[480px] overflow-y-auto p-3 shadow-2xl backdrop-blur-2xl z-50 space-y-3`}
-                >
-                  {/* Section 1: NVIDIA NIM Leading Models */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between px-2 py-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-success-400">
-                        NVIDIA NIM Models (build.nvidia.com)
-                      </span>
-                      <Badge variant="soft" intent="success" size="xs">
-                        Free Inference
-                      </Badge>
-                    </div>
-                    <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
-                      {NVIDIA_MODEL_OPTIONS.map((m) => {
-                        const isSelected =
-                          (workspaceConfig.aiProvider || "nvidia") === "nvidia" &&
-                          (workspaceConfig.nvidiaModel ||
-                            DEFAULT_NVIDIA_MODEL) === m.id;
-                        return (
-                          <button
-                            key={m.id}
-                            type="button"
-                            onClick={() => {
-                              onUpdateWorkspaceConfig({
-                                aiProvider: "nvidia",
-                                nvidiaModel: m.id,
-                              });
-                              setModelMenuOpen(false);
-                            }}
-                            className={`w-full flex items-center justify-between gap-2 rounded-[--btn-radius] px-2.5 py-2 text-left transition-colors ${
-                              isSelected
-                                ? "bg-primary-500/15 border border-primary-500/45 text-title shadow-sm"
-                                : "border border-[--ui-border-color] bg-[--ui-soft-bg]/50 text-body hover:bg-[--ui-soft-bg] hover:text-title"
-                            }`}
-                          >
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-semibold truncate text-title">
-                                  {m.name}
-                                </span>
-                                <Badge variant="soft" intent="gray" size="xs">
-                                  {m.badge}
-                                </Badge>
-                              </div>
-                              <div className="text-[10px] text-caption truncate mt-0.5">
-                                {m.provider} • {m.desc}
-                              </div>
-                            </div>
-                            {isSelected && (
-                              <Check className="size-4 text-primary-400 shrink-0" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
+                {/* Section 1: NVIDIA NIM Leading Models */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between px-2.5 py-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                      NVIDIA NIM Models (build.nvidia.com)
+                    </span>
+                    <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-300">
+                      Free Inference
+                    </span>
                   </div>
-
-                  {/* Section 2: Google Gemini (Paired) */}
-                  <div className="border-t border-[--ui-border-color] pt-2.5 space-y-1.5">
-                    <div className="px-2 py-0.5">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-caption">
-                        Google Gemini (Paired Failover)
-                      </span>
-                    </div>
-                    {(
-                      [
-                        {
-                          id: "flash",
-                          name: "Gemini 3.8 Flash",
-                          desc: "Fast, agile task & board actions",
-                        },
-                        {
-                          id: "pro",
-                          name: "Gemini 3.8 Pro",
-                          desc: "Deep planning & complex schedules",
-                        },
-                      ] as const
-                    ).map((m) => {
+                  <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
+                    {NVIDIA_MODEL_OPTIONS.map((m) => {
                       const isSelected =
-                        workspaceConfig.aiProvider === "gemini" &&
-                        modelChoice === m.id;
+                        (workspaceConfig.aiProvider || "nvidia") === "nvidia" &&
+                        (workspaceConfig.nvidiaModel || DEFAULT_NVIDIA_MODEL) ===
+                          m.id;
                       return (
                         <button
                           key={m.id}
                           type="button"
                           onClick={() => {
-                            setModelChoice(m.id);
-                            onUpdateWorkspaceConfig({ aiProvider: "gemini" });
+                            onUpdateWorkspaceConfig({
+                              aiProvider: "nvidia",
+                              nvidiaModel: m.id,
+                            });
                             setModelMenuOpen(false);
                           }}
-                          className={`w-full flex items-center justify-between rounded-[--btn-radius] px-2.5 py-2 text-left transition-colors ${
+                          className={`w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
                             isSelected
-                              ? "bg-primary-500/15 border border-primary-500/45 text-title shadow-sm"
-                              : "border border-[--ui-border-color] bg-[--ui-soft-bg]/50 text-body hover:bg-[--ui-soft-bg] hover:text-title"
+                              ? "bg-primary/20 border border-primary/50 text-white shadow-sm"
+                              : "border border-white/5 bg-white/[0.03] text-white/80 hover:bg-white/[0.08] hover:text-white"
                           }`}
                         >
-                          <div>
-                            <div className="text-xs font-semibold text-title">
-                              {m.name}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-semibold truncate text-white">
+                                {m.name}
+                              </span>
+                              <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold text-white/70">
+                                {m.badge}
+                              </span>
                             </div>
-                            <div className="text-[10px] text-caption mt-0.5">
-                              {m.desc}
+                            <div className="text-[10px] text-white/55 truncate mt-0.5">
+                              {m.provider} • {m.desc}
                             </div>
                           </div>
                           {isSelected && (
-                            <Check className="size-4 text-primary-400 shrink-0" />
+                            <Check className="w-4 h-4 text-primary shrink-0" />
                           )}
                         </button>
                       );
                     })}
                   </div>
+                </div>
 
-                  {/* Section 3: Agent Personality */}
-                  <div className="border-t border-[--ui-border-color] pt-2.5 space-y-1.5">
-                    <div className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-caption">
-                      Agent Personality
-                    </div>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {(Object.keys(TONE_META) as AITone[]).map((tk) => {
-                        const active = profile.ai_tone === tk;
-                        return (
-                          <button
-                            key={tk}
-                            type="button"
-                            onClick={() => {
-                              onChangeTone(tk);
-                              setModelMenuOpen(false);
-                            }}
-                            className={`rounded-[--btn-radius] px-2.5 py-2 text-left text-[11px] transition-colors ${
-                              active
-                                ? "bg-primary-500/15 border border-primary-500/45 text-primary-300 font-semibold shadow-sm"
-                                : "border border-[--ui-border-color] bg-[--ui-soft-bg]/50 text-body hover:bg-[--ui-soft-bg] hover:text-title"
-                            }`}
-                          >
-                            {TONE_META[tk].label}
-                          </button>
-                        );
-                      })}
-                    </div>
+                {/* Section 2: Google Gemini (Paired) */}
+                <div className="border-t border-white/10 pt-2.5 space-y-1.5">
+                  <div className="flex items-center justify-between px-2.5 py-0.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
+                      Google Gemini (Paired Failover)
+                    </span>
                   </div>
-                </Card>
-              )}
-            </div>
+                  {(
+                    [
+                      {
+                        id: "flash",
+                        name: "Gemini 3.8 Flash",
+                        desc: "Fast, agile task & board actions",
+                      },
+                      {
+                        id: "pro",
+                        name: "Gemini 3.8 Pro",
+                        desc: "Deep planning & complex schedules",
+                      },
+                    ] as const
+                  ).map((m) => {
+                    const isSelected =
+                      workspaceConfig.aiProvider === "gemini" &&
+                      modelChoice === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setModelChoice(m.id);
+                          onUpdateWorkspaceConfig({ aiProvider: "gemini" });
+                          setModelMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between rounded-xl px-2.5 py-2 text-left transition-colors ${
+                          isSelected
+                            ? "bg-primary/20 border border-primary/50 text-white shadow-sm"
+                            : "border border-white/5 bg-white/[0.03] text-white/80 hover:bg-white/[0.08] hover:text-white"
+                        }`}
+                      >
+                        <div>
+                          <div className="text-xs font-semibold text-white">{m.name}</div>
+                          <div className="text-[10px] text-white/55 mt-0.5">
+                            {m.desc}
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <Check className="w-4 h-4 text-primary shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
 
-            {/* Microphone Voice Input */}
-            <Button.Root
-              variant={isListening ? "soft" : "ghost"}
-              intent={isListening ? "danger" : "gray"}
-              size="sm"
-              onClick={toggleSpeechDictation}
-              aria-label={isListening ? "Stop voice input" : "Voice input"}
-              className={`rounded-full ${isListening ? "animate-pulse" : ""}`}
-              title={isListening ? "Listening... Click to stop" : "Dictate message"}
-            >
-              <Button.Icon type="only" size="sm">
-                {isListening ? <MicOff /> : <Mic />}
-              </Button.Icon>
-            </Button.Root>
-
-            {/* Submit Button (shows when text entered or while thinking) */}
-            {(input.trim().length > 0 || isThinking) && (
-              <Button.Root
-                type="submit"
-                variant="solid"
-                intent="primary"
-                size="sm"
-                disabled={!input.trim() || isThinking}
-                aria-label="Send message"
-                className="rounded-full"
-              >
-                <Button.Icon type="only" size="sm">
-                  {isThinking ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <ArrowUp className="stroke-[2.5]" />
-                  )}
-                </Button.Icon>
-              </Button.Root>
+                {/* Section 3: Agent Personality */}
+                <div className="border-t border-white/10 pt-2.5 space-y-1.5">
+                  <div className="px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/45">
+                    Agent Personality
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {(Object.keys(TONE_META) as AITone[]).map((tk) => {
+                      const active = profile.ai_tone === tk;
+                      return (
+                        <button
+                          key={tk}
+                          type="button"
+                          onClick={() => {
+                            onChangeTone(tk);
+                            setModelMenuOpen(false);
+                          }}
+                          className={`rounded-xl px-2.5 py-2 text-left text-[11px] transition-colors ${
+                            active
+                              ? "bg-primary/20 border border-primary/50 text-highlight font-semibold shadow-sm"
+                              : "border border-white/5 bg-white/[0.03] text-white/75 hover:bg-white/[0.08] hover:text-white"
+                          }`}
+                        >
+                          {TONE_META[tk].label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
-        </form>
-      </Card>
+
+          {/* Microphone Voice Input */}
+          <button
+            type="button"
+            onClick={toggleSpeechDictation}
+            aria-label={isListening ? "Stop voice input" : "Voice input"}
+            className={`flex h-9 w-9 items-center justify-center rounded-full transition-all ${
+              isListening
+                ? "bg-red-500/25 text-red-400 animate-pulse ring-1 ring-red-400/50"
+                : "text-white/65 hover:bg-white/10 hover:text-white"
+            }`}
+            title={isListening ? "Listening... Click to stop" : "Dictate message"}
+          >
+            {isListening ? (
+              <MicOff className="w-4 h-4" />
+            ) : (
+              <Mic className="w-4 h-4" />
+            )}
+          </button>
+
+          {/* Submit Button (shows when text entered or while thinking) */}
+          {(input.trim().length > 0 || isThinking) && (
+            <button
+              type="submit"
+              disabled={!input.trim() || isThinking}
+              aria-label="Send message"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-black shadow-neon hover:brightness-110 disabled:opacity-45 transition-all"
+            >
+              {isThinking ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+              )}
+            </button>
+          )}
+        </div>
+      </form>
     </div>
   );
 
@@ -1592,49 +1562,39 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
 
         <div className="relative z-10 w-full max-w-[760px] flex flex-col items-center">
           {/* Minimalist Kite Crest / Sharingan Crest */}
-          <Badge
-            variant="outlined"
-            intent={profile.theme === "sharingan" ? "danger" : "gray"}
-            size="sm"
-            className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 backdrop-blur-md select-none"
+          <div
+            className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-medium backdrop-blur-md select-none transition-all ${
+              profile.theme === "sharingan"
+                ? "border-red-500/40 bg-red-950/30 text-red-300 shadow-[0_0_16px_rgba(255,31,56,0.35)]"
+                : "border-white/[0.09] bg-white/[0.03] text-white/60"
+            }`}
           >
             {profile.theme === "sharingan" ? (
               <>
                 <SharinganIcon size={16} animate speed="normal" glow interactive />
-                <span className="font-semibold tracking-wider text-danger-200">
+                <span className="font-semibold tracking-wider text-red-200">
                   UCHIHA CLAN DOMAIN
                 </span>
               </>
             ) : (
               <>
-                <KiteLogoMark className="size-3.5 text-primary-400" />
+                <KiteLogoMark className="w-3.5 h-3.5 text-primary" />
                 <span>kite workspace</span>
               </>
             )}
-          </Badge>
+          </div>
 
           {/* Hero Prompt Headline */}
-          <Title
-            as="h1"
-            size="3xl"
-            weight="semibold"
-            align="center"
-            className="tracking-tight mb-6 sm:mb-9 select-none sm:text-[42px]"
-          >
+          <h1 className="text-2xl sm:text-[32px] md:text-[44px] font-normal tracking-[-0.025em] text-white/95 text-center mb-6 sm:mb-9 select-none">
             What&apos;s on your mind?
-          </Title>
+          </h1>
 
           {/* Live Voice Dictation Indicator */}
           {isListening && (
-            <Badge
-              variant="soft"
-              intent="danger"
-              size="md"
-              className="mb-3 inline-flex items-center gap-2 rounded-full animate-pulse"
-            >
-              <Mic className="size-3.5" />
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-red-400/35 bg-red-500/15 px-3.5 py-1 text-xs font-medium text-red-200 animate-pulse">
+              <Mic className="w-3.5 h-3.5 text-red-400" />
               <span>Listening — speak your mind, then press Enter...</span>
-            </Badge>
+            </div>
           )}
 
           {/* Stadium Input Pill */}
@@ -1643,46 +1603,36 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           {/* One-Click "View Chat" Pill when previous messages exist */}
           {messages.length > 0 && (
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              <Button.Root
-                variant="soft"
-                intent="primary"
-                size="sm"
+              <button
+                type="button"
                 onClick={() => setShowConversation(true)}
-                className="rounded-full"
+                className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/15 hover:bg-primary/25 px-4 py-1.5 text-xs font-semibold text-highlight shadow-sm transition-all"
               >
-                <Button.Icon type="leading" size="xs">
-                  <MessageSquare />
-                </Button.Icon>
-                <Button.Label>
+                <MessageSquare className="w-3.5 h-3.5 text-primary" />
+                <span>
                   View Chat ({messages.length}{" "}
                   {messages.length === 1 ? "message" : "messages"})
-                </Button.Label>
-                <Button.Icon type="trailing" size="xs">
-                  <ArrowRight />
-                </Button.Icon>
-              </Button.Root>
+                </span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
 
-              <Button.Root
-                variant="outlined"
-                intent="gray"
-                size="sm"
+              <button
+                type="button"
                 onClick={() => setMessages([])}
-                className="rounded-full"
+                className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] px-3 py-1.5 text-xs text-white/50 hover:text-white/85 transition-colors"
                 title="Start a fresh conversation"
               >
-                <Button.Icon type="leading" size="xs">
-                  <RotateCcw />
-                </Button.Icon>
-                <Button.Label>Clear</Button.Label>
-              </Button.Root>
+                <RotateCcw className="w-3 h-3" />
+                <span>Clear</span>
+              </button>
             </div>
           )}
 
-          {/* Centered [ my chat | my tasks | my day ] Switcher Pill */}
+          {/* Centered [ Chat | Tasks | my day ] Switcher Pill */}
           <div className="mt-6">{ModeSwitcherPill}</div>
 
           {/* Subtle Optional Quick Prompts */}
-          <div className="mt-6 sm:mt-9 flex flex-wrap items-center justify-center gap-2 max-w-2xl px-2">
+          <div className="mt-6 sm:mt-9 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 max-w-2xl px-2">
             {(activeTaskCount === 0
               ? [
                   {
@@ -1728,16 +1678,14 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                   },
                 ]
             ).map((chip) => (
-              <Button.Root
+              <button
                 key={chip.label}
-                variant="outlined"
-                intent="gray"
-                size="xs"
+                type="button"
                 onClick={() => sendPrompt(chip.prompt)}
-                className="rounded-full text-caption hover:text-title"
+                className="rounded-full border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs text-white/50 hover:text-white/85 transition-all"
               >
-                <Button.Label>{chip.label}</Button.Label>
-              </Button.Root>
+                {chip.label}
+              </button>
             ))}
           </div>
         </div>
@@ -1751,24 +1699,20 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   return (
     <div className="flex-1 flex flex-col max-w-[840px] w-full mx-auto px-2.5 sm:px-6 pt-2 sm:pt-3 pb-6 min-h-[calc(100vh-5rem)]">
       {/* Top Minimal Session Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-2 border-b border-[--ui-border-color]">
-        <div className="flex items-center gap-2.5 text-xs text-caption">
-          <Button.Root
-            variant="outlined"
-            intent="gray"
-            size="xs"
+      <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 pb-3 mb-2 border-b border-white/[0.08]">
+        <div className="flex items-center gap-2 text-xs text-white/55">
+          <button
+            type="button"
             onClick={() => setShowConversation(false)}
-            className="rounded-full"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.04] hover:bg-white/10 px-2.5 sm:px-3 py-1 text-xs font-medium text-white/80 hover:text-white transition-colors"
             title="Return to What's on your mind? screen"
           >
-            <Button.Icon type="leading" size="xs">
-              <ArrowLeft className="text-primary-400" />
-            </Button.Icon>
-            <Button.Label>What&apos;s on your mind?</Button.Label>
-          </Button.Root>
+            <ArrowLeft className="w-3.5 h-3.5 text-primary" />
+            <span>What&apos;s on your mind?</span>
+          </button>
 
           <span className="hidden sm:inline-flex items-center gap-1.5">
-            <KiteLogoMark className="size-3.5 text-primary-400" />
+            <KiteLogoMark className="w-3.5 h-3.5 text-primary" />
             <span>
               {(workspaceConfig.aiProvider || "nvidia") === "nvidia"
                 ? NVIDIA_MODEL_OPTIONS.find(
@@ -1782,47 +1726,35 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <Button.Root
-            variant="outlined"
-            intent="gray"
-            size="xs"
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <button
+            type="button"
             onClick={() => onSelectTab("my_day")}
-            className="rounded-full"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 px-2.5 sm:px-3 py-1 text-xs text-white/75 hover:text-white transition-colors"
           >
-            <Button.Icon type="leading" size="xs">
-              <CalendarClock className="text-primary-400" />
-            </Button.Icon>
-            <Button.Label>my day</Button.Label>
-          </Button.Root>
-          <Button.Root
-            variant="outlined"
-            intent="gray"
-            size="xs"
+            <CalendarClock className="w-3.5 h-3.5 text-primary" />
+            <span>my day</span>
+          </button>
+          <button
+            type="button"
             onClick={() => onSelectTab("tasks")}
-            className="rounded-full"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 px-2.5 sm:px-3 py-1 text-xs text-white/75 hover:text-white transition-colors"
           >
-            <Button.Icon type="leading" size="xs">
-              <Table2 className="text-primary-400" />
-            </Button.Icon>
-            <Button.Label>my tasks</Button.Label>
-          </Button.Root>
-          <Button.Root
-            variant="soft"
-            intent="gray"
-            size="xs"
+            <Table2 className="w-3.5 h-3.5 text-primary" />
+            <span>my tasks</span>
+          </button>
+          <button
+            type="button"
             onClick={() => {
               setMessages([]);
               setShowConversation(false);
             }}
-            className="rounded-full"
+            className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 px-2.5 sm:px-3 py-1 text-xs text-white/65 hover:text-white transition-colors"
             title="Start a fresh chat"
           >
-            <Button.Icon type="leading" size="xs">
-              <Plus />
-            </Button.Icon>
-            <Button.Label>New Chat</Button.Label>
-          </Button.Root>
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Chat</span>
+          </button>
         </div>
       </div>
 
@@ -1832,12 +1764,9 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           if (m.role === "user") {
             return (
               <div key={m.id} className="flex justify-end">
-                <Card
-                  variant="soft"
-                  className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-br-sm border border-[--ui-border-color] px-4 sm:px-5 py-3 text-sm sm:text-[15px] text-title leading-relaxed shadow-sm whitespace-pre-wrap"
-                >
+                <div className="max-w-[85%] sm:max-w-[75%] rounded-3xl rounded-br-md border border-white/[0.12] bg-[#26282e]/90 px-5 py-3 text-sm sm:text-[15px] text-white leading-relaxed shadow-md whitespace-pre-wrap">
                   {m.content}
-                </Card>
+                </div>
               </div>
             );
           }
@@ -1854,78 +1783,61 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           return (
             <div key={m.id} className="flex items-start gap-3.5">
               {/* Minimalist Kite Avatar */}
-              <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border border-primary-500/35 bg-primary-500/15 text-primary-400">
-                <KiteLogoMark className="size-4" />
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/35 bg-primary/15 text-primary shadow-neon">
+                <KiteLogoMark className="w-4 h-4" />
               </div>
 
               <div className="flex-1 min-w-0 space-y-3">
                 {/* Executed Workspace Operations Summary Card */}
                 {m.executedActions && m.executedActions.length > 0 && (
-                  <Card variant="mixed" fancy className="p-3.5 space-y-2.5">
+                  <div className="rounded-2xl border border-white/15 bg-[#16181e]/90 p-3.5 space-y-2.5 shadow-lg">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <Badge
-                        variant="soft"
-                        intent="primary"
-                        size="xs"
-                        className="inline-flex items-center gap-1.5 font-semibold uppercase tracking-wider"
-                      >
-                        <Zap className="size-3" />
+                      <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-highlight">
+                        <Zap className="w-3.5 h-3.5 text-primary" />
                         <span>
                           {m.executedActions.length} Workspace{" "}
-                          {m.executedActions.length === 1
-                            ? "Action"
-                            : "Actions"}{" "}
+                          {m.executedActions.length === 1 ? "Action" : "Actions"}{" "}
                           Applied
                         </span>
-                      </Badge>
+                      </div>
 
-                      <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
                         {(hasTaskOrBoardAction || !hasScheduleAction) && (
-                          <Button.Root
-                            variant="outlined"
-                            intent="gray"
-                            size="xs"
+                          <button
+                            type="button"
                             onClick={() => onSelectTab("tasks")}
-                            className="h-6 px-2 text-[11px]"
+                            className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/80 hover:text-white transition-colors"
                           >
-                            <Button.Icon type="leading" size="xs">
-                              <Table2 className="text-primary-400" />
-                            </Button.Icon>
-                            <Button.Label>View in my tasks</Button.Label>
-                          </Button.Root>
+                            <Table2 className="w-3 h-3 text-primary" />
+                            <span>View in my tasks</span>
+                          </button>
                         )}
 
                         {hasScheduleAction && (
-                          <Button.Root
-                            variant="outlined"
-                            intent="gray"
-                            size="xs"
+                          <button
+                            type="button"
                             onClick={() => onSelectTab("my_day")}
-                            className="h-6 px-2 text-[11px]"
+                            className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/80 hover:text-white transition-colors"
                           >
-                            <Button.Icon type="leading" size="xs">
-                              <CalendarClock className="text-primary-400" />
-                            </Button.Icon>
-                            <Button.Label>View in my day</Button.Label>
-                          </Button.Root>
+                            <CalendarClock className="w-3 h-3 text-primary" />
+                            <span>View in my day</span>
+                          </button>
                         )}
 
                         {m.undoSnapshot && (
-                          <Button.Root
-                            variant={m.undone ? "soft" : "outlined"}
-                            intent={m.undone ? "success" : "gray"}
-                            size="xs"
+                          <button
+                            type="button"
                             disabled={m.undone}
                             onClick={() => onUndoAgentMessage(m.id)}
-                            className="h-6 px-2 text-[11px]"
+                            className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                              m.undone
+                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 cursor-default"
+                                : "border-white/15 bg-white/5 hover:bg-white/10 text-white/75 hover:text-white"
+                            }`}
                           >
-                            <Button.Icon type="leading" size="xs">
-                              <RotateCcw />
-                            </Button.Icon>
-                            <Button.Label>
-                              {m.undone ? "Reverted" : "Undo"}
-                            </Button.Label>
-                          </Button.Root>
+                            <RotateCcw className="w-3 h-3" />
+                            <span>{m.undone ? "Reverted" : "Undo"}</span>
+                          </button>
                         )}
                       </div>
                     </div>
@@ -1934,17 +1846,17 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                       {m.executedActions.map((act) => (
                         <div
                           key={act.id}
-                          className="flex items-start gap-2 rounded-[--btn-radius] border border-[--ui-border-color] bg-[--ui-soft-bg]/50 px-3 py-2 text-xs"
+                          className="flex items-start gap-2 rounded-xl border border-white/[0.07] bg-black/35 px-3 py-2 text-xs"
                         >
                           <div className="mt-0.5">
                             {getActionCategoryIcon(act.category)}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <span className="font-medium text-title">
+                            <span className="font-medium text-white">
                               {act.summary}
                             </span>
                             {act.detail && (
-                              <p className="text-[11px] text-caption truncate mt-0.5">
+                              <p className="text-[11px] text-white/50 truncate mt-0.5">
                                 {act.detail}
                               </p>
                             )}
@@ -1952,7 +1864,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                         </div>
                       ))}
                     </div>
-                  </Card>
+                  </div>
                 )}
 
                 {/* Embedded Live MY DAY Status Bar & Schedule Card */}
@@ -1969,65 +1881,53 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
 
                 {/* Embedded Interactive Canvas LMS Sync Card */}
                 {m.triggerCanvasSync && (
-                  <Card
-                    variant="mixed"
-                    fancy
-                    className="p-3.5 space-y-2.5 backdrop-blur-md"
-                  >
+                  <div className="rounded-2xl border border-primary/35 bg-[#12161f]/95 p-3.5 space-y-2.5 shadow-lg backdrop-blur-md">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                       <div className="flex items-center gap-2.5">
-                        <span className="flex size-8 items-center justify-center rounded-[--btn-radius] bg-primary-500/15 text-primary-400 border border-primary-500/35 shrink-0">
-                          <GraduationCap className="size-4" />
+                        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/20 text-primary border border-primary/40 shadow-neon shrink-0">
+                          <GraduationCap className="w-4 h-4" />
                         </span>
                         <div>
-                          <h4 className="text-xs font-semibold text-title tracking-wide">
+                          <h4 className="text-xs font-bold text-white tracking-wide">
                             Canvas LMS Assignment Picker
                           </h4>
-                          <p className="text-[11px] text-caption">
-                            Choose which upcoming assignments to import into
-                            your workspace.
+                          <p className="text-[11px] text-white/55">
+                            Choose which upcoming assignments to import into your workspace.
                           </p>
                         </div>
                       </div>
 
-                      <Button.Root
-                        variant="solid"
-                        intent="primary"
-                        size="xs"
+                      <button
+                        type="button"
                         onClick={onQuickSyncCanvas}
-                        className="shrink-0 font-semibold"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-black hover:brightness-110 active:scale-95 transition-all shadow-neon shrink-0"
                       >
-                        <Button.Icon type="leading" size="xs">
-                          <RefreshCw />
-                        </Button.Icon>
-                        <Button.Label>Select Assignments</Button.Label>
-                      </Button.Root>
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Select Assignments</span>
+                      </button>
                     </div>
-                  </Card>
+                  </div>
                 )}
 
                 {/* Agent Markdown Reply */}
                 <div
                   className={
                     m.isError
-                      ? "rounded-[--card-radius] border border-danger-500/35 bg-danger-500/10 px-4 py-3 text-sm text-danger-200"
+                      ? "rounded-2xl border border-red-500/35 bg-red-500/10 px-4 py-3 text-sm text-red-200"
                       : "px-0.5"
                   }
                 >
                   <FormattedAgentMarkdown content={m.content} />
                   {m.isError && (
                     <div className="mt-2.5">
-                      <Button.Root
-                        variant="outlined"
-                        intent="gray"
-                        size="xs"
+                      <button
+                        type="button"
                         onClick={onOpenApiKeySetup}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/10 hover:bg-white/15 px-3 py-1.5 text-xs font-semibold text-white transition-colors"
                       >
-                        <Button.Icon type="leading" size="xs">
-                          <KeyRound className="text-primary-400" />
-                        </Button.Icon>
-                        <Button.Label>Check API Key Settings</Button.Label>
-                      </Button.Root>
+                        <KeyRound className="w-3.5 h-3.5 text-primary" />
+                        <span>Check API Key Settings</span>
+                      </button>
                     </div>
                   )}
                 </div>
@@ -2076,8 +1976,8 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
         {/* Minimalistic Kite Flying Loading Animation */}
         {isThinking && (
           <div className="flex items-start gap-3.5 py-1">
-            <div className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full border border-primary-500/40 bg-primary-500/15 text-primary-400">
-              <KiteLogoMark className="size-4" />
+            <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/15 text-primary shadow-neon">
+              <KiteLogoMark className="w-4 h-4" />
             </div>
             <KiteFlyingLoader elapsedSeconds={thinkingSeconds} />
           </div>

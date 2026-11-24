@@ -14,7 +14,6 @@ import {
   Send,
   XCircle,
 } from "lucide-react";
-import { Badge, Button, Card, Textarea } from "@/components/tailus-ui";
 
 interface StudyCheckpointCardProps {
   checkpoint: StudyCheckpoint;
@@ -60,24 +59,15 @@ export const StudyCheckpointCard: React.FC<StudyCheckpointCardProps> = ({
   };
 
   return (
-    <Card
-      variant="mixed"
-      fancy
-      className="mt-4 p-0 overflow-hidden shadow-lg"
-    >
+    <div className="mt-4 overflow-hidden rounded-2xl border border-primary/35 bg-black/50 shadow-xl">
       {/* Checkpoint Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[--ui-border-color] bg-primary-500/10 px-4 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-primary/10 px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <Badge
-            variant="soft"
-            intent="primary"
-            size="xs"
-            className="inline-flex items-center gap-1.5 rounded-full font-mono uppercase tracking-wider"
-          >
-            <HelpCircle className="size-3" />
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/25 border border-primary/40 px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-highlight">
+            <HelpCircle className="h-3 w-3 text-primary" />
             Comprehension Gate
-          </Badge>
-          <span className="text-xs font-medium text-caption truncate max-w-[240px] sm:max-w-xs">
+          </span>
+          <span className="text-xs font-medium text-white/75 truncate max-w-[240px] sm:max-w-xs">
             {checkpoint.questionType === "mcq"
               ? "Multiple-Choice Check"
               : "Active Recall Prompt"}
@@ -86,35 +76,27 @@ export const StudyCheckpointCard: React.FC<StudyCheckpointCardProps> = ({
 
         <div className="flex items-center gap-2">
           {checkpoint.hint && (
-            <Button.Root
-              variant="soft"
-              intent="warning"
-              size="xs"
+            <button
+              type="button"
               onClick={() => setShowHint((v) => !v)}
-              className="h-6 px-2 text-[11px]"
+              className="inline-flex items-center gap-1 rounded-lg border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-200 hover:bg-amber-500/20 transition-colors"
             >
-              <Button.Icon type="leading" size="xs">
-                <Lightbulb />
-              </Button.Icon>
-              <Button.Label>{showHint ? "Hide Hint" : "Hint"}</Button.Label>
-            </Button.Root>
+              <Lightbulb className="h-3 w-3 text-amber-400" />
+              <span>{showHint ? "Hide Hint" : "Hint"}</span>
+            </button>
           )}
 
           {!checkpoint.isCorrect && (
-            <Button.Root
-              variant="outlined"
-              intent="gray"
-              size="xs"
+            <button
+              type="button"
               disabled={isBusy}
               onClick={() => onSkipKnown(checkpoint.subtopicId)}
-              className="h-6 px-2.5 text-[11px]"
+              className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/75 hover:text-white hover:border-primary/40 transition-colors disabled:opacity-50"
               title="Bypass teaching this subtopic and count it toward completed progress"
             >
-              <Button.Icon type="leading" size="xs">
-                <FastForward className="text-primary-400" />
-              </Button.Icon>
-              <Button.Label>I already know this</Button.Label>
-            </Button.Root>
+              <FastForward className="h-3 w-3 text-primary" />
+              <span>I already know this</span>
+            </button>
           )}
         </div>
       </div>
@@ -122,19 +104,16 @@ export const StudyCheckpointCard: React.FC<StudyCheckpointCardProps> = ({
       {/* Checkpoint Body */}
       <div className="p-4 space-y-3.5">
         {/* Question Text */}
-        <div className="text-xs sm:text-sm font-semibold text-title leading-relaxed">
+        <div className="text-xs sm:text-sm font-semibold text-white leading-relaxed">
           {renderStudyInline(checkpoint.question)}
         </div>
 
         {/* Optional Hint */}
         {showHint && checkpoint.hint && (
-          <Card
-            variant="outlined"
-            className="border-warning-500/30 bg-warning-500/10 px-3.5 py-2 text-xs text-warning-200 flex items-start gap-2"
-          >
-            <Lightbulb className="size-4 text-warning-400 shrink-0 mt-0.5" />
+          <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-200 flex items-start gap-2">
+            <Lightbulb className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
             <span>{renderStudyInline(checkpoint.hint)}</span>
-          </Card>
+          </div>
         )}
 
         {/* Multiple-Choice Options */}
@@ -151,21 +130,21 @@ export const StudyCheckpointCard: React.FC<StudyCheckpointCardProps> = ({
                     type="button"
                     disabled={isBusy || Boolean(checkpoint.isCorrect)}
                     onClick={() => onSelectMcqOption(checkpoint, opt)}
-                    className={`w-full flex items-start gap-3 rounded-[--btn-radius] border p-3 text-left text-xs sm:text-sm transition-all ${
+                    className={`w-full flex items-start gap-3 rounded-xl border p-3 text-left text-xs sm:text-sm transition-all ${
                       showAsCorrect
-                        ? "border-success-500/60 bg-success-500/15 text-title shadow-sm"
+                        ? "border-emerald-400/60 bg-emerald-500/15 text-white shadow-sm"
                         : showAsWrong
-                        ? "border-danger-500/60 bg-danger-500/15 text-title shadow-sm"
-                        : "border-[--ui-border-color] bg-[--ui-soft-bg]/50 text-body hover:border-primary-500/50 hover:text-title"
+                        ? "border-rose-400/60 bg-rose-500/15 text-white shadow-sm"
+                        : "border-white/12 bg-white/[0.03] text-zinc-200 hover:border-primary/50 hover:bg-white/[0.07]"
                     } disabled:cursor-default`}
                   >
                     <span
-                      className={`mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-md font-mono text-xs font-bold border ${
+                      className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-bold border ${
                         showAsCorrect
-                          ? "border-success-400 bg-success-500 text-black"
+                          ? "border-emerald-400 bg-emerald-500 text-black"
                           : showAsWrong
-                          ? "border-danger-400 bg-danger-500 text-white"
-                          : "border-[--ui-border-color] bg-[--ui-bg] text-primary-300"
+                          ? "border-rose-400 bg-rose-500 text-white"
+                          : "border-white/20 bg-white/10 text-highlight"
                       }`}
                     >
                       {opt.label}
@@ -174,33 +153,33 @@ export const StudyCheckpointCard: React.FC<StudyCheckpointCardProps> = ({
                       {renderStudyInline(opt.text)}
                     </span>
                     {showAsCorrect && (
-                      <CheckCircle2 className="size-5 text-success-400 shrink-0 mt-0.5" />
+                      <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
                     )}
                     {showAsWrong && (
-                      <XCircle className="size-5 text-danger-400 shrink-0 mt-0.5" />
+                      <XCircle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
                     )}
                   </button>
 
                   {/* Targeted Immediate Explanation for Selected Option */}
                   {isSelected && (
                     <div
-                      className={`rounded-[--btn-radius] border px-3.5 py-2.5 text-xs leading-relaxed ${
+                      className={`rounded-xl border px-3.5 py-2.5 text-xs leading-relaxed ${
                         opt.isCorrect
-                          ? "border-success-500/35 bg-success-500/10 text-success-200"
-                          : "border-danger-500/35 bg-danger-500/10 text-danger-200"
+                          ? "border-emerald-500/35 bg-emerald-950/35 text-emerald-200"
+                          : "border-rose-500/35 bg-rose-950/35 text-rose-200"
                       }`}
                     >
-                      <div className="font-semibold mb-0.5 flex items-center gap-1.5">
+                      <div className="font-bold mb-0.5 flex items-center gap-1.5">
                         {opt.isCorrect ? (
                           <>
-                            <CheckCircle2 className="size-3.5 text-success-400" />
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
                             <span>
                               Correct! &ldquo;{subtopicTitle}&rdquo; Mastered
                             </span>
                           </>
                         ) : (
                           <>
-                            <RotateCcw className="size-3.5 text-danger-400" />
+                            <RotateCcw className="h-3.5 w-3.5 text-rose-400" />
                             <span>
                               Not quite — Let&apos;s break down why &amp; try a
                               clearer angle
@@ -220,18 +199,14 @@ export const StudyCheckpointCard: React.FC<StudyCheckpointCardProps> = ({
               onRequestNextLesson &&
               !isBusy && (
                 <div className="pt-2 flex justify-end">
-                  <Button.Root
-                    variant="solid"
-                    intent="primary"
-                    size="sm"
+                  <button
+                    type="button"
                     onClick={onRequestNextLesson}
-                    className="font-semibold"
+                    className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-black hover:brightness-110 transition-all shadow-neon"
                   >
-                    <Button.Label>Continue to Next Micro-Lesson</Button.Label>
-                    <Button.Icon type="trailing" size="xs">
-                      <ArrowRight />
-                    </Button.Icon>
-                  </Button.Root>
+                    <span>Continue to Next Micro-Lesson</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               )}
           </div>
@@ -240,32 +215,32 @@ export const StudyCheckpointCard: React.FC<StudyCheckpointCardProps> = ({
         {/* Short-Answer / Active Recall Input */}
         {checkpoint.questionType === "short_answer" && (
           <form onSubmit={handleShortAnswerFormSubmit} className="space-y-2.5">
-            <Textarea
-              variant="outlined"
+            <textarea
               value={shortAnswerInput}
               onChange={(e) => setShortAnswerInput(e.target.value)}
               disabled={isBusy || Boolean(checkpoint.isCorrect)}
               rows={3}
               placeholder="Explain the concept in your own words..."
+              className="w-full rounded-xl border border-white/15 bg-black/45 px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder:text-white/35 focus:border-primary focus:outline-none disabled:opacity-60"
             />
 
             {checkpoint.aiFeedback && (
               <div
-                className={`rounded-[--btn-radius] border px-3.5 py-2.5 text-xs leading-relaxed ${
+                className={`rounded-xl border px-3.5 py-2.5 text-xs leading-relaxed ${
                   checkpoint.isCorrect
-                    ? "border-success-500/35 bg-success-500/10 text-success-200"
-                    : "border-warning-500/35 bg-warning-500/10 text-warning-200"
+                    ? "border-emerald-500/35 bg-emerald-950/35 text-emerald-200"
+                    : "border-amber-500/35 bg-amber-950/35 text-amber-200"
                 }`}
               >
-                <div className="font-semibold mb-0.5 flex items-center gap-1.5">
+                <div className="font-bold mb-0.5 flex items-center gap-1.5">
                   {checkpoint.isCorrect ? (
                     <>
-                      <CheckCircle2 className="size-3.5 text-success-400" />
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
                       <span>Concept Mastered!</span>
                     </>
                   ) : (
                     <>
-                      <RotateCcw className="size-3.5 text-warning-400" />
+                      <RotateCcw className="h-3.5 w-3.5 text-amber-400" />
                       <span>Adaptive Feedback — Let&apos;s Refine This</span>
                     </>
                   )}
@@ -276,30 +251,28 @@ export const StudyCheckpointCard: React.FC<StudyCheckpointCardProps> = ({
 
             {!checkpoint.isCorrect && (
               <div className="flex justify-end">
-                <Button.Root
+                <button
                   type="submit"
-                  variant="solid"
-                  intent="primary"
-                  size="sm"
                   disabled={!shortAnswerInput.trim() || isBusy}
-                  className="font-semibold"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-black hover:brightness-110 transition-all disabled:opacity-40"
                 >
-                  <Button.Icon type="leading" size="xs">
-                    {isBusy ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      <Send />
-                    )}
-                  </Button.Icon>
-                  <Button.Label>
-                    {isBusy ? "Evaluating..." : "Verify My Explanation"}
-                  </Button.Label>
-                </Button.Root>
+                  {isBusy ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Evaluating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-3.5 w-3.5" />
+                      <span>Verify My Explanation</span>
+                    </>
+                  )}
+                </button>
               </div>
             )}
           </form>
         )}
       </div>
-    </Card>
+    </div>
   );
 };

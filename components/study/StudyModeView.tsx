@@ -21,17 +21,6 @@ import { StudyMarkdown } from "@/components/study/StudyMarkdown";
 import { StudyVisualRenderer } from "@/components/study/StudyVisualRenderer";
 import { StudyCheckpointCard } from "@/components/study/StudyCheckpointCard";
 import {
-  Badge,
-  Button,
-  Caption,
-  Card,
-  Input,
-  Progress,
-  Text,
-  Textarea,
-  Title,
-} from "@/components/tailus-ui";
-import {
   ArrowLeft,
   ArrowRight,
   Check,
@@ -795,32 +784,23 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
   // ===========================================================================
   const ModelSelectorDropdown = (
     <div className="relative">
-      <Button.Root
+      <button
         type="button"
-        variant="soft"
-        intent="gray"
-        size="sm"
         onClick={() => setModelDropdownOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/[0.06] px-3 py-1.5 text-xs font-semibold text-white/90 hover:border-primary/50 hover:text-white transition-all"
         title="Switch AI Model"
       >
-        <Button.Icon type="leading">
-          <Cpu className="h-3.5 w-3.5 text-primary-400" />
-        </Button.Icon>
-        <Button.Label className="truncate max-w-[140px]">
-          {activeModelLabel}
-        </Button.Label>
-        <Button.Icon type="trailing">
-          <ChevronDown className="h-3 w-3 text-caption" />
-        </Button.Icon>
-      </Button.Root>
+        <Cpu className="h-3.5 w-3.5 text-primary" />
+        <span className="truncate max-w-[140px]">{activeModelLabel}</span>
+        <ChevronDown className="h-3 w-3 text-white/55" />
+      </button>
 
       {modelDropdownOpen && (
-        <Card
-          variant="mixed"
-          className="absolute right-0 mt-1.5 w-72 max-h-80 overflow-y-auto p-2 shadow-2xl backdrop-blur-2xl z-50 space-y-1"
+        <div
+          className="absolute right-0 mt-1.5 w-72 max-h-80 overflow-y-auto rounded-2xl border border-white/20 bg-[#14161c]/95 p-2 shadow-2xl backdrop-blur-2xl z-50 space-y-1"
           onMouseLeave={() => setModelDropdownOpen(false)}
         >
-          <div className="px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-caption">
+          <div className="px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-white/45">
             Select AI Model
           </div>
           {NVIDIA_MODEL_OPTIONS.map((m) => {
@@ -833,31 +813,26 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                 onClick={() =>
                   handleSelectModel("nvidia", m.id, undefined, true)
                 }
-                className={`w-full flex items-center justify-between gap-2 rounded-[--btn-radius] px-2.5 py-2 text-left text-xs transition-colors ${
+                className={`w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left text-xs transition-colors ${
                   isSelected
-                    ? "bg-primary-500/20 text-title font-semibold"
-                    : "text-body hover:bg-[--ui-soft-bg] hover:text-title"
+                    ? "bg-primary/20 text-white font-bold"
+                    : "text-zinc-300 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                <div className="truncate flex items-center gap-1.5">
+                <div className="truncate">
                   <span>{m.name}</span>
-                  <Badge
-                    variant="soft"
-                    intent="primary"
-                    size="xs"
-                    className="font-mono text-[9px]"
-                  >
+                  <span className="ml-1.5 rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-mono text-highlight">
                     {m.badge}
-                  </Badge>
+                  </span>
                 </div>
                 {isSelected && (
-                  <Check className="h-3.5 w-3.5 text-primary-400 shrink-0" />
+                  <Check className="h-3.5 w-3.5 text-primary shrink-0" />
                 )}
               </button>
             );
           })}
 
-          <div className="border-t border-[--ui-border-color] pt-1 mt-1">
+          <div className="border-t border-white/10 pt-1 mt-1">
             {(["flash", "pro"] as const).map((tier) => {
               const isSelected =
                 activeProvider === "gemini" && geminiTier === tier;
@@ -868,23 +843,23 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                   onClick={() =>
                     handleSelectModel("gemini", undefined, tier, true)
                   }
-                  className={`w-full flex items-center justify-between gap-2 rounded-[--btn-radius] px-2.5 py-2 text-left text-xs transition-colors ${
+                  className={`w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left text-xs transition-colors ${
                     isSelected
-                      ? "bg-primary-500/20 text-title font-semibold"
-                      : "text-body hover:bg-[--ui-soft-bg] hover:text-title"
+                      ? "bg-primary/20 text-white font-bold"
+                      : "text-zinc-300 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   <span>
                     {tier === "flash" ? "Gemini 2.0 Flash" : "Gemini 1.5 Pro"}
                   </span>
                   {isSelected && (
-                    <Check className="h-3.5 w-3.5 text-primary-400 shrink-0" />
+                    <Check className="h-3.5 w-3.5 text-primary shrink-0" />
                   )}
                 </button>
               );
             })}
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );
@@ -907,25 +882,22 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
       {floSubView === "home" || !syllabus ? (
         <div className="space-y-8">
           {/* Clean Focused Prompt Card */}
-          <Card
-            variant="mixed"
-            className="p-6 sm:p-8 shadow-2xl backdrop-blur-2xl space-y-5"
-          >
+          <div className="rounded-3xl border theme-panel p-6 sm:p-8 shadow-2xl backdrop-blur-2xl space-y-5">
             {/* Header Row */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-primary-500/35 bg-primary-500/15">
-                  <Sparkles className="h-5 w-5 text-primary-400" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-primary/35 bg-primary/15">
+                  <Sparkles className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <Title size="xl" weight="bold" className="tracking-tight">
+                  <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
                     What do you want to learn?
-                  </Title>
-                  <Caption>
+                  </h1>
+                  <p className="text-xs text-white/55">
                     Enter any topic or paste your syllabus —{" "}
-                    <strong className="text-title">flo</strong> breaks it down
+                    <strong className="text-white">flo</strong> breaks it down
                     and teaches you step-by-step.
-                  </Caption>
+                  </p>
                 </div>
               </div>
 
@@ -933,36 +905,28 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
             </div>
 
             {!hasApiKey && (
-              <Card
-                variant="outlined"
-                className="flex items-center justify-between gap-3 border-warning-500/35 bg-warning-500/10 px-4 py-2.5 text-xs text-warning-200"
-              >
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-400/35 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-200">
                 <div className="flex items-center gap-2">
-                  <KeyRound className="h-4 w-4 text-warning-400 shrink-0" />
+                  <KeyRound className="h-4 w-4 text-amber-400 shrink-0" />
                   <span>
                     Connect your free NVIDIA NIM or Google Gemini API key to
                     start learning.
                   </span>
                 </div>
-                <Button.Root
+                <button
                   type="button"
-                  variant="solid"
-                  intent="warning"
-                  size="xs"
                   onClick={onOpenApiKeySetup}
-                  className="shrink-0"
+                  className="rounded-lg bg-amber-400 px-3 py-1 font-bold text-black hover:brightness-110 shrink-0"
                 >
-                  <Button.Label>Setup Key</Button.Label>
-                </Button.Root>
-              </Card>
+                  Setup Key
+                </button>
+              </div>
             )}
 
             {/* Simple Input Box */}
-            <div className="rounded-[--card-radius] border border-[--ui-border-color] bg-[--ui-bg] p-4 focus-within:border-primary-500/60 transition-colors">
-              <Textarea
+            <div className="rounded-2xl border border-white/15 bg-black/45 p-4 focus-within:border-primary/60 transition-colors">
+              <textarea
                 id="flo-study-topic-input"
-                variant="plain"
-                size="md"
                 value={topicInput}
                 onChange={(e) => setTopicInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -973,144 +937,116 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                 }}
                 rows={3}
                 placeholder="e.g. Calculus limits & continuity, Cellular respiration, Principles of microeconomics..."
-                className="w-full resize-none bg-transparent text-sm sm:text-base text-title placeholder:text-placeholder focus:outline-none leading-relaxed border-0 p-0"
+                className="w-full resize-none bg-transparent text-sm sm:text-base text-white placeholder:text-white/35 focus:outline-none leading-relaxed"
               />
             </div>
 
             {/* Bottom Row: Quick Topic Chips + Generate Button */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-1.5">
-                <Caption className="mr-1">Try:</Caption>
+                <span className="text-xs text-white/45 mr-1">Try:</span>
                 {QUICK_TOPICS.map((chip, idx) => (
-                  <Button.Root
+                  <button
                     key={idx}
                     type="button"
-                    variant="soft"
-                    intent="gray"
-                    size="xs"
                     onClick={() => setTopicInput(chip.prompt)}
-                    className="rounded-full"
+                    className="rounded-full border border-white/12 bg-white/[0.04] px-3 py-1 text-xs text-white/75 hover:border-primary/45 hover:bg-primary/15 hover:text-white transition-all"
                   >
-                    <Button.Label>{chip.label}</Button.Label>
-                  </Button.Root>
+                    {chip.label}
+                  </button>
                 ))}
               </div>
 
-              <Button.Root
+              <button
                 type="button"
-                variant="solid"
-                intent="primary"
-                size="md"
                 disabled={!topicInput.trim() || isGeneratingSyllabus}
                 onClick={() => handleGenerateSyllabus()}
-                className="shadow-neon shrink-0"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs sm:text-sm font-bold text-black hover:brightness-110 transition-all shadow-neon disabled:opacity-40 shrink-0"
               >
                 {isGeneratingSyllabus ? (
                   <>
-                    <Button.Icon type="leading">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    </Button.Icon>
-                    <Button.Label>Building syllabus...</Button.Label>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Building syllabus...</span>
                   </>
                 ) : (
                   <>
-                    <Button.Icon type="leading">
-                      <Sparkles className="h-4 w-4" />
-                    </Button.Icon>
-                    <Button.Label>Generate syllabus</Button.Label>
-                    <Button.Icon type="trailing">
-                      <ArrowRight className="h-4 w-4" />
-                    </Button.Icon>
+                    <Sparkles className="h-4 w-4" />
+                    <span>Generate syllabus</span>
+                    <ArrowRight className="h-4 w-4" />
                   </>
                 )}
-              </Button.Root>
+              </button>
             </div>
-          </Card>
+          </div>
 
           {/* Saved Courses ("Prior Study Topics") — always visible when user has prior topics */}
           {savedCourses.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between px-1">
-                <Title
-                  size="base"
-                  weight="bold"
-                  className="text-sm uppercase tracking-wider text-body"
-                >
+                <h2 className="text-sm font-bold uppercase tracking-wider text-white/70">
                   Prior Study Topics ({savedCourses.length})
-                </Title>
-                <Caption>
+                </h2>
+                <span className="text-xs text-white/45">
                   Click any topic to pick up where you left off
-                </Caption>
+                </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
                 {savedCourses.map((course) => {
                   const prog = computeSyllabusProgress(course.syllabus);
                   return (
-                    <Card
+                    <div
                       key={course.id}
-                      variant="mixed"
                       onClick={() => handleOpenSavedCourse(course)}
-                      className="group cursor-pointer p-4 transition-all hover:border-primary-500/50 flex flex-col justify-between gap-3"
+                      className="group cursor-pointer rounded-2xl border theme-panel p-4 transition-all hover:border-primary/50 flex flex-col justify-between gap-3"
                     >
                       <div className="space-y-1">
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="text-sm font-bold text-title group-hover:text-primary-300 transition-colors line-clamp-1">
+                          <h3 className="text-sm font-bold text-white group-hover:text-highlight transition-colors line-clamp-1">
                             {course.syllabus.title}
                           </h3>
-                          <Button.Root
+                          <button
                             type="button"
-                            variant="ghost"
-                            intent="danger"
-                            size="xs"
                             onClick={(e) =>
                               handleDeleteSavedCourse(course.id, e)
                             }
-                            className="shrink-0"
+                            className="rounded p-1 text-white/35 hover:bg-rose-500/20 hover:text-rose-300 transition-colors shrink-0"
                             title="Delete course"
                           >
-                            <Button.Icon type="only">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button.Icon>
-                          </Button.Root>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
-                        <Caption>
+                        <p className="text-xs text-white/50">
                           {prog.completedCount} / {prog.totalActive} topics
                           completed
-                        </Caption>
+                        </p>
                       </div>
 
                       <div className="space-y-2">
                         <div className="flex items-center gap-2.5">
-                          <Progress.Root
-                            value={prog.percentage}
-                            size="xs"
-                            variant="soft"
-                            className="flex-1"
-                          >
-                            <Progress.Indicator
-                              intent="primary"
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+                            <div
+                              className="h-full rounded-full transition-all"
                               style={{
-                                transform: `translateX(-${
-                                  100 - prog.percentage
-                                }%)`,
+                                width: `${prog.percentage}%`,
+                                backgroundColor: "var(--primary)",
                               }}
                             />
-                          </Progress.Root>
-                          <span className="font-mono text-[11px] font-bold text-primary-300">
+                          </div>
+                          <span className="font-mono text-[11px] font-bold text-highlight">
                             {prog.percentage}%
                           </span>
                         </div>
 
-                        <div className="flex items-center justify-between text-xs text-caption pt-1.5 border-t border-[--ui-border-color]">
+                        <div className="flex items-center justify-between text-xs text-white/65 pt-1 border-t border-white/10">
                           <span className="truncate">
                             Next:{" "}
                             {prog.activeSubtopic?.title || "Completed!"}
                           </span>
-                          <ArrowRight className="h-3.5 w-3.5 shrink-0 text-caption group-hover:text-primary-400" />
+                          <ArrowRight className="h-3.5 w-3.5 shrink-0 text-white/45 group-hover:text-primary" />
                         </div>
                       </div>
-                    </Card>
+                    </div>
                   );
                 })}
               </div>
@@ -1123,49 +1059,35 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
            =================================================================== */
         <div className="space-y-4">
           {/* Single Compact Top Bar */}
-          <Card
-            variant="mixed"
-            className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 backdrop-blur-2xl"
-          >
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border theme-panel px-4 py-2.5 backdrop-blur-2xl">
             <div className="flex items-center gap-2 min-w-0">
-              <Button.Root
+              <button
                 type="button"
-                variant="soft"
-                intent="gray"
-                size="xs"
                 onClick={() => setFloSubView("home")}
-                className="shrink-0"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-white/80 hover:text-white transition-colors shrink-0"
               >
-                <Button.Icon type="leading">
-                  <ArrowLeft className="h-3.5 w-3.5 text-primary-400" />
-                </Button.Icon>
-                <Button.Label>New / All Topics</Button.Label>
-              </Button.Root>
+                <ArrowLeft className="h-3.5 w-3.5 text-primary" />
+                <span>New / All Topics</span>
+              </button>
 
               {savedCourses.length > 0 && (
                 <div className="relative">
-                  <Button.Root
+                  <button
                     type="button"
-                    variant="soft"
-                    intent="gray"
-                    size="xs"
                     onClick={() => setPriorTopicsOpen((v) => !v)}
-                    className="shrink-0"
+                    className="inline-flex items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-white/80 hover:text-white hover:border-primary/40 transition-colors shrink-0"
                     title="Switch to a prior study topic"
                   >
-                    <Button.Label>Prior ({savedCourses.length})</Button.Label>
-                    <Button.Icon type="trailing">
-                      <ChevronDown className="h-3 w-3 text-caption" />
-                    </Button.Icon>
-                  </Button.Root>
+                    <span>Prior ({savedCourses.length})</span>
+                    <ChevronDown className="h-3 w-3 text-white/55" />
+                  </button>
 
                   {priorTopicsOpen && (
-                    <Card
-                      variant="mixed"
-                      className="absolute left-0 mt-1.5 w-72 max-h-72 overflow-y-auto p-2 shadow-2xl backdrop-blur-2xl z-50 space-y-1"
+                    <div
+                      className="absolute left-0 mt-1.5 w-72 max-h-72 overflow-y-auto rounded-2xl border border-white/20 bg-[#14161c]/95 p-2 shadow-2xl backdrop-blur-2xl z-50 space-y-1"
                       onMouseLeave={() => setPriorTopicsOpen(false)}
                     >
-                      <div className="px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-caption">
+                      <div className="px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-white/45">
                         Switch Study Topic
                       </div>
                       {savedCourses.map((course) => {
@@ -1179,76 +1101,72 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                               setPriorTopicsOpen(false);
                               handleOpenSavedCourse(course);
                             }}
-                            className={`w-full flex items-center justify-between gap-2 rounded-[--btn-radius] px-2.5 py-2 text-left text-xs transition-colors ${
+                            className={`w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left text-xs transition-colors ${
                               isCurrent
-                                ? "bg-primary-500/20 text-title font-semibold"
-                                : "text-body hover:bg-[--ui-soft-bg] hover:text-title"
+                                ? "bg-primary/20 text-white font-bold"
+                                : "text-zinc-300 hover:bg-white/10 hover:text-white"
                             }`}
                           >
                             <div className="min-w-0 flex-1">
                               <div className="truncate">
                                 {course.syllabus.title}
                               </div>
-                              <div className="text-[10px] text-caption truncate">
+                              <div className="text-[10px] text-white/50 truncate">
                                 {prog.completedCount}/{prog.totalActive} done •{" "}
                                 {prog.percentage}%
                               </div>
                             </div>
                             {isCurrent && (
-                              <Check className="h-3.5 w-3.5 text-primary-400 shrink-0" />
+                              <Check className="h-3.5 w-3.5 text-primary shrink-0" />
                             )}
                           </button>
                         );
                       })}
-                    </Card>
+                    </div>
                   )}
                 </div>
               )}
 
-              <Button.Root
+              <button
                 type="button"
-                variant="soft"
-                intent="gray"
-                size="xs"
                 onClick={() => setMobileDrawerOpen((v) => !v)}
-                className="lg:hidden shrink-0"
+                className="lg:hidden inline-flex items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-white/80"
               >
-                <Button.Icon type="leading">
-                  <Menu className="h-3.5 w-3.5 text-primary-400" />
-                </Button.Icon>
-                <Button.Label>Syllabus</Button.Label>
-              </Button.Root>
+                <Menu className="h-3.5 w-3.5 text-primary" />
+                <span>Syllabus</span>
+              </button>
 
-              <Title size="base" weight="bold" className="text-sm truncate">
+              <h2 className="text-sm font-bold text-white truncate">
                 {syllabus.title}
-              </Title>
+              </h2>
             </div>
 
             <div className="flex items-center gap-3">
               {/* Simple Progress Pill */}
               <div className="flex items-center gap-2">
-                <Progress.Root
-                  aria-label="Study progress"
-                  value={progress.percentage}
-                  size="sm"
-                  variant="soft"
-                  className="w-24 sm:w-32"
-                >
-                  <Progress.Indicator
-                    intent="primary"
+                <div className="w-24 sm:w-32 h-2 overflow-hidden rounded-full bg-white/10">
+                  <progress
+                    aria-label="Study progress"
+                    value={progress.completedCount}
+                    max={Math.max(1, progress.totalActive)}
+                    className="sr-only"
+                  />
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
                     style={{
-                      transform: `translateX(-${100 - progress.percentage}%)`,
+                      width: `${progress.percentage}%`,
+                      backgroundColor: "var(--primary)",
                     }}
                   />
-                </Progress.Root>
-                <span className="font-mono text-xs font-bold text-primary-300">
+                </div>
+                <span className="font-mono text-xs font-bold text-highlight">
                   {progress.percentage}%
                 </span>
               </div>
 
               {ModelSelectorDropdown}
             </div>
-          </Card>
+          </div>
 
           {/* 2-Column Workspace: Left Checklist + Right Active Lesson */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
@@ -1382,18 +1300,14 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                 />
                 <div className="relative z-10 w-full max-w-sm h-full p-3">
                   <div className="mb-2 flex justify-end">
-                    <Button.Root
+                    <button
                       type="button"
-                      variant="soft"
-                      intent="gray"
-                      size="xs"
                       onClick={() => setMobileDrawerOpen(false)}
+                      className="inline-flex items-center gap-1 rounded-xl border border-white/20 bg-black/80 px-3 py-1.5 text-xs font-semibold text-white"
                     >
-                      <Button.Icon type="leading">
-                        <X className="h-3.5 w-3.5" />
-                      </Button.Icon>
-                      <Button.Label>Close</Button.Label>
-                    </Button.Root>
+                      <X className="h-3.5 w-3.5" />
+                      <span>Close</span>
+                    </button>
                   </div>
                   <StudySyllabusSidebar
                     syllabus={syllabus}
@@ -1505,40 +1419,34 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
             <div className="lg:col-span-8 space-y-4">
               {isTutorThinking ? (
                 /* Clean Loading State with Model Switcher */
-                <Card variant="mixed" className="p-6 space-y-4">
+                <div className="rounded-2xl border theme-panel p-6 space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <Loader2 className="h-5 w-5 animate-spin text-primary-400 shrink-0" />
+                      <Loader2 className="h-5 w-5 animate-spin text-primary shrink-0" />
                       <div>
-                        <Title className="text-sm" size="base" weight="bold">
+                        <div className="text-sm font-bold text-white">
                           Preparing lesson:{" "}
                           {progress.activeSubtopic?.title || "Next topic"}...
-                        </Title>
-                        <Caption>
+                        </div>
+                        <div className="text-xs text-white/55">
                           Using {activeModelLabel} • Switch models on the right
                           if it takes more than a few seconds
-                        </Caption>
+                        </div>
                       </div>
                     </div>
                     {ModelSelectorDropdown}
                   </div>
-                </Card>
+                </div>
               ) : lastTutorError ? (
                 /* Simple Retry Card */
-                <Card
-                  variant="outlined"
-                  className="border-danger-500/40 bg-danger-950/30 p-5 flex flex-wrap items-center justify-between gap-3"
-                >
-                  <div className="text-xs sm:text-sm text-danger-200">
+                <div className="rounded-2xl border border-rose-400/40 bg-rose-950/30 p-5 flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-xs sm:text-sm text-rose-200">
                     {lastTutorError}
                   </div>
                   <div className="flex items-center gap-2">
                     {ModelSelectorDropdown}
-                    <Button.Root
+                    <button
                       type="button"
-                      variant="solid"
-                      intent="primary"
-                      size="xs"
                       onClick={() =>
                         handleSelectModel(
                           activeProvider,
@@ -1547,188 +1455,159 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                           true
                         )
                       }
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-black"
                     >
-                      <Button.Icon type="leading">
-                        <RotateCcw className="h-3.5 w-3.5" />
-                      </Button.Icon>
-                      <Button.Label>Retry</Button.Label>
-                    </Button.Root>
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      <span>Retry</span>
+                    </button>
                   </div>
-                </Card>
+                </div>
               ) : progress.isComplete ? (
                 /* 100% Complete Card */
-                <Card
-                  variant="outlined"
-                  className="border-success-500/50 bg-success-950/30 p-8 text-center space-y-3"
-                >
-                  <Trophy className="mx-auto h-8 w-8 text-success-300" />
-                  <Title size="xl" weight="bold">
+                <div className="rounded-2xl border border-emerald-400/50 bg-emerald-950/30 p-8 text-center space-y-3">
+                  <Trophy className="mx-auto h-8 w-8 text-emerald-300" />
+                  <h3 className="text-xl font-bold text-white">
                     100% Syllabus Completed!
-                  </Title>
-                  <Text size="sm" className="text-success-100/80">
+                  </h3>
+                  <p className="text-xs sm:text-sm text-emerald-100/80">
                     You finished all {progress.totalActive} topics in{" "}
-                    <strong className="text-title">{syllabus.title}</strong>.
-                  </Text>
-                  <div className="pt-1 flex justify-center">
-                    <Button.Root
-                      type="button"
-                      variant="solid"
-                      intent="success"
-                      size="sm"
-                      onClick={() => setFloSubView("home")}
-                    >
-                      <Button.Label>Study Another Topic</Button.Label>
-                    </Button.Root>
-                  </div>
-                </Card>
+                    <strong>{syllabus.title}</strong>.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setFloSubView("home")}
+                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2 text-xs font-bold text-black"
+                  >
+                    <span>Study Another Topic</span>
+                  </button>
+                </div>
               ) : activeLessonTurn ? (
                 /* Active Micro-Lesson Card */
-                <Card
-                  variant="mixed"
-                  className="p-5 sm:p-6 shadow-xl backdrop-blur-2xl space-y-5"
-                >
-                  <article className="space-y-5">
-                    {/* Clean Header: Topic Title + Skip Button */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[--ui-border-color] pb-3.5">
-                      <div>
-                        <div className="text-[11px] font-mono text-primary-400 uppercase tracking-wider">
-                          {activeLessonTurn.moduleTitle || syllabus.title}
-                        </div>
-                        <Title size="lg" weight="bold">
-                          {activeLessonTurn.subtopicTitle ||
-                            progress.activeSubtopic?.title}
-                        </Title>
+                <article className="rounded-2xl border theme-panel p-5 sm:p-6 shadow-xl backdrop-blur-2xl space-y-5">
+                  {/* Clean Header: Topic Title + Skip Button */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3.5">
+                    <div>
+                      <div className="text-[11px] font-mono text-primary uppercase tracking-wider">
+                        {activeLessonTurn.moduleTitle || syllabus.title}
                       </div>
-
-                      {progress.activeSubtopic && (
-                        <Button.Root
-                          type="button"
-                          variant="soft"
-                          intent="warning"
-                          size="xs"
-                          onClick={() =>
-                            handleToggleSkipKnown(progress.activeSubtopic!.id)
-                          }
-                        >
-                          <Button.Icon type="leading">
-                            <FastForward className="h-3.5 w-3.5" />
-                          </Button.Icon>
-                          <Button.Label>I already know this</Button.Label>
-                        </Button.Root>
-                      )}
+                      <h3 className="text-base sm:text-lg font-bold text-white">
+                        {activeLessonTurn.subtopicTitle ||
+                          progress.activeSubtopic?.title}
+                      </h3>
                     </div>
 
-                    {/* Short-Answer Evaluation Feedback (if any) */}
-                    {activeLessonTurn.evaluationResult && (
-                      <div
-                        className={`rounded-[--card-radius] border px-4 py-3 text-xs sm:text-sm ${
-                          activeLessonTurn.evaluationResult.passed
-                            ? "border-success-500/40 bg-success-950/35 text-success-200"
-                            : "border-warning-500/40 bg-warning-950/35 text-warning-200"
-                        }`}
+                    {progress.activeSubtopic && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleToggleSkipKnown(progress.activeSubtopic!.id)
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/35 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-200 hover:bg-amber-500/25 transition-colors"
                       >
-                        {activeLessonTurn.evaluationResult.feedback}
+                        <FastForward className="h-3.5 w-3.5" />
+                        <span>I already know this</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Short-Answer Evaluation Feedback (if any) */}
+                  {activeLessonTurn.evaluationResult && (
+                    <div
+                      className={`rounded-xl border px-4 py-3 text-xs sm:text-sm ${
+                        activeLessonTurn.evaluationResult.passed
+                          ? "border-emerald-500/40 bg-emerald-950/35 text-emerald-200"
+                          : "border-amber-500/40 bg-amber-950/35 text-amber-200"
+                      }`}
+                    >
+                      {activeLessonTurn.evaluationResult.feedback}
+                    </div>
+                  )}
+
+                  {/* Lesson Content (Formulas, Step-by-Step, Worked Examples) */}
+                  <StudyMarkdown content={activeLessonTurn.content} />
+
+                  {/* Key Takeaways */}
+                  {activeLessonTurn.keyTakeaways &&
+                    activeLessonTurn.keyTakeaways.length > 0 && (
+                      <div className="rounded-xl border border-primary/25 bg-primary/[0.08] p-3.5 space-y-1.5">
+                        <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-highlight">
+                          Key Takeaways
+                        </div>
+                        <ul className="space-y-1">
+                          {activeLessonTurn.keyTakeaways.map((kt, kIdx) => (
+                            <li
+                              key={kIdx}
+                              className="flex items-start gap-2 text-xs text-zinc-100"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                              <span>{kt}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     )}
 
-                    {/* Lesson Content (Formulas, Step-by-Step, Worked Examples) */}
-                    <StudyMarkdown content={activeLessonTurn.content} />
+                  {/* Visual Diagram */}
+                  {activeLessonTurn.visual && (
+                    <StudyVisualRenderer visual={activeLessonTurn.visual} />
+                  )}
 
-                    {/* Key Takeaways */}
-                    {activeLessonTurn.keyTakeaways &&
-                      activeLessonTurn.keyTakeaways.length > 0 && (
-                        <div className="rounded-[--card-radius] border border-primary-500/25 bg-primary-500/10 p-3.5 space-y-1.5">
-                          <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-primary-300">
-                            Key Takeaways
-                          </div>
-                          <ul className="space-y-1">
-                            {activeLessonTurn.keyTakeaways.map((kt, kIdx) => (
-                              <li
-                                key={kIdx}
-                                className="flex items-start gap-2 text-xs text-body"
-                              >
-                                <CheckCircle2 className="h-3.5 w-3.5 text-primary-400 shrink-0 mt-0.5" />
-                                <span>{kt}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                    {/* Visual Diagram */}
-                    {activeLessonTurn.visual && (
-                      <StudyVisualRenderer visual={activeLessonTurn.visual} />
-                    )}
-
-                    {/* Interactive Question Checkpoint */}
-                    {activeLessonTurn.checkpoint && (
-                      <StudyCheckpointCard
-                        checkpoint={activeLessonTurn.checkpoint}
-                        subtopicTitle={
-                          activeLessonTurn.subtopicTitle ||
-                          progress.activeSubtopic?.title ||
-                          "Current Topic"
-                        }
-                        isLatestTurn={true}
-                        isBusy={isTutorThinking}
-                        onSelectMcqOption={handleSelectMcqOption}
-                        onSubmitShortAnswer={handleSubmitShortAnswer}
-                        onSkipKnown={handleToggleSkipKnown}
-                        onRequestNextLesson={
-                          progress.activeSubtopic && !progress.isComplete
-                            ? () =>
-                                requestTutorTurn({
-                                  currentSyllabus: syllabus,
-                                  actionType: "start_or_continue",
-                                  targetSubtopicId: progress.activeSubtopic!.id,
-                                })
-                            : undefined
-                        }
-                      />
-                    )}
-                  </article>
-                </Card>
+                  {/* Interactive Question Checkpoint */}
+                  {activeLessonTurn.checkpoint && (
+                    <StudyCheckpointCard
+                      checkpoint={activeLessonTurn.checkpoint}
+                      subtopicTitle={
+                        activeLessonTurn.subtopicTitle ||
+                        progress.activeSubtopic?.title ||
+                        "Current Topic"
+                      }
+                      isLatestTurn={true}
+                      isBusy={isTutorThinking}
+                      onSelectMcqOption={handleSelectMcqOption}
+                      onSubmitShortAnswer={handleSubmitShortAnswer}
+                      onSkipKnown={handleToggleSkipKnown}
+                      onRequestNextLesson={
+                        progress.activeSubtopic && !progress.isComplete
+                          ? () =>
+                              requestTutorTurn({
+                                currentSyllabus: syllabus,
+                                actionType: "start_or_continue",
+                                targetSubtopicId: progress.activeSubtopic!.id,
+                              })
+                          : undefined
+                      }
+                    />
+                  )}
+                </article>
               ) : null}
 
               <div ref={streamEndRef} />
 
               {/* Single Clean Bottom Chat Input */}
-              <Card
-                variant="mixed"
-                className="p-2.5 shadow-xl backdrop-blur-2xl"
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendChatMessage();
+                }}
+                className="flex items-center gap-2 rounded-2xl border theme-panel p-2.5 shadow-xl backdrop-blur-2xl"
               >
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSendChatMessage();
-                  }}
-                  className="flex items-center gap-2"
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  disabled={isTutorThinking}
+                  placeholder='Ask a question, ask for more examples, or type "skip"...'
+                  className="flex-1 rounded-xl bg-transparent px-3 py-1.5 text-xs sm:text-sm text-white placeholder:text-white/40 focus:outline-none disabled:opacity-50"
+                />
+                <button
+                  type="submit"
+                  disabled={!chatInput.trim() || isTutorThinking}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-black hover:brightness-110 transition-all disabled:opacity-40 shrink-0"
                 >
-                  <Input
-                    type="text"
-                    variant="plain"
-                    size="sm"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    disabled={isTutorThinking}
-                    placeholder='Ask a question, ask for more examples, or type "skip"...'
-                    className="flex-1 bg-transparent border-0 text-xs sm:text-sm"
-                  />
-                  <Button.Root
-                    type="submit"
-                    variant="solid"
-                    intent="primary"
-                    size="sm"
-                    disabled={!chatInput.trim() || isTutorThinking}
-                    className="shrink-0"
-                  >
-                    <Button.Icon type="leading">
-                      <Send className="h-3.5 w-3.5" />
-                    </Button.Icon>
-                    <Button.Label>Ask</Button.Label>
-                  </Button.Root>
-                </form>
-              </Card>
+                  <Send className="h-3.5 w-3.5" />
+                  <span>Ask</span>
+                </button>
+              </form>
             </div>
           </div>
         </div>

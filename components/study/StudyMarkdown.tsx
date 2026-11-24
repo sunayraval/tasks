@@ -2,7 +2,6 @@
 
 import React from "react";
 import katex from "katex";
-import { Card, Separator, Text, Title } from "@/components/tailus-ui";
 
 interface StudyMarkdownProps {
   content: string;
@@ -53,7 +52,7 @@ export function renderStudyInline(text: string): React.ReactNode[] {
       parts.push(
         <span
           key={`bmath-${match.index}`}
-          className="my-2 block overflow-x-auto rounded-[--card-radius] border border-[--ui-border-color] bg-[--ui-soft-bg] px-3 py-2 text-center text-primary-300"
+          className="my-2 block overflow-x-auto rounded-lg bg-black/35 px-3 py-2 text-center text-highlight"
           dangerouslySetInnerHTML={{ __html: html }}
         />
       );
@@ -68,7 +67,7 @@ export function renderStudyInline(text: string): React.ReactNode[] {
       parts.push(
         <span
           key={`imath-${match.index}`}
-          className="inline-block px-0.5 text-primary-300"
+          className="inline-block px-0.5 text-highlight"
           dangerouslySetInnerHTML={{ __html: html }}
         />
       );
@@ -76,7 +75,7 @@ export function renderStudyInline(text: string): React.ReactNode[] {
       parts.push(
         <strong
           key={`bold-${match.index}`}
-          className="font-semibold text-title"
+          className="font-semibold text-white"
         >
           {token.slice(2, -2)}
         </strong>
@@ -85,14 +84,14 @@ export function renderStudyInline(text: string): React.ReactNode[] {
       parts.push(
         <code
           key={`code-${match.index}`}
-          className="rounded-md bg-[--ui-soft-bg] px-1.5 py-0.5 font-mono text-[12px] text-primary-300 border border-[--ui-border-color]"
+          className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[12px] text-highlight border border-white/10"
         >
           {token.slice(1, -1)}
         </code>
       );
     } else if (token.startsWith("*") && token.endsWith("*")) {
       parts.push(
-        <em key={`em-${match.index}`} className="italic text-body">
+        <em key={`em-${match.index}`} className="italic text-zinc-200">
           {token.slice(1, -1)}
         </em>
       );
@@ -130,7 +129,7 @@ export const StudyMarkdown: React.FC<StudyMarkdownProps> = ({
     // Horizontal rule
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
       blocks.push(
-        <Separator key={`hr-${idx}`} className="my-3" />
+        <hr key={`hr-${idx}`} className="my-3 border-t border-white/10" />
       );
       idx++;
       continue;
@@ -150,10 +149,9 @@ export const StudyMarkdown: React.FC<StudyMarkdownProps> = ({
       }
       const html = renderLatexToHtml(mathLines.join("\n"), true);
       blocks.push(
-        <Card
+        <div
           key={`mathblock-${idx}`}
-          variant="soft"
-          className="my-3 overflow-x-auto px-4 py-3 text-center text-primary-300"
+          className="my-3 overflow-x-auto rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-center text-highlight"
           dangerouslySetInnerHTML={{ __html: html }}
         />
       );
@@ -168,10 +166,9 @@ export const StudyMarkdown: React.FC<StudyMarkdownProps> = ({
     ) {
       const html = renderLatexToHtml(trimmed.slice(2, -2), true);
       blocks.push(
-        <Card
+        <div
           key={`mathsingle-${idx}`}
-          variant="soft"
-          className="my-3 overflow-x-auto px-4 py-3 text-center text-primary-300"
+          className="my-3 overflow-x-auto rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-center text-highlight"
           dangerouslySetInnerHTML={{ __html: html }}
         />
       );
@@ -190,20 +187,19 @@ export const StudyMarkdown: React.FC<StudyMarkdownProps> = ({
       }
       idx++; // skip closing ```
       blocks.push(
-        <Card
+        <div
           key={`code-${idx}`}
-          variant="outlined"
-          className="my-3 overflow-hidden p-0"
+          className="my-3 overflow-hidden rounded-xl border border-white/10 bg-black/55"
         >
           {lang && (
-            <div className="border-b border-[--ui-border-color] bg-[--ui-soft-bg] px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-caption">
+            <div className="border-b border-white/10 bg-white/5 px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-white/60">
               {lang}
             </div>
           )}
-          <pre className="overflow-x-auto p-3.5 font-mono text-xs text-primary-300 leading-relaxed">
+          <pre className="overflow-x-auto p-3.5 font-mono text-xs text-highlight leading-relaxed">
             <code>{codeLines.join("\n")}</code>
           </pre>
-        </Card>
+        </div>
       );
       continue;
     }
@@ -232,29 +228,28 @@ export const StudyMarkdown: React.FC<StudyMarkdownProps> = ({
       }
 
       blocks.push(
-        <Card
+        <div
           key={`table-${idx}`}
-          variant="outlined"
-          className="my-3 overflow-x-auto p-0"
+          className="my-3 overflow-x-auto rounded-xl border border-white/15 bg-black/35"
         >
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-[--ui-border-color] bg-[--ui-soft-bg]">
+              <tr className="border-b border-white/15 bg-white/5">
                 {headers.map((h, hIdx) => (
                   <th
                     key={hIdx}
-                    className="px-3.5 py-2.5 font-semibold text-primary-300"
+                    className="px-3.5 py-2.5 font-semibold text-highlight"
                   >
                     {renderStudyInline(h)}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[--ui-border-color]">
+            <tbody className="divide-y divide-white/10">
               {rows.map((row, rIdx) => (
-                <tr key={rIdx} className="hover:bg-[--ui-soft-bg] transition-colors">
+                <tr key={rIdx} className="hover:bg-white/5 transition-colors">
                   {row.map((cell, cIdx) => (
-                    <td key={cIdx} className="px-3.5 py-2 text-body">
+                    <td key={cIdx} className="px-3.5 py-2 text-zinc-200">
                       {renderStudyInline(cell)}
                     </td>
                   ))}
@@ -262,7 +257,7 @@ export const StudyMarkdown: React.FC<StudyMarkdownProps> = ({
               ))}
             </tbody>
           </table>
-        </Card>
+        </div>
       );
       continue;
     }
@@ -270,15 +265,12 @@ export const StudyMarkdown: React.FC<StudyMarkdownProps> = ({
     // Headings
     if (trimmed.startsWith("### ")) {
       blocks.push(
-        <Title
+        <h4
           key={`h3-${idx}`}
-          as="h4"
-          size="base"
-          weight="bold"
-          className="mt-3.5 mb-1.5 text-sm tracking-tight"
+          className="mt-3.5 mb-1.5 text-sm font-bold text-white tracking-tight"
         >
           {renderStudyInline(trimmed.slice(4))}
-        </Title>
+        </h4>
       );
       idx++;
       continue;
@@ -287,15 +279,12 @@ export const StudyMarkdown: React.FC<StudyMarkdownProps> = ({
     if (trimmed.startsWith("## ") || trimmed.startsWith("# ")) {
       const headingText = trimmed.replace(/^#{1,2}\s+/, "");
       blocks.push(
-        <Title
+        <h3
           key={`h2-${idx}`}
-          as="h3"
-          size="base"
-          weight="bold"
-          className="mt-4 mb-2 text-primary-300 tracking-tight"
+          className="mt-4 mb-2 text-base font-bold text-highlight tracking-tight"
         >
           {renderStudyInline(headingText)}
-        </Title>
+        </h3>
       );
       idx++;
       continue;
@@ -311,7 +300,7 @@ export const StudyMarkdown: React.FC<StudyMarkdownProps> = ({
       blocks.push(
         <blockquote
           key={`quote-${idx}`}
-          className="my-2.5 rounded-r-[--card-radius] border-l-2 border-primary-500 bg-primary-500/10 px-3.5 py-2.5 text-xs sm:text-sm text-body leading-relaxed"
+          className="my-2.5 rounded-r-xl border-l-2 border-primary bg-primary/10 px-3.5 py-2.5 text-xs sm:text-sm text-zinc-200 leading-relaxed"
         >
           {renderStudyInline(quoteLines.join(" "))}
         </blockquote>
@@ -331,9 +320,12 @@ export const StudyMarkdown: React.FC<StudyMarkdownProps> = ({
           {items.map((item, i) => (
             <li
               key={i}
-              className="flex items-start gap-2.5 text-xs sm:text-sm leading-relaxed text-body"
+              className="flex items-start gap-2.5 text-xs sm:text-sm leading-relaxed text-zinc-200"
             >
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-400" />
+              <span
+                className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: "var(--primary)" }}
+              />
               <span className="flex-1">{renderStudyInline(item)}</span>
             </li>
           ))}
@@ -358,9 +350,9 @@ export const StudyMarkdown: React.FC<StudyMarkdownProps> = ({
           {items.map((item, i) => (
             <li
               key={i}
-              className="flex items-start gap-2.5 text-xs sm:text-sm leading-relaxed text-body"
+              className="flex items-start gap-2.5 text-xs sm:text-sm leading-relaxed text-zinc-200"
             >
-              <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[--ui-soft-bg] border border-[--ui-border-color] font-mono text-[11px] font-bold text-primary-300">
+              <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white/10 font-mono text-[11px] font-bold text-highlight">
                 {item.num}
               </span>
               <span className="flex-1">{renderStudyInline(item.text)}</span>
@@ -373,13 +365,12 @@ export const StudyMarkdown: React.FC<StudyMarkdownProps> = ({
 
     // Standard Paragraph
     blocks.push(
-      <Text
+      <p
         key={`p-${idx}`}
-        size="sm"
-        className="my-2 text-xs sm:text-sm leading-relaxed text-body"
+        className="my-2 text-xs sm:text-sm leading-relaxed text-zinc-200"
       >
         {renderStudyInline(trimmed)}
-      </Text>
+      </p>
     );
     idx++;
   }

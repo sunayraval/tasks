@@ -37,16 +37,6 @@ import {
   Trophy,
   X,
 } from "lucide-react";
-import {
-  Badge,
-  Button,
-  Card,
-  Input,
-  Progress,
-  Tabs,
-  Text,
-  Title,
-} from "@/components/tailus-ui";
 
 const LOCAL_JOURNEY_STORAGE_KEY = "kite_my_journey_v1";
 
@@ -1029,52 +1019,35 @@ export const MyJourneyView: React.FC<MyJourneyViewProps> = ({
       {/* LEFT COLUMN: Clean Visual Milestone Journey Canvas               */}
       {/* ================================================================ */}
       <section aria-label="My Journey Visual Roadmap" className="min-w-0 space-y-5">
-        {/* Clean Tailus Header Card */}
-        <Card
-          variant="mixed"
-          fancy
-          className="relative overflow-hidden backdrop-blur-md"
-        >
+        {/* Clean Header Card */}
+        <div className="relative overflow-hidden rounded-2xl border theme-panel p-5 sm:p-6 backdrop-blur-md">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               {/* Top tiny label + Journey switcher */}
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <Badge
-                  variant="soft"
-                  intent="primary"
-                  size="xs"
-                  className="inline-flex items-center gap-1.5 rounded-full font-mono font-semibold uppercase tracking-wider"
-                >
-                  <Compass className="size-3" />
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/35 bg-primary/15 px-2.5 py-0.5 text-[10.5px] font-mono font-semibold uppercase tracking-wider text-highlight">
+                  <Compass className="w-3 h-3 text-primary" />
                   my journey
-                </Badge>
+                </span>
 
                 {/* Multi-journey switcher dropdown */}
                 <div className="relative" ref={switcherRef}>
-                  <Button.Root
-                    variant="outlined"
-                    intent="gray"
-                    size="xs"
+                  <button
+                    type="button"
                     onClick={() => setJourneySwitcherOpen((v) => !v)}
-                    className="h-6 rounded-full px-2.5 gap-1 text-[11px]"
+                    className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 hover:bg-white/10 px-2.5 py-0.5 text-[11px] font-medium text-white/70 hover:text-white transition-colors"
                   >
-                    <Button.Label>
+                    <span>
                       {journeys.length > 1
                         ? `Journeys (${journeys.length})`
                         : "Switch / New"}
-                    </Button.Label>
-                    <Button.Icon type="trailing" size="xs">
-                      <ChevronDown className="opacity-60" />
-                    </Button.Icon>
-                  </Button.Root>
+                    </span>
+                    <ChevronDown className="w-3 h-3 opacity-60" />
+                  </button>
 
                   {journeySwitcherOpen && (
-                    <Card
-                      variant="elevated"
-                      fancy
-                      className="absolute left-0 mt-1.5 w-64 p-1.5 shadow-2xl z-40 backdrop-blur-2xl"
-                    >
-                      <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-caption">
+                    <div className="absolute left-0 mt-1.5 w-64 rounded-xl border theme-popover p-1.5 shadow-2xl z-40">
+                      <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/45">
                         Your Journeys
                       </div>
                       {journeys.map((j) => {
@@ -1083,10 +1056,10 @@ export const MyJourneyView: React.FC<MyJourneyViewProps> = ({
                         return (
                           <div
                             key={j.id}
-                            className={`flex items-center justify-between gap-1 rounded-[--btn-radius] px-2 py-1.5 text-xs transition-colors ${
+                            className={`flex items-center justify-between gap-1 rounded-lg px-2 py-1.5 text-xs transition-colors ${
                               selected
-                                ? "bg-primary-500/15 text-primary-300 font-semibold border border-primary-500/40"
-                                : "text-body hover:bg-[--ui-soft-bg] hover:text-title"
+                                ? "bg-primary/20 text-highlight font-semibold border border-primary/40"
+                                : "text-white/75 hover:bg-white/10 hover:text-white"
                             }`}
                           >
                             <button
@@ -1099,46 +1072,38 @@ export const MyJourneyView: React.FC<MyJourneyViewProps> = ({
                               className="flex-1 text-left truncate"
                             >
                               {j.title}
-                              <span className="ml-1.5 text-[10px] font-mono text-caption">
+                              <span className="ml-1.5 text-[10px] font-mono text-white/45">
                                 ({prog.completed}/{prog.total})
                               </span>
                             </button>
                             {journeys.length > 1 && (
-                              <Button.Root
-                                variant="ghost"
-                                intent="danger"
-                                size="xs"
+                              <button
+                                type="button"
                                 onClick={() => handleDeleteJourney(j.id)}
                                 title="Delete journey"
-                                className="h-6 w-6"
+                                className="p-1 text-white/35 hover:text-rose-400"
                               >
-                                <Button.Icon type="only" size="xs">
-                                  <Trash2 />
-                                </Button.Icon>
-                              </Button.Root>
+                                <Trash2 className="w-3 h-3" />
+                              </button>
                             )}
                           </div>
                         );
                       })}
-                      <div className="my-1 border-t border-[--ui-border-color]" />
-                      <Button.Root
-                        variant="ghost"
-                        intent="primary"
-                        size="xs"
+                      <div className="my-1 border-t border-white/10" />
+                      <button
+                        type="button"
                         onClick={handleCreateNewJourney}
-                        className="w-full justify-start"
+                        className="w-full flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15 transition-colors"
                       >
-                        <Button.Icon type="leading" size="xs">
-                          <Plus />
-                        </Button.Icon>
-                        <Button.Label>New Journey</Button.Label>
-                      </Button.Root>
-                    </Card>
+                        <Plus className="w-3.5 h-3.5" />
+                        New Journey
+                      </button>
+                    </div>
                   )}
                 </div>
 
                 {horizonLabel && (
-                  <span className="text-[11px] font-mono text-caption">
+                  <span className="text-[11px] font-mono text-white/45">
                     {horizonLabel}
                   </span>
                 )}
@@ -1150,119 +1115,95 @@ export const MyJourneyView: React.FC<MyJourneyViewProps> = ({
                   onSubmit={handleSaveHeaderEdit}
                   className="space-y-2 mt-1 max-w-xl"
                 >
-                  <Input
+                  <input
                     type="text"
                     autoFocus
-                    variant="outlined"
-                    size="lg"
                     value={headerTitleDraft}
                     onChange={(e) => setHeaderTitleDraft(e.target.value)}
                     placeholder="Journey title..."
-                    className="font-bold"
+                    className="w-full rounded-xl border theme-input px-3 py-1.5 text-lg font-bold focus:outline-none"
                   />
-                  <Input
+                  <input
                     type="text"
-                    variant="outlined"
-                    size="sm"
                     value={headerVisionDraft}
                     onChange={(e) => setHeaderVisionDraft(e.target.value)}
                     placeholder="1-line overarching vision..."
+                    className="w-full rounded-xl border theme-input px-3 py-1.5 text-xs text-white/85 focus:outline-none"
                   />
                   <div className="flex items-center gap-2">
-                    <Button.Root
+                    <button
                       type="submit"
-                      variant="solid"
-                      intent="primary"
-                      size="xs"
-                      className="font-semibold"
+                      className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1 text-xs font-bold text-zinc-950"
                     >
-                      <Button.Icon type="leading" size="xs">
-                        <Check />
-                      </Button.Icon>
-                      <Button.Label>Save</Button.Label>
-                    </Button.Root>
-                    <Button.Root
-                      variant="outlined"
-                      intent="gray"
-                      size="xs"
+                      <Check className="w-3.5 h-3.5" />
+                      Save
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setEditingHeader(false)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-xs text-white/70 hover:text-white"
                     >
-                      <Button.Icon type="leading" size="xs">
-                        <X />
-                      </Button.Icon>
-                      <Button.Label>Cancel</Button.Label>
-                    </Button.Root>
+                      <X className="w-3.5 h-3.5" />
+                      Cancel
+                    </button>
                   </div>
                 </form>
               ) : (
                 <div className="group/title">
                   <div className="flex items-center gap-2">
-                    <Title
-                      as="h1"
-                      size="2xl"
-                      weight="bold"
-                      className="tracking-tight leading-tight truncate"
-                    >
+                    <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white leading-tight truncate">
                       {activeJourney.title}
-                    </Title>
-                    <Button.Root
-                      variant="ghost"
-                      intent="gray"
-                      size="xs"
+                    </h1>
+                    <button
+                      type="button"
                       onClick={() => {
                         setHeaderTitleDraft(activeJourney.title);
                         setHeaderVisionDraft(activeJourney.vision);
                         setEditingHeader(true);
                       }}
                       title="Edit journey title & vision"
-                      className="opacity-0 group-hover/title:opacity-100 h-7 w-7"
+                      className="opacity-0 group-hover/title:opacity-100 rounded-lg p-1 text-white/45 hover:text-white hover:bg-white/10 transition-all"
                     >
-                      <Button.Icon type="only" size="xs">
-                        <Pencil />
-                      </Button.Icon>
-                    </Button.Root>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <Text size="sm" className="mt-1 text-caption leading-relaxed max-w-2xl">
+                  <p className="mt-1 text-xs sm:text-sm text-white/65 leading-relaxed max-w-2xl">
                     {activeJourney.vision}
-                  </Text>
+                  </p>
                 </div>
               )}
             </div>
 
             {/* Right: Progress Summary + Manual Add Button */}
             <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2.5 shrink-0">
-              <Button.Root
-                variant="solid"
-                intent="primary"
-                size="sm"
+              <button
+                type="button"
                 onClick={() => {
                   setEditingMilestone(null);
                   setEditorOpen(true);
                 }}
-                className="font-semibold"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-zinc-950 hover:opacity-90 transition-all shadow-lg"
               >
-                <Button.Icon type="leading" size="xs">
-                  <Plus className="stroke-[2.5]" />
-                </Button.Icon>
-                <Button.Label>Add Milestone</Button.Label>
-              </Button.Root>
+                <Plus className="w-4 h-4" strokeWidth={2.6} />
+                Add Milestone
+              </button>
 
               {progress.total > 0 && (
                 <div className="flex items-center gap-2 text-xs">
                   <Trophy
-                    className={`size-3.5 ${
+                    className={`w-3.5 h-3.5 ${
                       progress.percentage === 100
-                        ? "text-success-400"
-                        : "text-primary-400"
+                        ? "text-emerald-400"
+                        : "text-primary/80"
                     }`}
                   />
-                  <span className="font-mono font-semibold text-title">
+                  <span className="font-mono font-semibold text-white/90">
                     {progress.completed}/{progress.total}
                   </span>
-                  <span className="text-caption">reached</span>
-                  <Badge variant="soft" intent="primary" size="xs" className="font-mono">
+                  <span className="text-white/50">reached</span>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10.5px] font-mono text-highlight">
                     {progress.percentage}%
-                  </Badge>
+                  </span>
                 </div>
               )}
             </div>
@@ -1270,7 +1211,7 @@ export const MyJourneyView: React.FC<MyJourneyViewProps> = ({
 
           {/* Sleek thin progress bar hugging bottom edge of header */}
           {progress.total > 0 && (
-            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gray-800">
+            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/10">
               <motion.div
                 className="h-full"
                 initial={false}
@@ -1285,55 +1226,42 @@ export const MyJourneyView: React.FC<MyJourneyViewProps> = ({
               />
             </div>
           )}
-        </Card>
+        </div>
 
-        {/* Minimal Filter Row via Tailus Tabs (only shown when milestones exist) */}
+        {/* Minimal Filter Row (only shown when milestones exist) */}
         {activeJourney.milestones.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-            <Tabs.Root
-              value={statusFilter}
-              onValueChange={(v) =>
-                setStatusFilter(v as "all" | "active" | "completed")
-              }
-            >
-              <Tabs.List
-                variant="soft"
-                triggerVariant="softToSoft"
-                size="sm"
-                intent="primary"
-                className="border border-[--ui-border-color] bg-[--ui-soft-bg]/90 p-0.5 backdrop-blur-md"
-              >
-                {(
-                  [
-                    { id: "all", label: `All (${progress.total})` },
-                    {
-                      id: "active",
-                      label: `Active (${progress.upcoming + progress.inProgress})`,
-                    },
-                    { id: "completed", label: `Reached (${progress.completed})` },
-                  ] as const
-                ).map((tab) => (
-                  <Tabs.Trigger
-                    key={tab.id}
-                    value={tab.id}
-                    className="px-3 text-[11px] font-semibold data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
-                  >
-                    {tab.label}
-                  </Tabs.Trigger>
-                ))}
-              </Tabs.List>
-            </Tabs.Root>
+            <div className="inline-flex items-center rounded-full border border-white/12 bg-black/30 p-0.5 backdrop-blur-md">
+              {(
+                [
+                  { id: "all", label: `All (${progress.total})` },
+                  {
+                    id: "active",
+                    label: `Active (${progress.upcoming + progress.inProgress})`,
+                  },
+                  { id: "completed", label: `Reached (${progress.completed})` },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={`rounded-full px-3 py-1 text-[11px] font-semibold transition-all ${
+                    statusFilter === tab.id
+                      ? "bg-white/15 text-white shadow-sm"
+                      : "text-white/55 hover:text-white"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
             {isExecutingSequence && (
-              <Badge
-                variant="soft"
-                intent="primary"
-                size="sm"
-                className="inline-flex items-center gap-1.5 rounded-full"
-              >
-                <Sparkles className="size-3 animate-pulse" />
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/45 bg-primary/15 px-3 py-1 text-[11px] font-semibold text-highlight">
+                <Sparkles className="w-3 h-3 animate-pulse text-primary" />
                 Agent is placing milestones sequentially...
-              </Badge>
+              </span>
             )}
           </div>
         )}
@@ -1342,93 +1270,77 @@ export const MyJourneyView: React.FC<MyJourneyViewProps> = ({
         {/* MAIN VISUAL MILESTONE PATH OR CLEAN EMPTY STATE                */}
         {/* ============================================================== */}
         {activeJourney.milestones.length === 0 ? (
-          <Card
-            variant="mixed"
-            fancy
-            className="p-8 sm:p-10 text-center backdrop-blur-xl"
-          >
+          <div className="rounded-2xl border theme-panel p-8 sm:p-10 text-center backdrop-blur-xl">
             {/* Minimalist vertical path illustration */}
             <div
               className="mx-auto mb-6 flex flex-col items-center gap-2 select-none"
               aria-hidden="true"
             >
-              <div className="size-3.5 rounded-full bg-success-400/80 shadow-[0_0_12px_rgba(52,211,153,0.6)]" />
-              <div className="h-6 w-px bg-gradient-to-b from-success-400/70 to-primary-500/60" />
-              <div className="size-5 rounded-full border-2 border-primary-500 bg-primary-500/20 flex items-center justify-center">
-                <div className="size-1.5 rounded-full bg-primary-400" />
+              <div className="h-3.5 w-3.5 rounded-full bg-emerald-400/80 shadow-[0_0_12px_rgba(52,211,153,0.6)]" />
+              <div className="h-6 w-px bg-gradient-to-b from-emerald-400/70 to-primary/60" />
+              <div className="h-5 w-5 rounded-full border-2 border-primary bg-primary/20 shadow-[0_0_18px_color-mix(in_srgb,var(--primary)_60%,transparent)] flex items-center justify-center">
+                <div className="h-1.5 w-1.5 rounded-full bg-primary" />
               </div>
-              <div className="h-6 w-px border-l border-dashed border-[--ui-border-color]" />
-              <div className="size-3.5 rounded-full border border-[--ui-border-color] bg-[--ui-soft-bg]" />
+              <div className="h-6 w-px border-l border-dashed border-white/25" />
+              <div className="h-3.5 w-3.5 rounded-full border border-white/30 bg-white/5" />
             </div>
 
-            <Title as="h2" size="xl" weight="bold" align="center">
+            <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
               Map the big milestones you want to accomplish
-            </Title>
-            <Text size="sm" align="center" className="mt-2 mx-auto max-w-md text-caption leading-relaxed">
+            </h2>
+            <p className="mt-2 mx-auto max-w-md text-xs sm:text-sm text-white/60 leading-relaxed">
               Set milestones yourself or describe your vision to the{" "}
-              <span className="text-primary-300 font-semibold">
-                Journey Agent
-              </span>{" "}
+              <span className="text-highlight font-semibold">Journey Agent</span>{" "}
               on the right — it will place them onto your timeline one by one.
-            </Text>
+            </p>
 
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <Button.Root
-                variant="solid"
-                intent="primary"
-                size="sm"
+              <button
+                type="button"
                 onClick={() => {
                   setEditingMilestone(null);
                   setEditorOpen(true);
                 }}
-                className="font-semibold"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-zinc-950 hover:opacity-90 transition-all shadow-lg"
               >
-                <Button.Icon type="leading" size="xs">
-                  <Flag />
-                </Button.Icon>
-                <Button.Label>Set Your First Milestone</Button.Label>
-              </Button.Root>
+                <Flag className="w-3.5 h-3.5" />
+                Set Your First Milestone
+              </button>
               {hasApiKey && (
-                <Button.Root
-                  variant="outlined"
-                  intent="gray"
-                  size="sm"
+                <button
+                  type="button"
                   onClick={() =>
                     handleSendAgentMessage(
                       "Help me build a clean 4-milestone personal & career roadmap for the next 12 months."
                     )
                   }
                   disabled={isThinking || isExecutingSequence}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 px-4 py-2.5 text-xs font-semibold text-white/90 transition-all"
                 >
-                  <Button.Icon type="leading" size="xs">
-                    <Sparkles className="text-primary-400" />
-                  </Button.Icon>
-                  <Button.Label>Let Agent Draft Example Path</Button.Label>
-                </Button.Root>
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                  Let Agent Draft Example Path
+                </button>
               )}
             </div>
-          </Card>
+          </div>
         ) : visibleMilestones.length === 0 ? (
-          <Card variant="mixed" fancy className="p-8 text-center backdrop-blur-xl">
-            <Text size="sm" align="center" className="text-body font-medium">
+          <div className="rounded-2xl border theme-panel p-8 text-center backdrop-blur-xl">
+            <p className="text-sm font-medium text-white/75">
               No milestones match this filter.
-            </Text>
-            <div className="mt-3 flex justify-center">
-              <Button.Root
-                variant="outlined"
-                intent="gray"
-                size="xs"
-                onClick={() => setStatusFilter("all")}
-              >
-                <Button.Label>Show all milestones</Button.Label>
-              </Button.Root>
-            </div>
-          </Card>
+            </p>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("all")}
+              className="mt-3 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15"
+            >
+              Show all milestones
+            </button>
+          </div>
         ) : (
           <div className="relative pb-6">
             {/* Continuous Background Vertical Spine Track (aligned to 40px node center = left-[19px]) */}
             <div
-              className="pointer-events-none absolute left-[19px] top-9 bottom-12 w-[2px] rounded-full bg-gray-800 overflow-hidden"
+              className="pointer-events-none absolute left-[19px] top-9 bottom-12 w-[2px] rounded-full bg-white/12 overflow-hidden"
               aria-hidden="true"
             >
               {/* Animated Progress Glow Fill along the spine */}
@@ -1484,25 +1396,21 @@ export const MyJourneyView: React.FC<MyJourneyViewProps> = ({
                   setEditingMilestone(null);
                   setEditorOpen(true);
                 }}
-                className="relative z-10 flex size-10 items-center justify-center rounded-full border border-dashed border-[--ui-border-color] bg-[--ui-bg] text-caption hover:border-primary-500 hover:text-primary-400 hover:bg-primary-500/15 transition-all"
+                className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full border border-dashed border-white/25 bg-black/45 text-white/60 hover:border-primary hover:text-primary hover:bg-primary/15 transition-all"
                 title="Add next milestone"
               >
-                <Plus className="size-4" />
+                <Plus className="w-4 h-4" />
               </button>
-              <Button.Root
-                variant="ghost"
-                intent="gray"
-                size="xs"
+              <button
+                type="button"
                 onClick={() => {
                   setEditingMilestone(null);
                   setEditorOpen(true);
                 }}
-                className="text-caption hover:text-primary-300"
+                className="text-xs font-semibold text-white/50 hover:text-highlight transition-colors"
               >
-                <Button.Label>
-                  + Add next milestone to your journey
-                </Button.Label>
-              </Button.Root>
+                + Add next milestone to your journey
+              </button>
             </div>
           </div>
         )}

@@ -4,13 +4,6 @@ import React, { useEffect, useState, useId } from "react";
 import { StudyVisualPayload } from "@/types/study";
 import { renderStudyInline } from "@/components/study/StudyMarkdown";
 import {
-  Card,
-  Badge,
-  Button,
-  Caption,
-  Text,
-} from "@/components/tailus-ui";
-import {
   Code2,
   Eye,
   GitBranch,
@@ -50,15 +43,15 @@ class VisualErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <Card variant="outlined" className="my-3 p-4 text-xs text-body">
-          <div className="flex items-center gap-2 font-semibold text-primary-300">
-            <Layers className="h-4 w-4 text-primary-400" />
+        <div className="my-3 rounded-xl border border-white/15 bg-black/40 p-4 text-xs text-zinc-300">
+          <div className="flex items-center gap-2 font-semibold text-highlight">
+            <Layers className="h-4 w-4 text-primary" />
             <span>{this.props.fallbackTitle || "Concept Visual"}</span>
           </div>
-          <Caption className="mt-1">
+          <p className="mt-1 text-white/65">
             Visual diagram simplified to text view due to complex formatting.
-          </Caption>
-        </Card>
+          </p>
+        </div>
       );
     }
     return this.props.children;
@@ -163,52 +156,48 @@ const MermaidDiagramBlock: React.FC<{
   return (
     <div className="space-y-2.5">
       <div className="flex items-center justify-end gap-2">
-        <Button.Root
+        <button
           type="button"
-          variant="soft"
-          intent="gray"
-          size="xs"
           onClick={() => setShowSource((v) => !v)}
+          className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-white/65 hover:text-white hover:border-white/25 transition-colors"
         >
-          <Button.Icon type="leading">
-            {showSource ? (
-              <Eye className="h-3 w-3 text-primary-400" />
-            ) : (
-              <Code2 className="h-3 w-3 text-primary-400" />
-            )}
-          </Button.Icon>
-          <Button.Label>
-            {showSource ? "Diagram View" : "Mermaid Source"}
-          </Button.Label>
-        </Button.Root>
+          {showSource ? (
+            <>
+              <Eye className="h-3 w-3 text-primary" />
+              <span>Diagram View</span>
+            </>
+          ) : (
+            <>
+              <Code2 className="h-3 w-3 text-primary" />
+              <span>Mermaid Source</span>
+            </>
+          )}
+        </button>
       </div>
 
       {showSource ? (
-        <pre className="overflow-x-auto rounded-[--card-radius] border border-[--ui-border-color] bg-[--ui-bg] p-3.5 font-mono text-xs text-primary-300">
+        <pre className="overflow-x-auto rounded-xl border border-white/10 bg-black/60 p-3.5 font-mono text-xs text-highlight">
           <code>{code}</code>
         </pre>
       ) : svgHtml && !renderFailed ? (
         <div
-          className="flex items-center justify-center overflow-x-auto rounded-[--card-radius] bg-[--ui-soft-bg] border border-[--ui-border-color] p-4 [&_svg]:max-w-full [&_svg]:h-auto"
+          className="flex items-center justify-center overflow-x-auto rounded-xl bg-black/35 p-4 [&_svg]:max-w-full [&_svg]:h-auto"
           dangerouslySetInnerHTML={{ __html: svgHtml }}
         />
       ) : renderFailed ? (
         /* Graceful structured visual flow fallback if Mermaid syntax had an issue */
-        <div className="rounded-[--card-radius] border border-[--ui-border-color] bg-[--ui-soft-bg] p-4">
-          <div className="mb-2.5 text-[11px] font-mono uppercase tracking-wider text-caption">
+        <div className="rounded-xl border border-white/10 bg-black/35 p-4">
+          <div className="mb-2.5 text-[11px] font-mono uppercase tracking-wider text-white/55">
             Structured Flow Breakdown — {title}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {fallbackSteps.map((step, idx) => (
               <React.Fragment key={idx}>
-                <Card
-                  variant="outlined"
-                  className="px-3 py-2 text-xs font-medium text-title border-primary-500/35 bg-primary-500/10"
-                >
+                <div className="rounded-xl border border-primary/35 bg-primary/10 px-3 py-2 text-xs font-medium text-white shadow-sm">
                   {step}
-                </Card>
+                </div>
                 {idx < fallbackSteps.length - 1 && (
-                  <span className="font-mono text-sm font-bold text-primary-400">
+                  <span className="font-mono text-sm font-bold text-primary">
                     →
                   </span>
                 )}
@@ -217,9 +206,9 @@ const MermaidDiagramBlock: React.FC<{
           </div>
         </div>
       ) : (
-        <Caption className="flex items-center justify-center py-8">
+        <div className="flex items-center justify-center py-8 text-xs text-white/50">
           Rendering interactive diagram...
-        </Caption>
+        </div>
       )}
     </div>
   );
@@ -240,7 +229,7 @@ const SafeInlineSvgBlock: React.FC<{ svgCode: string; title: string }> = ({
 
   if (!sanitized) {
     return (
-      <div className="rounded-[--card-radius] border border-[--ui-border-color] bg-[--ui-soft-bg] p-4 text-xs text-caption">
+      <div className="rounded-xl border border-white/10 bg-black/35 p-4 text-xs text-white/70">
         Visual diagram: {title}
       </div>
     );
@@ -248,7 +237,7 @@ const SafeInlineSvgBlock: React.FC<{ svgCode: string; title: string }> = ({
 
   return (
     <div
-      className="flex items-center justify-center overflow-x-auto rounded-[--card-radius] bg-[--ui-soft-bg] border border-[--ui-border-color] p-4 [&_svg]:max-w-full [&_svg]:max-h-[340px] [&_svg]:w-auto [&_svg]:h-auto"
+      className="flex items-center justify-center overflow-x-auto rounded-xl bg-black/40 p-4 [&_svg]:max-w-full [&_svg]:max-h-[340px] [&_svg]:w-auto [&_svg]:h-auto"
       dangerouslySetInnerHTML={{ __html: sanitized }}
     />
   );
@@ -270,44 +259,34 @@ export const StudyVisualRenderer: React.FC<{
 
   return (
     <VisualErrorBoundary fallbackTitle={visual.title}>
-      <Card
-        variant="mixed"
-        className={`my-3.5 overflow-hidden p-0 transition-all ${
-          expanded ? "ring-1 ring-primary-500/50" : ""
+      <div
+        className={`my-3.5 overflow-hidden rounded-2xl border border-white/15 bg-black/45 shadow-lg transition-all ${
+          expanded ? "ring-1 ring-primary/50" : ""
         }`}
       >
         {/* Visual Header */}
-        <div className="flex items-center justify-between gap-2 border-b border-[--ui-border-color] bg-[--ui-soft-bg] px-4 py-2.5">
+        <div className="flex items-center justify-between gap-2 border-b border-white/10 bg-white/[0.04] px-4 py-2.5">
           <div className="flex items-center gap-2 min-w-0">
-            <Badge
-              variant="soft"
-              intent="primary"
-              size="xs"
-              className="gap-1.5 font-mono uppercase tracking-wider shrink-0"
-            >
-              <IconComp className="h-3 w-3" />
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/35 bg-primary/15 px-2.5 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-highlight shrink-0">
+              <IconComp className="h-3 w-3 text-primary" />
               {badgeMeta.label}
-            </Badge>
-            <h5 className="truncate text-xs sm:text-sm font-bold text-title">
+            </span>
+            <h5 className="truncate text-xs sm:text-sm font-bold text-white">
               {visual.title}
             </h5>
           </div>
-          <Button.Root
+          <button
             type="button"
-            variant="ghost"
-            intent="gray"
-            size="xs"
             onClick={() => setExpanded((v) => !v)}
+            className="rounded-lg p-1 text-white/50 hover:bg-white/10 hover:text-white transition-colors shrink-0"
             title={expanded ? "Compact view" : "Expand visual"}
           >
-            <Button.Icon type="only">
-              {expanded ? (
-                <Minimize2 className="h-3.5 w-3.5" />
-              ) : (
-                <Maximize2 className="h-3.5 w-3.5" />
-              )}
-            </Button.Icon>
-          </Button.Root>
+            {expanded ? (
+              <Minimize2 className="h-3.5 w-3.5" />
+            ) : (
+              <Maximize2 className="h-3.5 w-3.5" />
+            )}
+          </button>
         </div>
 
         {/* Visual Body */}
@@ -329,33 +308,33 @@ export const StudyVisualRenderer: React.FC<{
           {visual.type === "comparison_table" &&
             visual.tableHeaders &&
             visual.tableRows && (
-              <div className="overflow-x-auto rounded-[--card-radius] border border-[--ui-border-color] bg-[--ui-bg]">
+              <div className="overflow-x-auto rounded-xl border border-white/10 bg-black/35">
                 <table className="w-full text-left text-xs sm:text-sm border-collapse">
                   <thead>
-                    <tr className="border-b border-[--ui-border-color] bg-[--ui-soft-bg]">
+                    <tr className="border-b border-white/15 bg-white/[0.06]">
                       {visual.tableHeaders.map((header, idx) => (
                         <th
                           key={idx}
-                          className="px-3.5 py-2.5 font-semibold text-primary-300"
+                          className="px-3.5 py-2.5 font-semibold text-highlight"
                         >
                           {renderStudyInline(header)}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[--ui-border-color]">
+                  <tbody className="divide-y divide-white/10">
                     {visual.tableRows.map((row, rIdx) => (
                       <tr
                         key={rIdx}
-                        className="hover:bg-[--ui-soft-bg] transition-colors"
+                        className="hover:bg-white/[0.04] transition-colors"
                       >
                         {row.map((cell, cIdx) => (
                           <td
                             key={cIdx}
                             className={`px-3.5 py-2.5 leading-relaxed ${
                               cIdx === 0
-                                ? "font-semibold text-title"
-                                : "text-body"
+                                ? "font-semibold text-white"
+                                : "text-zinc-200"
                             }`}
                           >
                             {renderStudyInline(cell)}
@@ -371,56 +350,53 @@ export const StudyVisualRenderer: React.FC<{
           {visual.type === "visual_cards" && visual.cards && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {visual.cards.map((card, idx) => (
-                <Card
+                <div
                   key={idx}
-                  variant="soft"
-                  className="flex flex-col justify-between p-3.5"
+                  className="flex flex-col justify-between rounded-xl border border-white/12 bg-white/[0.03] p-3.5"
                 >
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-2">
-                      <h6 className="text-xs sm:text-sm font-bold text-title">
+                      <h6 className="text-xs sm:text-sm font-bold text-white">
                         {renderStudyInline(card.title)}
                       </h6>
                       {card.badge && (
-                        <Badge
-                          variant="soft"
-                          intent="primary"
-                          size="xs"
-                          className="font-mono"
-                        >
+                        <span className="rounded-full border border-primary/30 bg-primary/15 px-2 py-0.5 text-[10px] font-mono text-highlight">
                           {card.badge}
-                        </Badge>
+                        </span>
                       )}
                     </div>
                     <ul className="space-y-1.5">
                       {card.points.map((pt, pIdx) => (
                         <li
                           key={pIdx}
-                          className="flex items-start gap-2 text-xs text-body leading-relaxed"
+                          className="flex items-start gap-2 text-xs text-zinc-200 leading-relaxed"
                         >
-                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-400" />
+                          <span
+                            className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: "var(--primary)" }}
+                          />
                           <span>{renderStudyInline(pt)}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
                   {card.highlight && (
-                    <div className="mt-3 rounded-[--badge-radius] border border-primary-500/25 bg-primary-500/10 px-2.5 py-1.5 text-[11px] font-medium text-primary-300">
+                    <div className="mt-3 rounded-lg border border-primary/25 bg-primary/10 px-2.5 py-1.5 text-[11px] font-medium text-highlight">
                       {renderStudyInline(card.highlight)}
                     </div>
                   )}
-                </Card>
+                </div>
               ))}
             </div>
           )}
 
           {visual.caption && (
-            <Caption className="mt-2.5 text-center italic block">
+            <p className="mt-2.5 text-center text-[11px] italic text-white/60">
               {renderStudyInline(visual.caption)}
-            </Caption>
+            </p>
           )}
         </div>
-      </Card>
+      </div>
     </VisualErrorBoundary>
   );
 };

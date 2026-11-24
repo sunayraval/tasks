@@ -18,7 +18,6 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { Button, Card, Input, Title } from "@/components/tailus-ui";
 
 interface StudySyllabusSidebarProps {
   syllabus: StudySyllabus;
@@ -77,34 +76,28 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
   };
 
   return (
-    <Card
-      variant="mixed"
-      fancy
+    <aside
       aria-label="Study Syllabus"
-      className="p-0 flex flex-col backdrop-blur-2xl overflow-hidden"
+      className="flex flex-col rounded-2xl border theme-panel backdrop-blur-2xl overflow-hidden"
     >
       {/* Simple Header */}
-      <div className="flex items-center justify-between border-b border-[--ui-border-color] px-4 py-3 bg-[--ui-soft-bg]/50">
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <div>
-          <Title as="h3" size="base" weight="semibold" className="text-xs uppercase tracking-wider">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-white">
             Syllabus Outline
-          </Title>
-          <p className="text-[11px] text-caption">
+          </h3>
+          <p className="text-[11px] text-white/50">
             {progress.completedCount} of {progress.totalActive} completed
           </p>
         </div>
-        <Button.Root
-          variant="outlined"
-          intent="gray"
-          size="xs"
+        <button
+          type="button"
           onClick={() => setShowAddModule((v) => !v)}
-          className="h-7 px-2.5 text-[11px]"
+          className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/80 hover:text-white hover:border-primary/40 transition-colors"
         >
-          <Button.Icon type="leading" size="xs">
-            <Plus className="text-primary-400" />
-          </Button.Icon>
-          <Button.Label>Add Section</Button.Label>
-        </Button.Root>
+          <Plus className="h-3 w-3 text-primary" />
+          <span>Add Section</span>
+        </button>
       </div>
 
       {showAddModule && (
@@ -116,27 +109,22 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
             setNewModuleTitle("");
             setShowAddModule(false);
           }}
-          className="border-b border-[--ui-border-color] bg-[--ui-soft-bg]/50 p-3 flex items-center gap-2"
+          className="border-b border-white/10 bg-black/40 p-3 flex items-center gap-2"
         >
-          <Input
+          <input
             type="text"
-            variant="outlined"
-            size="sm"
             value={newModuleTitle}
             onChange={(e) => setNewModuleTitle(e.target.value)}
             placeholder="New section title..."
             autoFocus
-            className="flex-1"
+            className="flex-1 rounded-lg border border-white/15 bg-black/60 px-2.5 py-1.5 text-xs text-white focus:border-primary focus:outline-none"
           />
-          <Button.Root
+          <button
             type="submit"
-            variant="solid"
-            intent="primary"
-            size="sm"
-            className="font-semibold"
+            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-black"
           >
-            <Button.Label>Add</Button.Label>
-          </Button.Root>
+            Add
+          </button>
         </form>
       )}
 
@@ -151,10 +139,8 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
               <div className="group flex items-center justify-between gap-2 px-1">
                 {isEditingMod ? (
                   <div className="flex items-center gap-1 flex-1">
-                    <Input
+                    <input
                       type="text"
-                      variant="outlined"
-                      size="sm"
                       value={editingText}
                       onChange={(e) => setEditingText(e.target.value)}
                       onKeyDown={(e) => {
@@ -167,26 +153,23 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
                         if (e.key === "Escape") setEditingId(null);
                       }}
                       autoFocus
-                      className="h-7 text-xs font-semibold"
+                      className="w-full rounded border border-primary bg-black/80 px-2 py-0.5 text-xs font-bold text-white focus:outline-none"
                     />
-                    <Button.Root
-                      variant="ghost"
-                      intent="primary"
-                      size="xs"
+                    <button
+                      type="button"
                       onClick={() => {
                         if (editingText.trim()) {
                           onRenameModule(mod.id, editingText.trim());
                         }
                         setEditingId(null);
                       }}
+                      className="p-1 text-primary"
                     >
-                      <Button.Icon type="only" size="xs">
-                        <Check />
-                      </Button.Icon>
-                    </Button.Root>
+                      <Check className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 ) : (
-                  <h4 className="text-xs font-semibold text-title truncate">
+                  <h4 className="text-xs font-bold text-white/85 truncate">
                     {mod.title}
                   </h4>
                 )}
@@ -195,10 +178,10 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
                   <button
                     type="button"
                     onClick={(e) => startEdit(mod.id, mod.title, e)}
-                    className="rounded p-1 text-caption hover:text-title"
+                    className="rounded p-1 text-white/40 hover:text-white"
                     title="Rename section"
                   >
-                    <Pencil className="size-3" />
+                    <Pencil className="h-3 w-3" />
                   </button>
                   <button
                     type="button"
@@ -208,18 +191,18 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
                       );
                       setNewSubtopicTitle("");
                     }}
-                    className="rounded p-1 text-caption hover:text-primary-400"
+                    className="rounded p-1 text-white/40 hover:text-primary"
                     title="Add topic to this section"
                   >
-                    <Plus className="size-3" />
+                    <Plus className="h-3 w-3" />
                   </button>
                   <button
                     type="button"
                     onClick={() => onDeleteModule(mod.id)}
-                    className="rounded p-1 text-caption hover:text-danger-400"
+                    className="rounded p-1 text-white/40 hover:text-rose-400"
                     title="Remove section"
                   >
-                    <Trash2 className="size-3" />
+                    <Trash2 className="h-3 w-3" />
                   </button>
                 </div>
               </div>
@@ -240,29 +223,29 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
                           onSelectActiveSubtopic(sub.id);
                         }
                       }}
-                      className={`group flex items-center justify-between gap-2 rounded-[--btn-radius] border px-3 py-2 text-xs transition-all cursor-pointer ${
+                      className={`group flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs transition-all cursor-pointer ${
                         isActive
-                          ? "border-primary-500/60 bg-primary-500/15 text-title font-semibold shadow-sm"
+                          ? "border-primary/60 bg-primary/15 text-white font-semibold shadow-sm"
                           : isMastered
-                          ? "border-success-500/25 bg-success-500/10 text-success-200"
+                          ? "border-emerald-500/25 bg-emerald-500/[0.06] text-emerald-200"
                           : isKnown
-                          ? "border-warning-500/25 bg-warning-500/5 text-caption line-through"
-                          : "border-transparent bg-[--ui-soft-bg]/40 text-body hover:bg-[--ui-soft-bg] hover:text-title"
+                          ? "border-amber-400/25 bg-amber-500/[0.05] text-white/50 line-through"
+                          : "border-transparent bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07] hover:text-white"
                       }`}
                     >
                       {/* Left Status Dot / Check + Title */}
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         {isMastered ? (
-                          <CheckCircle2 className="size-4 text-success-400 shrink-0" />
+                          <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
                         ) : isKnown ? (
-                          <FastForward className="size-3.5 text-warning-300 shrink-0" />
+                          <FastForward className="h-3.5 w-3.5 text-amber-300 shrink-0" />
                         ) : isActive ? (
                           <span
-                            className="size-2.5 rounded-full shrink-0 animate-pulse"
+                            className="h-2.5 w-2.5 rounded-full shrink-0 animate-pulse"
                             style={{ backgroundColor: "var(--primary)" }}
                           />
                         ) : (
-                          <span className="size-2 rounded-full border border-gray-500 shrink-0" />
+                          <span className="h-2 w-2 rounded-full border border-white/30 shrink-0" />
                         )}
 
                         {isEditingSub ? (
@@ -270,10 +253,8 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
                             className="flex items-center gap-1 flex-1"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <Input
+                            <input
                               type="text"
-                              variant="outlined"
-                              size="sm"
                               value={editingText}
                               onChange={(e) => setEditingText(e.target.value)}
                               onKeyDown={(e) => {
@@ -290,7 +271,7 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
                                 if (e.key === "Escape") setEditingId(null);
                               }}
                               autoFocus
-                              className="h-6 text-xs"
+                              className="w-full rounded border border-primary bg-black/80 px-2 py-0.5 text-xs text-white focus:outline-none"
                             />
                             <button
                               type="button"
@@ -304,9 +285,9 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
                                 }
                                 setEditingId(null);
                               }}
-                              className="p-0.5 text-primary-400"
+                              className="p-0.5 text-primary"
                             >
-                              <Check className="size-3.5" />
+                              <Check className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         ) : (
@@ -314,7 +295,7 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
                         )}
                       </div>
 
-                      {/* Right Hover Actions */}
+                      {/* Right Hover Actions: Skip (Know it), Edit, Move, Remove */}
                       <div
                         className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={(e) => e.stopPropagation()}
@@ -324,8 +305,8 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
                           onClick={() => onToggleSkipKnown(sub.id)}
                           className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
                             isKnown
-                              ? "bg-warning-500/20 text-warning-200"
-                              : "bg-[--ui-bg] text-caption hover:text-title"
+                              ? "bg-amber-500/20 text-amber-200"
+                              : "bg-white/10 text-white/70 hover:text-white"
                           }`}
                           title={
                             isKnown
@@ -339,20 +320,20 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
                         <button
                           type="button"
                           onClick={(e) => startEdit(sub.id, sub.title, e)}
-                          className="rounded p-1 text-caption hover:text-title"
+                          className="rounded p-1 text-white/45 hover:text-white"
                           title="Rename"
                         >
-                          <Pencil className="size-3" />
+                          <Pencil className="h-3 w-3" />
                         </button>
 
                         {sIdx > 0 && (
                           <button
                             type="button"
                             onClick={() => onMoveSubtopic(mod.id, sub.id, "up")}
-                            className="rounded p-0.5 text-caption hover:text-title"
+                            className="rounded p-0.5 text-white/45 hover:text-white"
                             title="Move up"
                           >
-                            <ArrowUp className="size-3" />
+                            <ArrowUp className="h-3 w-3" />
                           </button>
                         )}
                         {sIdx < mod.subtopics.length - 1 && (
@@ -361,20 +342,20 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
                             onClick={() =>
                               onMoveSubtopic(mod.id, sub.id, "down")
                             }
-                            className="rounded p-0.5 text-caption hover:text-title"
+                            className="rounded p-0.5 text-white/45 hover:text-white"
                             title="Move down"
                           >
-                            <ArrowDown className="size-3" />
+                            <ArrowDown className="h-3 w-3" />
                           </button>
                         )}
 
                         <button
                           type="button"
                           onClick={() => onDeleteSubtopic(mod.id, sub.id)}
-                          className="rounded p-1 text-caption hover:text-danger-400"
+                          className="rounded p-1 text-white/45 hover:text-rose-400"
                           title="Remove topic"
                         >
-                          <X className="size-3.5" />
+                          <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </div>
@@ -393,25 +374,20 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
                     }}
                     className="flex items-center gap-1.5 pt-1"
                   >
-                    <Input
+                    <input
                       type="text"
-                      variant="outlined"
-                      size="sm"
                       value={newSubtopicTitle}
                       onChange={(e) => setNewSubtopicTitle(e.target.value)}
                       placeholder="New topic name..."
                       autoFocus
-                      className="flex-1"
+                      className="flex-1 rounded-lg border border-white/15 bg-black/60 px-2.5 py-1.5 text-xs text-white focus:border-primary focus:outline-none"
                     />
-                    <Button.Root
+                    <button
                       type="submit"
-                      variant="solid"
-                      intent="primary"
-                      size="sm"
-                      className="font-semibold"
+                      className="rounded-lg bg-primary px-2.5 py-1.5 text-xs font-bold text-black"
                     >
-                      <Button.Label>Add</Button.Label>
-                    </Button.Root>
+                      Add
+                    </button>
                   </form>
                 )}
               </div>
@@ -419,6 +395,6 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
           );
         })}
       </div>
-    </Card>
+    </aside>
   );
 };

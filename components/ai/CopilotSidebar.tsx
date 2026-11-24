@@ -10,7 +10,6 @@ import {
   SectionGroup,
 } from "@/types/taskit";
 import { ActionConfirmationCard } from "@/components/ai/ActionConfirmationCard";
-import { Badge, Button, Caption, Card, Input, Text, Title } from "@/components/tailus-ui";
 import {
   Bot,
   CalendarClock,
@@ -165,124 +164,102 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
 
   if (!isOpen) {
     return (
-      <Button.Root
+      <button
         type="button"
-        variant="solid"
-        intent="primary"
-        size="md"
         onClick={onToggle}
-        className="fixed bottom-6 right-6 z-40 shadow-neon hover:scale-105 transition-transform"
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 rounded-2xl border border-primary/50 bg-black/80 px-4 py-3 text-xs sm:text-sm font-bold text-white shadow-neon backdrop-blur-xl hover:scale-105 transition-all"
       >
-        <Button.Icon type="leading" size="sm">
-          <Bot />
-        </Button.Icon>
-        <Button.Label>kite Copilot</Button.Label>
-        <Badge variant="soft" intent="gray" size="xs" className="ml-1">
+        <Bot className="w-5 h-5 text-primary" />
+        <span>kite Copilot</span>
+        <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] text-highlight">
           {TONE_LABELS[aiTone].label}
-        </Badge>
-      </Button.Root>
+        </span>
+      </button>
     );
   }
 
   return (
-    <aside className="fixed inset-y-0 right-0 z-40 w-full sm:w-[400px] lg:w-[430px] border-l border-[--ui-border-color] bg-[--ui-bg]/90 backdrop-blur-2xl shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+    <aside className="fixed inset-y-0 right-0 z-40 w-full sm:w-[400px] lg:w-[430px] border-l border-white/15 bg-[#051014]/90 backdrop-blur-2xl shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
       {/* Top Header */}
-      <div className="flex items-center justify-between border-b border-[--ui-border-color] px-5 py-4">
+      <div className="flex items-center justify-between border-b border-white/10 px-5 py-4 bg-black/40">
         <div className="flex items-center gap-2.5">
-          <Badge variant="soft" intent="primary" size="sm" className="h-9 w-9 p-0 flex items-center justify-center shadow-neon">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/20 border border-primary/40 text-highlight shadow-neon">
             <Bot className="w-5 h-5" />
-          </Badge>
+          </div>
           <div>
             <div className="flex items-center gap-2">
-              <Title as="h2" size="base" weight="bold" className="text-sm">
-                kite Copilot
-              </Title>
-              <Badge variant="soft" intent="success" size="xs">
+              <h2 className="text-sm font-bold text-white">kite Copilot</h2>
+              <span className="rounded-full bg-emerald-500/20 border border-emerald-400/30 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
                 Gemini 1.5 Flash
-              </Badge>
+              </span>
             </div>
-            <Caption className="block">{TONE_LABELS[aiTone].badge}</Caption>
+            <p className="text-[11px] text-white/55">
+              {TONE_LABELS[aiTone].badge}
+            </p>
           </div>
         </div>
 
-        <Button.Root
+        <button
           type="button"
-          variant="ghost"
-          intent="gray"
-          size="sm"
           onClick={onToggle}
+          className="rounded-lg p-1.5 text-white/50 hover:bg-white/10 hover:text-white transition-colors"
           title="Collapse Copilot"
-          aria-label="Collapse Copilot"
         >
-          <Button.Icon type="only" size="sm">
-            <X />
-          </Button.Icon>
-        </Button.Root>
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Tone Switcher Strip */}
-      <div className="flex items-center justify-between gap-1 border-b border-[--ui-border-color] px-4 py-2">
-        <Caption className="font-medium shrink-0">AI Tone:</Caption>
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+      <div className="flex items-center justify-between gap-1 border-b border-white/10 bg-white/[0.02] px-4 py-2 text-[11px]">
+        <span className="text-white/45 font-medium">AI Tone:</span>
+        <div className="flex items-center gap-1">
           {(Object.keys(TONE_LABELS) as AITone[]).map((tKey) => (
-            <Button.Root
+            <button
               key={tKey}
               type="button"
-              variant={aiTone === tKey ? "solid" : "ghost"}
-              intent={aiTone === tKey ? "primary" : "gray"}
-              size="xs"
               onClick={() => onChangeTone(tKey)}
-              className="whitespace-nowrap"
+              className={`rounded-lg px-2 py-1 font-medium transition-all ${
+                aiTone === tKey
+                  ? "bg-primary text-black font-bold shadow-sm"
+                  : "text-white/60 hover:bg-white/10 hover:text-white"
+              }`}
             >
-              <Button.Label>{TONE_LABELS[tKey].label}</Button.Label>
-            </Button.Root>
+              {TONE_LABELS[tKey].label}
+            </button>
           ))}
         </div>
       </div>
 
       {/* Quick Action Tool Prompts */}
-      <div className="flex items-center gap-1.5 overflow-x-auto px-4 py-2.5 border-b border-[--ui-border-color] no-scrollbar">
-        <Button.Root
+      <div className="flex items-center gap-1.5 overflow-x-auto px-4 py-2.5 border-b border-white/10 bg-black/25 no-scrollbar">
+        <button
           type="button"
-          variant="outlined"
-          intent="gray"
-          size="xs"
-          onClick={() => sendMessage("Reschedule my overdue tasks to Saturday")}
-          className="whitespace-nowrap rounded-full"
+          onClick={() =>
+            sendMessage("Reschedule my overdue tasks to Saturday")
+          }
+          className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-white/80 hover:border-primary/50 hover:text-highlight whitespace-nowrap transition-colors"
         >
-          <Button.Icon type="leading" size="xs">
-            <CalendarClock className="text-primary-500" />
-          </Button.Icon>
-          <Button.Label>Reschedule Overdue</Button.Label>
-        </Button.Root>
-        <Button.Root
+          <CalendarClock className="w-3 h-3 text-primary" />
+          Reschedule Overdue
+        </button>
+        <button
           type="button"
-          variant="outlined"
-          intent="gray"
-          size="xs"
           onClick={() => sendMessage("Generate my daily briefing")}
-          className="whitespace-nowrap rounded-full"
+          className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-white/80 hover:border-primary/50 hover:text-highlight whitespace-nowrap transition-colors"
         >
-          <Button.Icon type="leading" size="xs">
-            <Zap className="text-warning-500" />
-          </Button.Icon>
-          <Button.Label>Daily Briefing</Button.Label>
-        </Button.Root>
-        <Button.Root
+          <Zap className="w-3 h-3 text-amber-400" />
+          Daily Briefing
+        </button>
+        <button
           type="button"
-          variant="outlined"
-          intent="gray"
-          size="xs"
           onClick={() =>
             sendMessage("Create a batch of 3 study sprint tasks for today")
           }
-          className="whitespace-nowrap rounded-full"
+          className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-white/80 hover:border-primary/50 hover:text-highlight whitespace-nowrap transition-colors"
         >
-          <Button.Icon type="leading" size="xs">
-            <Layers className="text-success-500" />
-          </Button.Icon>
-          <Button.Label>Batch Study Sprint</Button.Label>
-        </Button.Root>
+          <Layers className="w-3 h-3 text-emerald-400" />
+          Batch Study Sprint
+        </button>
       </div>
 
       {/* Chat Messages Stream */}
@@ -294,19 +271,15 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
               m.role === "user" ? "items-end" : "items-start"
             }`}
           >
-            {m.role === "user" ? (
-              <div className="max-w-[92%] rounded-2xl rounded-br-xs bg-primary-600 px-4 py-3 text-white">
-                <Text size="sm" weight="medium" className="my-0 text-white whitespace-pre-line">
-                  {m.content}
-                </Text>
-              </div>
-            ) : (
-              <Card variant="soft" className="max-w-[92%] rounded-2xl rounded-bl-xs px-4 py-3">
-                <Text size="sm" className="my-0 text-body leading-relaxed whitespace-pre-line">
-                  {m.content}
-                </Text>
-              </Card>
-            )}
+            <div
+              className={`max-w-[92%] rounded-2xl px-4 py-3 text-xs sm:text-sm leading-relaxed ${
+                m.role === "user"
+                  ? "bg-primary text-black font-medium rounded-br-xs"
+                  : "border border-white/10 bg-white/[0.05] text-white/90 rounded-bl-xs"
+              }`}
+            >
+              <div className="whitespace-pre-line">{m.content}</div>
+            </div>
 
             {/* Render Interactive Action Confirmation Card if present */}
             {m.actionProposal && (
@@ -322,14 +295,16 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
               </div>
             )}
 
-            <Caption className="mt-1 px-1 text-[10px]">{m.timestamp}</Caption>
+            <span className="mt-1 px-1 text-[10px] text-white/35">
+              {m.timestamp}
+            </span>
           </div>
         ))}
 
         {isLoading && (
-          <div className="flex items-center gap-2 px-2">
-            <Loader2 className="w-4 h-4 animate-spin text-primary-500" />
-            <Caption>kite Copilot is computing action proposal...</Caption>
+          <div className="flex items-center gap-2 text-xs text-highlight/80 px-2">
+            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            <span>kite Copilot is computing action proposal...</span>
           </div>
         )}
         <div ref={scrollEndRef} />
@@ -341,32 +316,26 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
           e.preventDefault();
           sendMessage(input);
         }}
-        className="border-t border-[--ui-border-color] p-3.5"
+        className="border-t border-white/10 bg-black/50 p-3.5"
       >
-        <div className="flex items-center gap-2">
-          <Input
+        <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.05] px-3 py-2 focus-within:border-primary transition-colors">
+          <input
             type="text"
-            variant="mixed"
-            size="md"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask Copilot to reschedule, batch-create, or brief..."
-            className="flex-1"
+            className="flex-1 bg-transparent text-xs sm:text-sm text-white placeholder-white/40 focus:outline-none"
           />
-          <Button.Root
+          <button
             type="submit"
-            variant="solid"
-            intent="primary"
-            size="md"
             disabled={!input.trim() || isLoading}
-            aria-label="Send message"
+            className="rounded-lg bg-primary p-2 text-black hover:brightness-110 disabled:opacity-40 transition-all"
           >
-            <Button.Icon type="only" size="sm">
-              <Send />
-            </Button.Icon>
-          </Button.Root>
+            <Send className="w-3.5 h-3.5" />
+          </button>
         </div>
       </form>
     </aside>
   );
 };
+

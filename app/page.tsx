@@ -33,7 +33,6 @@ import {
   syncTasksWithHeadersAndFilter,
 } from "@/utils/myDayUtils";
 import { KiteFlyingLoader } from "@/components/ui/KiteBrand";
-import { Card } from "@/components/tailus-ui";
 import type { SettingsTabId } from "@/components/settings/SettingsModal";
 import { CheckCircle2 } from "lucide-react";
 
@@ -747,40 +746,10 @@ export default function KiteWorkspacePage() {
     };
   }, []);
 
-  // 2. Apply theme, Tailus palette & custom colors to html element
+  // 2. Apply theme & custom colors to html element
   useEffect(() => {
     const root = document.documentElement;
     root.setAttribute("data-theme", profile.theme);
-
-    const themeToPalette: Record<string, string> = {
-      cyber_ocean: "winter",
-      sky_ocean: "winter",
-      sharingan: "passion",
-      rose_nebula: "romance",
-      sakura: "romance",
-      electric_lavender: "mystery",
-      alpine_forest: "nature",
-      mint_sunray: "energy",
-      warm_slate: "energy",
-      monochrome: "trust",
-    };
-    root.setAttribute("data-palette", themeToPalette[profile.theme] || "winter");
-    root.setAttribute("data-shade", "900");
-    root.setAttribute("data-rounded", "large");
-
-    const hexToRgbTriplet = (hex: string): string | null => {
-      const cleaned = hex.replace("#", "").trim();
-      const normalized =
-        cleaned.length === 3
-          ? cleaned
-              .split("")
-              .map((c) => c + c)
-              .join("")
-          : cleaned;
-      if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return null;
-      const num = parseInt(normalized, 16);
-      return `${(num >> 16) & 255} ${(num >> 8) & 255} ${num & 255}`;
-    };
 
     const customColors = workspaceConfig.customThemeColors;
     if (customColors) {
@@ -789,21 +758,12 @@ export default function KiteWorkspacePage() {
       root.style.setProperty("--accent", customColors.accent);
       root.style.setProperty("--primary", customColors.primary);
       root.style.setProperty("--highlight", customColors.highlight);
-      const rgb = hexToRgbTriplet(customColors.primary);
-      if (rgb) {
-        ["300", "400", "500", "600", "700"].forEach((step) => {
-          root.style.setProperty(`--colors-primary-${step}`, rgb);
-        });
-      }
     } else {
       root.style.removeProperty("--bg-base");
       root.style.removeProperty("--surface");
       root.style.removeProperty("--accent");
       root.style.removeProperty("--primary");
       root.style.removeProperty("--highlight");
-      ["300", "400", "500", "600", "700"].forEach((step) => {
-        root.style.removeProperty(`--colors-primary-${step}`);
-      });
     }
   }, [profile.theme, workspaceConfig.customThemeColors]);
 
@@ -2200,14 +2160,10 @@ export default function KiteWorkspacePage() {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <Card
-          variant="mixed"
-          fancy
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 border-primary-500/40 px-4 py-2 text-xs font-medium text-title shadow-2xl backdrop-blur-md"
-        >
-          <CheckCircle2 className="w-4 h-4 text-primary-400 shrink-0" />
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-primary/40 theme-panel px-4 py-2 text-xs font-medium text-white shadow-2xl backdrop-blur-md">
+          <CheckCircle2 className="w-4 h-4 text-primary" />
           <span>{toastMessage}</span>
-        </Card>
+        </div>
       )}
     </div>
   );
