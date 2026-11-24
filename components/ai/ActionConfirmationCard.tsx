@@ -44,7 +44,7 @@ export const ActionConfirmationCard: React.FC<ActionConfirmationCardProps> = ({
   };
 
   return (
-    <div className="my-2.5 rounded-2xl border border-primary/50 bg-black/75 p-4 shadow-neon backdrop-blur-xl transition-all">
+    <div className="my-2.5 rounded-2xl border border-primary/50 bg-black/75 p-4 shadow-neon transition-all">
       {/* Header Badge */}
       <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-white/10">
         <div className="flex items-center gap-2">

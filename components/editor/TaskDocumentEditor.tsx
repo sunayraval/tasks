@@ -662,7 +662,7 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
 
   if (viewMode === "inline") {
     return (
-      <div className="my-2 rounded-2xl border border-primary/40 theme-panel backdrop-blur-2xl shadow-neon overflow-hidden">
+      <div className="my-2 rounded-2xl border border-primary/40 theme-panel shadow-neon overflow-hidden">
         {innerContent}
       </div>
     );
@@ -670,9 +670,9 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
 
   if (viewMode === "center_modal") {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
         <div
-          className="relative w-full max-w-3xl max-h-[88vh] rounded-2xl border theme-panel backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200"
+          className="relative w-full max-w-3xl max-h-[88vh] rounded-2xl border theme-panel shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
           {innerContent}
@@ -687,7 +687,7 @@ export const TaskDocumentEditor: React.FC<TaskDocumentEditorProps> = ({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-xl lg:max-w-2xl h-full border-l theme-panel backdrop-blur-2xl shadow-2xl flex flex-col animate-in slide-in-from-right duration-200"
+        className="relative w-full max-w-xl lg:max-w-2xl h-full border-l theme-panel shadow-2xl flex flex-col animate-in slide-in-from-right duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {innerContent}

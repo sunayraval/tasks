@@ -97,7 +97,7 @@ export const KiteFlyingLoader: React.FC<KiteFlyingLoaderProps> = ({
     <div
       role="status"
       aria-live="polite"
-      className={`inline-flex items-center gap-3.5 rounded-2xl border border-white/[0.09] bg-[#16181f]/85 backdrop-blur-xl ${
+      className={`inline-flex items-center gap-3.5 rounded-2xl border border-white/[0.09] bg-[#16181f]/85 ${
         compact ? "px-3.5 py-2" : "px-4 py-3"
       } shadow-[0_12px_36px_rgba(0,0,0,0.45)] select-none`}
     >

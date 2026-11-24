@@ -111,22 +111,23 @@ interface SortableBlockCardProps {
   onRemove: (blockId: string) => void;
 }
 
-const SortableScheduleBlockCard: React.FC<SortableBlockCardProps> = ({
-  block,
-  totalBlocks,
-  swapSourceId,
-  isEditing,
-  onStartSwap,
-  onCompleteSwap,
-  onCancelSwap,
-  onMoveUp,
-  onMoveDown,
-  onStartEdit,
-  onCancelEdit,
-  onSaveEdit,
-  onToggleComplete,
-  onRemove,
-}) => {
+const SortableScheduleBlockCard: React.FC<SortableBlockCardProps> = React.memo(
+  ({
+    block,
+    totalBlocks,
+    swapSourceId,
+    isEditing,
+    onStartSwap,
+    onCompleteSwap,
+    onCancelSwap,
+    onMoveUp,
+    onMoveDown,
+    onStartEdit,
+    onCancelEdit,
+    onSaveEdit,
+    onToggleComplete,
+    onRemove,
+  }) => {
   const {
     attributes,
     listeners,
@@ -512,7 +513,8 @@ const SortableScheduleBlockCard: React.FC<SortableBlockCardProps> = ({
       </div>
     </div>
   );
-};
+});
+SortableScheduleBlockCard.displayName = "SortableScheduleBlockCard";
 
 export const MyDayView: React.FC<MyDayViewProps> = ({
   tasks,
@@ -1005,7 +1007,7 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
       {/* 2. WORKSPACE GRID: BUILDER PANEL (LEFT) + SWAPPABLE/EDITABLE TIMELINE (RIGHT) */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         {/* LEFT COLUMN: MANUAL BUILD & AI AUTO-ARRANGE */}
-        <div className="xl:col-span-5 rounded-3xl border theme-panel p-5 sm:p-6 shadow-2xl backdrop-blur-2xl space-y-5">
+        <div className="xl:col-span-5 rounded-3xl border theme-panel p-5 sm:p-6 shadow-2xl space-y-5">
           {/* Mode Switcher Tabs */}
           <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-white/12 bg-black/45 p-1">
             <button
@@ -1515,7 +1517,7 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
         </div>
 
         {/* RIGHT COLUMN: INTERACTIVE SWAPPABLE, MOVABLE, EDITABLE SCHEDULE */}
-        <div className="xl:col-span-7 rounded-3xl border theme-panel p-5 sm:p-6 shadow-2xl backdrop-blur-2xl space-y-4">
+        <div className="xl:col-span-7 rounded-3xl border theme-panel p-5 sm:p-6 shadow-2xl space-y-4">
           {/* Header & Logistics Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
             <div>

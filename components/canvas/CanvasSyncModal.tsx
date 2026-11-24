@@ -215,11 +215,11 @@ export const CanvasSyncModal: React.FC<CanvasSyncModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 animate-in fade-in duration-150"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-2 sm:p-4 animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl rounded-2xl sm:rounded-3xl border border-white/20 bg-[#0d1017]/95 backdrop-blur-2xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col max-h-[92vh] sm:max-h-[88vh] overflow-hidden animate-in zoom-in-95 duration-150"
+        className="w-full max-w-2xl rounded-2xl sm:rounded-3xl border border-white/20 bg-[#0d1017]/95 shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col max-h-[92vh] sm:max-h-[88vh] overflow-hidden animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -461,7 +461,7 @@ export const CanvasSyncModal: React.FC<CanvasSyncModalProps> = ({
         </div>
 
         {/* Sticky Footer */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-3.5 border-t border-white/10 bg-[#07090e]/95 backdrop-blur-md">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-3.5 border-t border-white/10 bg-[#07090e]/95">
           <div className="text-xs text-white/60 text-center sm:text-left">
             {!loading && !error && (
               <span>

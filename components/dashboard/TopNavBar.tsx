@@ -73,7 +73,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = React.memo(({
     THEME_OPTIONS.find((t) => t.id === profile.theme) || THEME_OPTIONS[0];
 
   return (
-    <header className="sticky top-0 z-30 border-b theme-header-bg backdrop-blur-md transition-colors duration-300">
+    <header className="sticky top-0 z-30 border-b theme-header-bg transition-colors duration-300">
       <div className="mx-auto max-w-[1600px] px-2.5 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-1.5 sm:gap-3">
         {/* Left: Brand Identity matching user screenshot, strictly non-editable */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 select-none">
@@ -329,7 +329,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = React.memo(({
 
             {themeDropdownOpen && (
               <div
-                className="absolute right-0 mt-2 w-64 rounded-xl border theme-panel p-1.5 shadow-2xl backdrop-blur-2xl z-50"
+                className="absolute right-0 mt-2 w-64 rounded-xl border theme-panel p-1.5 shadow-2xl z-50"
                 onMouseLeave={() => setThemeDropdownOpen(false)}
               >
                 {THEME_OPTIONS.map((t) => {

@@ -153,7 +153,7 @@ export const MyDayStatusBanner: React.FC<MyDayStatusBannerProps> = ({
   // ---------------------------------------------------------------------------
   if (variant === "chat") {
     return (
-      <div className="rounded-2xl border border-white/15 bg-[#14161c]/95 p-4 sm:p-5 shadow-2xl space-y-4 backdrop-blur-2xl">
+      <div className="rounded-2xl border border-white/15 bg-[#14161c]/95 p-4 sm:p-5 shadow-2xl space-y-4">
         {/* Top Row: Badge + Centered Live Time + Open Tab CTA */}
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
           <div className="inline-flex items-center gap-2">
@@ -371,7 +371,7 @@ export const MyDayStatusBanner: React.FC<MyDayStatusBannerProps> = ({
   // VARIANT: HERO CENTERPIECE ON "MY DAY" TAB
   // ---------------------------------------------------------------------------
   return (
-    <section className="relative overflow-hidden rounded-3xl border theme-panel p-4 sm:p-8 shadow-2xl backdrop-blur-2xl">
+    <section className="relative overflow-hidden rounded-3xl border theme-panel p-4 sm:p-8 shadow-2xl">
       {/* Subtle Ambient Radial Glow Behind Center Clock */}
       <div
         className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-64 w-[520px] rounded-full blur-[110px] opacity-20"

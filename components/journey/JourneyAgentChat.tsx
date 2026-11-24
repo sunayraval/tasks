@@ -128,7 +128,7 @@ const AgentTraceCard: React.FC<{
   const allDone = doneCount === trace.length;
 
   return (
-    <div className="mb-2.5 rounded-xl border border-white/12 bg-black/40 p-2.5 backdrop-blur-md">
+    <div className="mb-2.5 rounded-xl border border-white/12 bg-black/40 p-2.5">
       <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-white/10">
         <div className="flex items-center gap-1.5 text-[11px] font-semibold">
           {allDone ? (
@@ -295,7 +295,7 @@ export const JourneyAgentChat: React.FC<JourneyAgentChatProps> = ({
   return (
     <aside
       aria-label="Journey Agent Chat"
-      className="flex flex-col rounded-2xl border theme-panel backdrop-blur-md overflow-hidden lg:sticky lg:top-[76px] h-[540px] lg:h-[calc(100vh-100px)]"
+      className="flex flex-col rounded-2xl border theme-panel overflow-hidden lg:sticky lg:top-[76px] h-[540px] lg:h-[calc(100vh-100px)]"
     >
       {/* Agent Chat Header */}
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-white/10 bg-black/25 shrink-0">

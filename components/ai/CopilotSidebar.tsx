@@ -167,7 +167,7 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
       <button
         type="button"
         onClick={onToggle}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 rounded-2xl border border-primary/50 bg-black/80 px-4 py-3 text-xs sm:text-sm font-bold text-white shadow-neon backdrop-blur-xl hover:scale-105 transition-all"
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 rounded-2xl border border-primary/50 bg-black/80 px-4 py-3 text-xs sm:text-sm font-bold text-white shadow-neon hover:scale-105 transition-all"
       >
         <Bot className="w-5 h-5 text-primary" />
         <span>kite Copilot</span>
@@ -179,7 +179,7 @@ export const CopilotSidebar: React.FC<CopilotSidebarProps> = ({
   }
 
   return (
-    <aside className="fixed inset-y-0 right-0 z-40 w-full sm:w-[400px] lg:w-[430px] border-l border-white/15 bg-[#051014]/90 backdrop-blur-2xl shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+    <aside className="fixed inset-y-0 right-0 z-40 w-full sm:w-[400px] lg:w-[430px] border-l border-white/15 bg-[#051014]/90 shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
       {/* Top Header */}
       <div className="flex items-center justify-between border-b border-white/10 px-5 py-4 bg-black/40">
         <div className="flex items-center gap-2.5">

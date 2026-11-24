@@ -153,7 +153,7 @@ export const JourneyMilestoneCard: React.FC<JourneyMilestoneCardProps> = React.m
 
       {/* Semantic Milestone Card (<article>) */}
       <article
-        className={`journey-milestone-card relative flex-1 min-w-0 rounded-2xl border p-4 sm:p-5 backdrop-blur-md transition-colors duration-200 ${
+        className={`journey-milestone-card relative flex-1 min-w-0 rounded-2xl border p-4 sm:p-5 transition-colors duration-200 ${
           isHighlighted
             ? "theme-panel border-primary/80 shadow-[0_0_32px_-4px_color-mix(in_srgb,var(--primary)_55%,transparent)]"
             : isDone

@@ -1020,7 +1020,7 @@ export const MyJourneyView: React.FC<MyJourneyViewProps> = ({
       {/* ================================================================ */}
       <section aria-label="My Journey Visual Roadmap" className="min-w-0 space-y-5">
         {/* Clean Header Card */}
-        <div className="relative overflow-hidden rounded-2xl border theme-panel p-5 sm:p-6 backdrop-blur-md">
+        <div className="relative overflow-hidden rounded-2xl border theme-panel p-5 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               {/* Top tiny label + Journey switcher */}
@@ -1231,7 +1231,7 @@ export const MyJourneyView: React.FC<MyJourneyViewProps> = ({
         {/* Minimal Filter Row (only shown when milestones exist) */}
         {activeJourney.milestones.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-            <div className="inline-flex items-center rounded-full border border-white/12 bg-black/30 p-0.5 backdrop-blur-md">
+            <div className="inline-flex items-center rounded-full border border-white/12 bg-black/30 p-0.5">
               {(
                 [
                   { id: "all", label: `All (${progress.total})` },
@@ -1270,7 +1270,7 @@ export const MyJourneyView: React.FC<MyJourneyViewProps> = ({
         {/* MAIN VISUAL MILESTONE PATH OR CLEAN EMPTY STATE                */}
         {/* ============================================================== */}
         {activeJourney.milestones.length === 0 ? (
-          <div className="rounded-2xl border theme-panel p-8 sm:p-10 text-center backdrop-blur-xl">
+          <div className="rounded-2xl border theme-panel p-8 sm:p-10 text-center">
             {/* Minimalist vertical path illustration */}
             <div
               className="mx-auto mb-6 flex flex-col items-center gap-2 select-none"
@@ -1324,7 +1324,7 @@ export const MyJourneyView: React.FC<MyJourneyViewProps> = ({
             </div>
           </div>
         ) : visibleMilestones.length === 0 ? (
-          <div className="rounded-2xl border theme-panel p-8 text-center backdrop-blur-xl">
+          <div className="rounded-2xl border theme-panel p-8 text-center">
             <p className="text-sm font-medium text-white/75">
               No milestones match this filter.
             </p>

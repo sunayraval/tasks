@@ -127,7 +127,7 @@ export const MilestoneEditorModal: React.FC<MilestoneEditorModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4"
       onClick={onClose}
     >
       <div

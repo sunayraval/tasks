@@ -115,8 +115,8 @@
   --accent: #59213c;
   --primary: #ff7eb6;
   --highlight: #ffd6e7;
-  --panel-bg: rgba(26, 10, 19, 0.82);
-  --panel-header: rgba(42, 16, 30, 0.9);
+  --panel-bg: rgba(26, 10, 19, 0.88);
+  --panel-header: rgba(42, 16, 30, 0.94);
   --panel-border: rgba(255, 126, 182, 0.3);
 }
 
@@ -128,8 +128,8 @@
   --accent: #7ec8fc;
   --primary: #bae6fd;
   --highlight: #ffffff;
-  --panel-bg: rgba(20, 78, 128, 0.58);
-  --panel-header: rgba(18, 70, 118, 0.68);
+  --panel-bg: rgba(18, 72, 120, 0.78);
+  --panel-header: rgba(16, 64, 110, 0.86);
   --panel-border: rgba(255, 255, 255, 0.36);
 }
 
@@ -160,18 +160,18 @@ select option {
   color: #f4f4f5;
 }
 
-/* Theme-Aware Glass Surfaces */
+/* Theme-Aware Frosted Surfaces (no expensive full-frame backdrop-filter readback) */
 .theme-panel {
   background-color: var(--panel-bg);
   border-color: var(--panel-border);
-  box-shadow: 0 10px 35px -5px rgba(0, 0, 0, 0.45),
+  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.38),
     0 0 0 1px var(--panel-border);
 }
 
 .theme-popover {
-  background-color: color-mix(in srgb, var(--bg-base) 92%, #000000);
+  background-color: color-mix(in srgb, var(--bg-base) 95%, #000000);
   border-color: var(--panel-border);
-  box-shadow: 0 16px 40px -4px rgba(0, 0, 0, 0.75),
+  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.65),
     0 0 0 1px var(--panel-border);
 }
 

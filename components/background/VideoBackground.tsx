@@ -201,7 +201,7 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = React.memo(
       const ctx = canvas.getContext("2d", { alpha: true });
       if (!ctx) return;
 
-      const SCALE = 0.65; // Ambient aurora/particles look identical at 0.65x with 58% less GPU fill work
+      const SCALE = 0.5; // Ambient aurora/particles look identical at 0.5x with 75% less GPU fill work
       let width = Math.max(1, Math.floor(window.innerWidth * SCALE));
       let height = Math.max(1, Math.floor(window.innerHeight * SCALE));
       canvas.width = width;
@@ -220,7 +220,7 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = React.memo(
       };
       window.addEventListener("resize", handleResize, { passive: true });
 
-      const count = preset === "aurora" ? 0 : preset === "cyber" ? 42 : 36;
+      const count = preset === "aurora" ? 0 : preset === "cyber" ? 32 : 28;
       const items = Array.from({ length: count }, (_, idx) => ({
         x: Math.random() * width,
         y: Math.random() * height,
@@ -240,7 +240,7 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = React.memo(
       let tick = 0;
       let animationFrameId = 0;
       let lastFrame = performance.now();
-      const FRAME_INTERVAL = 1000 / 30; // 30fps cap for smooth, low-CPU ambient motion
+      const FRAME_INTERVAL = 1000 / 20; // 20fps cap for smooth, ultra-low-CPU ambient motion
       const cyberDistMax = 135 * SCALE;
       const cyberDistMaxSq = cyberDistMax * cyberDistMax;
 
@@ -379,20 +379,11 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = React.memo(
     return (
       <div
         className="fixed inset-0 z-0 pointer-events-none overflow-hidden select-none"
+        style={{ contain: "strict", transform: "translateZ(0)" }}
         aria-hidden="true"
       >
-        {/* Background Visual Layer (applies blur directly if configured rather than expensive full-viewport backdrop-filter readback) */}
-        <div
-          className="absolute inset-0"
-          style={
-            safeBlur > 0
-              ? {
-                  filter: `blur(${safeBlur}px)`,
-                  transform: "scale(1.03)",
-                }
-              : undefined
-          }
-        >
+        {/* Background Visual Layer — NEVER apply CSS filter:blur() over an animating canvas */}
+        <div className="absolute inset-0">
           {/* Rich multi-stop theme gradient backdrop */}
           <div
             className="absolute inset-0 transition-colors duration-500"
@@ -445,6 +436,14 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = React.memo(
               playsInline
               onLoadedData={() => setVideoLoaded(true)}
               onError={() => setVideoLoaded(false)}
+              style={
+                safeBlur > 0
+                  ? {
+                      filter: `blur(${Math.min(12, safeBlur)}px)`,
+                      transform: "scale(1.03)",
+                    }
+                  : undefined
+              }
               className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
                 videoLoaded ? "opacity-100" : "opacity-0"
               }`}

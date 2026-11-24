@@ -797,7 +797,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
 
       {modelDropdownOpen && (
         <div
-          className="absolute right-0 mt-1.5 w-72 max-h-80 overflow-y-auto rounded-2xl border border-white/20 bg-[#14161c]/95 p-2 shadow-2xl backdrop-blur-2xl z-50 space-y-1"
+          className="absolute right-0 mt-1.5 w-72 max-h-80 overflow-y-auto rounded-2xl border border-white/20 bg-[#14161c]/95 p-2 shadow-2xl z-50 space-y-1"
           onMouseLeave={() => setModelDropdownOpen(false)}
         >
           <div className="px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-white/45">
@@ -882,7 +882,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
       {floSubView === "home" || !syllabus ? (
         <div className="space-y-8">
           {/* Clean Focused Prompt Card */}
-          <div className="rounded-3xl border theme-panel p-6 sm:p-8 shadow-2xl backdrop-blur-2xl space-y-5">
+          <div className="rounded-3xl border theme-panel p-6 sm:p-8 shadow-2xl space-y-5">
             {/* Header Row */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -1059,7 +1059,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
            =================================================================== */
         <div className="space-y-4">
           {/* Single Compact Top Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border theme-panel px-4 py-2.5 backdrop-blur-2xl">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border theme-panel px-4 py-2.5">
             <div className="flex items-center gap-2 min-w-0">
               <button
                 type="button"
@@ -1084,7 +1084,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
 
                   {priorTopicsOpen && (
                     <div
-                      className="absolute left-0 mt-1.5 w-72 max-h-72 overflow-y-auto rounded-2xl border border-white/20 bg-[#14161c]/95 p-2 shadow-2xl backdrop-blur-2xl z-50 space-y-1"
+                      className="absolute left-0 mt-1.5 w-72 max-h-72 overflow-y-auto rounded-2xl border border-white/20 bg-[#14161c]/95 p-2 shadow-2xl z-50 space-y-1"
                       onMouseLeave={() => setPriorTopicsOpen(false)}
                     >
                       <div className="px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-white/45">
@@ -1295,7 +1295,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
             {mobileDrawerOpen && (
               <div className="fixed inset-0 z-50 lg:hidden flex">
                 <div
-                  className="fixed inset-0 bg-black/70 backdrop-blur-sm"
+                  className="fixed inset-0 bg-black/70"
                   onClick={() => setMobileDrawerOpen(false)}
                 />
                 <div className="relative z-10 w-full max-w-sm h-full p-3">
@@ -1483,7 +1483,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                 </div>
               ) : activeLessonTurn ? (
                 /* Active Micro-Lesson Card */
-                <article className="rounded-2xl border theme-panel p-5 sm:p-6 shadow-xl backdrop-blur-2xl space-y-5">
+                <article className="rounded-2xl border theme-panel p-5 sm:p-6 shadow-xl space-y-5">
                   {/* Clean Header: Topic Title + Skip Button */}
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3.5">
                     <div>
@@ -1589,7 +1589,7 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
                   e.preventDefault();
                   handleSendChatMessage();
                 }}
-                className="flex items-center gap-2 rounded-2xl border theme-panel p-2.5 shadow-xl backdrop-blur-2xl"
+                className="flex items-center gap-2 rounded-2xl border theme-panel p-2.5 shadow-xl"
               >
                 <input
                   type="text"

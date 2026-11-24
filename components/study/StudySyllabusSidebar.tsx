@@ -78,7 +78,7 @@ export const StudySyllabusSidebar: React.FC<StudySyllabusSidebarProps> = ({
   return (
     <aside
       aria-label="Study Syllabus"
-      className="flex flex-col rounded-2xl border theme-panel backdrop-blur-2xl overflow-hidden"
+      className="flex flex-col rounded-2xl border theme-panel overflow-hidden"
     >
       {/* Simple Header */}
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">

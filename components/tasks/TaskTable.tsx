@@ -292,7 +292,7 @@ const PillPopoverDropdown: React.FC<{
 
       {open && (
         <div
-          className="absolute left-0 top-full mt-1.5 w-56 rounded-xl border theme-popover p-2 z-50 space-y-2 backdrop-blur-2xl"
+          className="absolute left-0 top-full mt-1.5 w-56 rounded-xl border theme-popover p-2 z-50 space-y-2"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="max-h-44 overflow-y-auto space-y-1 pr-0.5">
@@ -418,7 +418,7 @@ const DurationPopoverCell: React.FC<{
 
       {open && (
         <div
-          className="absolute left-0 top-full mt-1.5 w-44 rounded-xl border theme-popover p-2 z-50 space-y-2 backdrop-blur-2xl"
+          className="absolute left-0 top-full mt-1.5 w-44 rounded-xl border theme-popover p-2 z-50 space-y-2"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="grid grid-cols-2 gap-1">
@@ -505,7 +505,7 @@ const FilterDropdown: React.FC<{
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1.5 w-48 rounded-xl border theme-popover p-1.5 z-50 space-y-1 backdrop-blur-2xl">
+        <div className="absolute left-0 top-full mt-1.5 w-48 rounded-xl border theme-popover p-1.5 z-50 space-y-1">
           <button
             type="button"
             onClick={() => {
@@ -1197,7 +1197,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   return (
     <div className="space-y-4">
       {/* Top Filter & Quick Actions Bar */}
-      <div className="flex flex-col gap-3 rounded-xl border theme-panel p-3.5 backdrop-blur-xl">
+      <div className="flex flex-col gap-3 rounded-xl border theme-panel p-3.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2.5 flex-1">
             {/* Search Input */}
@@ -1213,7 +1213,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             </div>
 
             {/* Quick Status Segmented Filter Bar: All/Active | To Do | In Progress | Completed */}
-            <div className="flex items-center gap-1 p-0.5 rounded-lg border border-white/10 bg-black/40 backdrop-blur-md overflow-x-auto no-scrollbar max-w-full shrink-0">
+            <div className="flex items-center gap-1 p-0.5 rounded-lg border border-white/10 bg-black/40 overflow-x-auto no-scrollbar max-w-full shrink-0">
               <button
                 type="button"
                 onClick={() => setStatusFilter("ALL")}
@@ -1398,7 +1398,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     </div>
 
       {/* Main Document-Style Table Container with smooth horizontal scrolling */}
-      <div className="rounded-xl border theme-panel overflow-hidden backdrop-blur-xl shadow-2xl">
+      <div className="rounded-xl border theme-panel overflow-hidden shadow-2xl">
         <div
           tabIndex={0}
           role="region"
@@ -2077,7 +2077,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
                                   {isTagMenuOpen && (
                                     <div
-                                      className="absolute left-0 top-full mt-1.5 w-64 rounded-xl border theme-popover p-2.5 z-50 space-y-2.5 backdrop-blur-2xl"
+                                      className="absolute left-0 top-full mt-1.5 w-64 rounded-xl border theme-popover p-2.5 z-50 space-y-2.5"
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
@@ -2249,7 +2249,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
                         {/* Subtasks dropdown expanded row */}
                         {isSubtasksExpanded && (
-                          <tr className="bg-black/45 border-b border-primary/20 backdrop-blur-md transition-all animate-in fade-in duration-150">
+                          <tr className="bg-black/45 border-b border-primary/20 transition-all animate-in fade-in duration-150">
                             <td className="w-10 pl-3 pr-1 py-2.5 align-top text-center">
                               <div className="flex justify-center pt-2 text-primary/60">
                                 <CornerDownRight className="w-4 h-4" />

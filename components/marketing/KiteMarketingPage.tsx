@@ -301,7 +301,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
       {/* =====================================================================
           1. STICKY GLASS MARKETING NAVBAR
          ===================================================================== */}
-      <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-black/45 backdrop-blur-2xl">
+      <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-black/45">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           {/* Brand Logo */}
           <a
@@ -419,7 +419,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
 
         <div className="relative z-10 mx-auto max-w-5xl text-center space-y-7">
           {/* Announcement Eyebrow Pill */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/35 bg-primary/10 px-4 py-1.5 text-xs font-semibold text-highlight shadow-neon backdrop-blur-xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-primary/35 bg-primary/10 px-4 py-1.5 text-xs font-semibold text-highlight shadow-neon">
             <Sparkles className="w-3.5 h-3.5 text-primary" />
             <span>
               Powered by Gemini 3.8 Flash • Conversational AI + Live Day
@@ -469,7 +469,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
 
             <a
               href="#interactive-demo"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] hover:bg-white/[0.1] px-7 py-4 text-sm sm:text-base font-semibold text-white backdrop-blur-xl transition-all"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] hover:bg-white/[0.1] px-7 py-4 text-sm sm:text-base font-semibold text-white transition-all"
             >
               <Wand2 className="w-4 h-4 text-primary" />
               <span>Try Interactive Live Demo</span>
@@ -503,7 +503,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
         <RevealSection delayMs={100} className="mt-14 sm:mt-16 mx-auto max-w-6xl">
           <div
             id="interactive-demo"
-            className="scroll-mt-24 rounded-3xl border border-white/15 bg-[#0e1016]/90 shadow-[0_30px_100px_rgba(0,0,0,0.8)] backdrop-blur-2xl overflow-hidden"
+            className="scroll-mt-24 rounded-3xl border border-white/15 bg-[#0e1016]/90 shadow-[0_30px_100px_rgba(0,0,0,0.8)] overflow-hidden"
           >
             {/* Top Glowing Accent Hairline */}
             <div
@@ -1022,7 +1022,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
           {/* Bento 1 (Wide 4 cols): Full-Access Gemini Agent */}
           <RevealSection
             delayMs={50}
-            className="md:col-span-4 rounded-3xl border border-white/12 theme-panel p-6 sm:p-8 backdrop-blur-2xl flex flex-col justify-between space-y-6 hover:border-primary/45 transition-colors"
+            className="md:col-span-4 rounded-3xl border border-white/12 theme-panel p-6 sm:p-8 flex flex-col justify-between space-y-6 hover:border-primary/45 transition-colors"
           >
             <div className="space-y-3">
               <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/35 bg-primary/15 text-primary shadow-neon">
@@ -1069,7 +1069,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
           {/* Bento 2 (2 cols): Canvas LMS Auto-Sync */}
           <RevealSection
             delayMs={120}
-            className="md:col-span-2 rounded-3xl border border-white/12 theme-panel p-6 sm:p-8 backdrop-blur-2xl flex flex-col justify-between space-y-5 hover:border-primary/45 transition-colors"
+            className="md:col-span-2 rounded-3xl border border-white/12 theme-panel p-6 sm:p-8 flex flex-col justify-between space-y-5 hover:border-primary/45 transition-colors"
           >
             <div className="space-y-3">
               <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-400/35 bg-cyan-500/15 text-cyan-300">
@@ -1102,7 +1102,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
           {/* Bento 3 (3 cols): MY DAY Live Time Engine */}
           <RevealSection
             delayMs={80}
-            className="md:col-span-3 rounded-3xl border border-white/12 theme-panel p-6 sm:p-8 backdrop-blur-2xl space-y-4 hover:border-primary/45 transition-colors"
+            className="md:col-span-3 rounded-3xl border border-white/12 theme-panel p-6 sm:p-8 space-y-4 hover:border-primary/45 transition-colors"
           >
             <div
               id="my-day-showcase"
@@ -1126,7 +1126,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
           {/* Bento 4 (3 cols): Resizable Notion-Style Table + TipTap Docs */}
           <RevealSection
             delayMs={150}
-            className="md:col-span-3 rounded-3xl border border-white/12 theme-panel p-6 sm:p-8 backdrop-blur-2xl space-y-4 hover:border-primary/45 transition-colors"
+            className="md:col-span-3 rounded-3xl border border-white/12 theme-panel p-6 sm:p-8 space-y-4 hover:border-primary/45 transition-colors"
           >
             <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-violet-400/35 bg-violet-500/15 text-violet-300">
               <Columns className="w-5 h-5" />
@@ -1145,7 +1145,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
           {/* Bento 5 (3 cols): Privacy & BYO Free Key */}
           <RevealSection
             delayMs={100}
-            className="md:col-span-3 rounded-3xl border border-white/12 theme-panel p-6 sm:p-8 backdrop-blur-2xl space-y-3 hover:border-primary/45 transition-colors"
+            className="md:col-span-3 rounded-3xl border border-white/12 theme-panel p-6 sm:p-8 space-y-3 hover:border-primary/45 transition-colors"
           >
             <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-400/35 bg-emerald-500/15 text-emerald-300">
               <ShieldCheck className="w-5 h-5" />
@@ -1164,7 +1164,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
           {/* Bento 6 (3 cols):Rich Document Modes */}
           <RevealSection
             delayMs={170}
-            className="md:col-span-3 rounded-3xl border border-white/12 theme-panel p-6 sm:p-8 backdrop-blur-2xl space-y-3 hover:border-primary/45 transition-colors"
+            className="md:col-span-3 rounded-3xl border border-white/12 theme-panel p-6 sm:p-8 space-y-3 hover:border-primary/45 transition-colors"
           >
             <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-400/35 bg-amber-500/15 text-amber-300">
               <Layers className="w-5 h-5" />
@@ -1191,7 +1191,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
         id="atmospheres"
         className="scroll-mt-20 py-16 px-4 sm:px-6 lg:px-8 mx-auto max-w-7xl"
       >
-        <RevealSection className="rounded-3xl border border-white/15 theme-panel p-6 sm:p-10 lg:p-12 backdrop-blur-2xl space-y-8">
+        <RevealSection className="rounded-3xl border border-white/15 theme-panel p-6 sm:p-10 lg:p-12 space-y-8">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
             <div className="space-y-2 max-w-2xl">
               <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary">
@@ -1339,7 +1339,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
             return (
               <div
                 key={item.step}
-                className="rounded-3xl border border-white/10 bg-black/40 p-6 sm:p-7 backdrop-blur-xl space-y-3"
+                className="rounded-3xl border border-white/10 bg-black/40 p-6 sm:p-7 space-y-3"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs font-extrabold text-primary bg-primary/15 border border-primary/30 rounded-lg px-2.5 py-1">
@@ -1358,7 +1358,7 @@ export const KiteMarketingPage: React.FC<KiteMarketingPageProps> = ({
 
         {/* Final High-Converting Call to Action Card */}
         <RevealSection>
-          <div className="relative overflow-hidden rounded-[32px] border border-primary/40 theme-panel p-8 sm:p-14 text-center shadow-[0_30px_90px_rgba(0,0,0,0.75)] backdrop-blur-2xl">
+          <div className="relative overflow-hidden rounded-[32px] border border-primary/40 theme-panel p-8 sm:p-14 text-center shadow-[0_30px_90px_rgba(0,0,0,0.75)]">
             <div
               className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-64 w-[520px] rounded-full blur-[130px] opacity-30"
               style={{ backgroundColor: "var(--primary)" }}

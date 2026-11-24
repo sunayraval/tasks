@@ -11,12 +11,13 @@ interface CircularProgressProps {
   streakDays?: number;
 }
 
-export const CircularProgress: React.FC<CircularProgressProps> = ({
-  tasks,
-  workspaceConfig,
-  onUpdateWorkspaceConfig,
-  streakDays = 1,
-}) => {
+export const CircularProgress: React.FC<CircularProgressProps> = React.memo(
+  ({
+    tasks,
+    workspaceConfig,
+    onUpdateWorkspaceConfig,
+    streakDays = 1,
+  }) => {
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingSubtitle, setEditingSubtitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(workspaceConfig.workspaceTitle);
@@ -75,7 +76,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
     circumference - (stats.percentage / 100) * circumference;
 
   return (
-    <div className="rounded-xl border theme-panel p-5 backdrop-blur-xl transition-all duration-300">
+    <div className="rounded-xl border theme-panel p-5 transition-all duration-300">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
         {/* Left: Editable Heading & Stats */}
         <div className="space-y-3 flex-1">
@@ -226,4 +227,5 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
       </div>
     </div>
   );
-};
+});
+CircularProgress.displayName = "CircularProgress";

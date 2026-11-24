@@ -147,10 +147,11 @@ function renderInlineFormatting(text: string): React.ReactNode[] {
   return parts;
 }
 
-const FormattedAgentMarkdown: React.FC<{ content: string }> = ({ content }) => {
-  const lines = content.split("\n");
-  const blocks: React.ReactNode[] = [];
-  let idx = 0;
+const FormattedAgentMarkdown: React.FC<{ content: string }> = React.memo(
+  ({ content }) => {
+    const lines = content.split("\n");
+    const blocks: React.ReactNode[] = [];
+    let idx = 0;
 
   while (idx < lines.length) {
     const line = lines[idx];
@@ -288,7 +289,7 @@ const FormattedAgentMarkdown: React.FC<{ content: string }> = ({ content }) => {
       blocks.push(
         <div
           key={`table-${idx}`}
-          className="my-3 overflow-x-auto rounded-xl border border-white/12 bg-black/45 shadow-lg backdrop-blur-md"
+          className="my-3 overflow-x-auto rounded-xl border border-white/12 bg-black/45 shadow-lg"
         >
           <table className="w-full border-collapse text-left text-xs sm:text-[13px]">
             <thead>
@@ -336,7 +337,20 @@ const FormattedAgentMarkdown: React.FC<{ content: string }> = ({ content }) => {
   }
 
   return <div className="space-y-2 text-sm sm:text-[15px]">{blocks}</div>;
-};
+});
+FormattedAgentMarkdown.displayName = "FormattedAgentMarkdown";
+
+const LiveThinkingLoader: React.FC = React.memo(() => {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSeconds((s) => s + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return <KiteFlyingLoader elapsedSeconds={seconds} />;
+});
+LiveThinkingLoader.displayName = "LiveThinkingLoader";
 
 function getActionCategoryIcon(category: AgentExecutedAction["category"]) {
   switch (category) {
@@ -390,7 +404,6 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   const [input, setInput] = useState("");
   const [modelChoice, setModelChoice] = useState<AIModelChoice>("flash");
   const [isThinking, setIsThinking] = useState(false);
-  const [thinkingSeconds, setThinkingSeconds] = useState(0);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -402,18 +415,6 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
       setShowConversation(false);
     }
   }, [heroResetNonce]);
-
-  // Live timer while agent is processing
-  useEffect(() => {
-    if (!isThinking) {
-      setThinkingSeconds(0);
-      return;
-    }
-    const timer = setInterval(() => {
-      setThinkingSeconds((s) => s + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [isThinking]);
 
   // Inline API Key quick-add when on Chat without key
   const [inlineKeyDraft, setInlineKeyDraft] = useState("");
@@ -969,7 +970,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   if (!hasApiKey) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center min-h-[calc(100vh-7rem)] px-4 py-10">
-        <div className="w-full max-w-lg rounded-3xl border border-white/15 bg-[#15161b]/95 backdrop-blur-2xl p-6 sm:p-8 shadow-[0_24px_70px_rgba(0,0,0,0.65)] space-y-5 text-center">
+        <div className="w-full max-w-lg rounded-3xl border border-white/15 bg-[#15161b]/95 p-6 sm:p-8 shadow-[0_24px_70px_rgba(0,0,0,0.65)] space-y-5 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/35 bg-primary/15 text-primary shadow-neon">
             <KeyRound className="w-5 h-5" />
           </div>
@@ -1064,7 +1065,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           style={{ backgroundColor: "rgba(18, 19, 24, 0.94)" }}
           className={`absolute left-1 right-1 sm:left-2 sm:right-2 ${
             isHeroEmpty ? "top-full mt-2" : "bottom-full mb-2"
-          } z-50 rounded-2xl border border-white/20 backdrop-blur-xl p-2 shadow-[0_24px_70px_rgba(0,0,0,0.85)] animate-in fade-in duration-150`}
+          } z-50 rounded-2xl border border-white/20 p-2 shadow-[0_24px_70px_rgba(0,0,0,0.85)] animate-in fade-in duration-150`}
         >
           <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/40 flex items-center justify-between">
             <span>Connectors, Skills &amp; Live Tasks</span>
@@ -1125,7 +1126,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           e.preventDefault();
           sendPrompt();
         }}
-        className="relative flex items-end gap-1.5 sm:gap-2 rounded-[30px] border border-white/[0.11] bg-[#1c1d21]/95 hover:border-white/[0.18] focus-within:border-white/[0.26] px-2.5 sm:px-4 py-2 sm:py-3 shadow-[0_18px_55px_rgba(0,0,0,0.6)] backdrop-blur-2xl transition-all"
+        className="relative flex items-end gap-1.5 sm:gap-2 rounded-[30px] border border-white/[0.11] bg-[#1c1d21]/95 hover:border-white/[0.18] focus-within:border-white/[0.26] px-2.5 sm:px-4 py-2 sm:py-3 shadow-[0_18px_55px_rgba(0,0,0,0.6)] transition-all"
       >
         {/* Left + Connector / Quick Skills Button */}
         <div ref={plusMenuRef} className="relative shrink-0 self-center">
@@ -1144,7 +1145,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
               style={{ backgroundColor: "rgba(18, 19, 24, 0.94)" }}
               className={`absolute left-0 ${
                 isHeroEmpty ? "top-full mt-3" : "bottom-full mb-3"
-              } w-[calc(100vw-36px)] max-w-64 rounded-2xl border border-white/20 p-2 shadow-[0_24px_70px_rgba(0,0,0,0.85)] backdrop-blur-xl z-50 space-y-1`}
+              } w-[calc(100vw-36px)] max-w-64 rounded-2xl border border-white/20 p-2 shadow-[0_24px_70px_rgba(0,0,0,0.85)] z-50 space-y-1`}
             >
               <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/40">
                 Workspace Connectors &amp; Skills
@@ -1367,7 +1368,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                 style={{ backgroundColor: "rgba(18, 19, 24, 0.94)" }}
                 className={`absolute right-0 ${
                   isHeroEmpty ? "top-full mt-3" : "bottom-full mb-3"
-                } w-[calc(100vw-28px)] max-w-[340px] sm:w-[350px] max-h-[480px] overflow-y-auto rounded-2xl border border-white/20 p-3 shadow-[0_24px_70px_rgba(0,0,0,0.85)] backdrop-blur-xl z-50 space-y-3`}
+                } w-[calc(100vw-28px)] max-w-[340px] sm:w-[350px] max-h-[480px] overflow-y-auto rounded-2xl border border-white/20 p-3 shadow-[0_24px_70px_rgba(0,0,0,0.85)] z-50 space-y-3`}
               >
                 {/* Section 1: NVIDIA NIM Leading Models */}
                 <div className="space-y-1.5">
@@ -1563,7 +1564,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
         <div className="relative z-10 w-full max-w-[760px] flex flex-col items-center">
           {/* Minimalist Kite Crest / Sharingan Crest */}
           <div
-            className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-medium backdrop-blur-md select-none transition-all ${
+            className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-medium select-none transition-all ${
               profile.theme === "sharingan"
                 ? "border-red-500/40 bg-red-950/30 text-red-300 shadow-[0_0_16px_rgba(255,31,56,0.35)]"
                 : "border-white/[0.09] bg-white/[0.03] text-white/60"
@@ -1881,7 +1882,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
 
                 {/* Embedded Interactive Canvas LMS Sync Card */}
                 {m.triggerCanvasSync && (
-                  <div className="rounded-2xl border border-primary/35 bg-[#12161f]/95 p-3.5 space-y-2.5 shadow-lg backdrop-blur-md">
+                  <div className="rounded-2xl border border-primary/35 bg-[#12161f]/95 p-3.5 space-y-2.5 shadow-lg">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                       <div className="flex items-center gap-2.5">
                         <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/20 text-primary border border-primary/40 shadow-neon shrink-0">
@@ -1979,7 +1980,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
             <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/15 text-primary shadow-neon">
               <KiteLogoMark className="w-4 h-4" />
             </div>
-            <KiteFlyingLoader elapsedSeconds={thinkingSeconds} />
+            <LiveThinkingLoader />
           </div>
         )}
 

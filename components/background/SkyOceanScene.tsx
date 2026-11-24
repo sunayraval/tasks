@@ -79,7 +79,7 @@ export const SkyOceanScene: React.FC<SkyOceanSceneProps> = React.memo(
       const ctx = canvas.getContext("2d", { alpha: true });
       if (!ctx) return;
 
-      const SCALE = 0.75; // Soft ambient ocean scene: 56% lower GPU pixel fill-rate
+      const SCALE = 0.5; // Soft ambient ocean scene: 75% lower GPU pixel fill-rate
       let width = Math.max(1, Math.floor(window.innerWidth * SCALE));
       let height = Math.max(1, Math.floor(window.innerHeight * SCALE));
       canvas.width = width;
@@ -122,15 +122,15 @@ export const SkyOceanScene: React.FC<SkyOceanSceneProps> = React.memo(
       };
       window.addEventListener("resize", handleResize, { passive: true });
 
-      const clouds: Cloud[] = Array.from({ length: 6 }, (_, i) => ({
-        x: (width / 5.5) * i + Math.random() * 90,
+      const clouds: Cloud[] = Array.from({ length: 5 }, (_, i) => ({
+        x: (width / 4.8) * i + Math.random() * 80,
         y: height * (0.06 + Math.random() * 0.32),
         scale: (0.65 + Math.random() * 0.75) * SCALE,
         speed: (0.18 + Math.random() * 0.24) * SCALE,
         opacity: 0.28 + Math.random() * 0.24,
       }));
 
-      const sparkles: Sparkle[] = Array.from({ length: 28 }, () => ({
+      const sparkles: Sparkle[] = Array.from({ length: 22 }, () => ({
         x: Math.random() * width,
         y: height * (0.63 + Math.random() * 0.34),
         r: (4.5 + Math.random() * 5.5) * SCALE,
@@ -141,7 +141,7 @@ export const SkyOceanScene: React.FC<SkyOceanSceneProps> = React.memo(
       let t = 0;
       let animId = 0;
       let lastFrameTime = performance.now();
-      const FRAME_INTERVAL = 1000 / 30; // Silky 30fps cap
+      const FRAME_INTERVAL = 1000 / 20; // Gentle 20fps cap for ambient waves
 
       const render = (now: number) => {
         animId = requestAnimationFrame(render);
@@ -172,7 +172,7 @@ export const SkyOceanScene: React.FC<SkyOceanSceneProps> = React.memo(
         }
 
         // 2. 4 layered animated pastel ocean waves using cached gradients
-        const stepX = 32;
+        const stepX = 36;
         for (let wIdx = 0; wIdx < waveDefs.length; wIdx++) {
           const w = waveDefs[wIdx];
           const baseY = height * w.yRatio;
@@ -228,12 +228,12 @@ export const SkyOceanScene: React.FC<SkyOceanSceneProps> = React.memo(
           }}
         />
 
-        {/* Warm Sunlit Pastel Halo at Horizon */}
+        {/* Warm Sunlit Pastel Halo at Horizon (soft radial gradient — zero blur filter needed) */}
         <div
-          className="absolute left-1/2 top-[18%] -translate-x-1/2 h-72 w-72 sm:h-[420px] sm:w-[420px] rounded-full opacity-45 blur-3xl"
+          className="absolute left-1/2 top-[14%] -translate-x-1/2 h-80 w-80 sm:h-[520px] sm:w-[520px] rounded-full opacity-50"
           style={{
             background:
-              "radial-gradient(circle, #ffffff 0%, #e0f2fe 45%, transparent 75%)",
+              "radial-gradient(circle, rgba(255,255,255,0.85) 0%, rgba(224,242,254,0.45) 38%, transparent 72%)",
           }}
         />
 

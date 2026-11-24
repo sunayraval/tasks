@@ -81,7 +81,7 @@ export const SakuraTreeScene: React.FC<SakuraTreeSceneProps> = React.memo(
       const ctx = canvas.getContext("2d", { alpha: true });
       if (!ctx) return;
 
-      const SCALE = 0.75; // Soft ambient canvas: 56% fewer pixels to rasterize
+      const SCALE = 0.5; // Soft ambient canvas: 75% fewer pixels to rasterize
       let width = Math.max(1, Math.floor(window.innerWidth * SCALE));
       let height = Math.max(1, Math.floor(window.innerHeight * SCALE));
       canvas.width = width;
@@ -101,7 +101,7 @@ export const SakuraTreeScene: React.FC<SakuraTreeSceneProps> = React.memo(
       window.addEventListener("resize", handleResize, { passive: true });
 
       const sprites = buildPetalSprites();
-      const PETAL_COUNT = 38;
+      const PETAL_COUNT = 28;
 
       const createPetal = (randomY = false): Petal => ({
         x: Math.random() * (width + 160) - 40,
@@ -125,7 +125,7 @@ export const SakuraTreeScene: React.FC<SakuraTreeSceneProps> = React.memo(
 
       let animId = 0;
       let lastFrameTime = performance.now();
-      const FRAME_INTERVAL = 1000 / 30; // Silky 30fps cap for ambient background
+      const FRAME_INTERVAL = 1000 / 20; // Gentle 20fps cap for ambient background
 
       const render = (now: number) => {
         animId = requestAnimationFrame(render);
@@ -182,12 +182,12 @@ export const SakuraTreeScene: React.FC<SakuraTreeSceneProps> = React.memo(
 
     return (
       <div className="sakura-ambient-backdrop pointer-events-none fixed inset-0 z-0 opacity-100 transition-opacity duration-700 overflow-hidden select-none">
-        {/* Moonlit Sakura Twilight Glow */}
+        {/* Moonlit Sakura Twilight Glow (soft radial gradient — zero blur filter needed) */}
         <div
-          className="absolute right-[8%] top-[10%] h-56 w-56 sm:h-80 sm:w-80 rounded-full opacity-25 blur-3xl"
+          className="absolute right-[6%] top-[8%] h-72 w-72 sm:h-96 sm:w-96 rounded-full opacity-30"
           style={{
             background:
-              "radial-gradient(circle, #ffd6e7 0%, #ff7eb6 45%, transparent 75%)",
+              "radial-gradient(circle, rgba(255,214,231,0.8) 0%, rgba(255,126,182,0.4) 40%, transparent 72%)",
           }}
         />
 
@@ -196,7 +196,7 @@ export const SakuraTreeScene: React.FC<SakuraTreeSceneProps> = React.memo(
           viewBox="0 0 800 700"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          className="animate-sakura-tree-sway absolute right-[-60px] bottom-[-20px] w-[440px] sm:w-[680px] lg:w-[820px] h-auto opacity-85"
+          className={`${paused ? "" : "animate-sakura-tree-sway"} absolute right-[-60px] bottom-[-20px] w-[440px] sm:w-[680px] lg:w-[820px] h-auto opacity-85 will-change-transform`}
         >
           <defs>
             <radialGradient id="blossomCloud1" cx="50%" cy="50%" r="50%">

@@ -231,7 +231,7 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
   // =========================================================================
   if (status === "consent") {
     return (
-      <div className="rounded-2xl border border-primary/35 bg-[#141720]/95 p-4 sm:p-5 shadow-[0_14px_45px_rgba(0,0,0,0.55)] backdrop-blur-xl space-y-3.5">
+      <div className="rounded-2xl border border-primary/35 bg-[#141720]/95 p-4 sm:p-5 shadow-[0_14px_45px_rgba(0,0,0,0.55)] space-y-3.5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/40 bg-primary/15 text-primary shadow-neon">
@@ -693,7 +693,7 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
       onSubmit={handleFormSubmit}
       action="/api/chat"
       method="POST"
-      className="rounded-2xl border border-primary/40 bg-[#141720]/95 p-4 sm:p-5 shadow-[0_16px_50px_rgba(0,0,0,0.6)] backdrop-blur-xl space-y-4"
+      className="rounded-2xl border border-primary/40 bg-[#141720]/95 p-4 sm:p-5 shadow-[0_16px_50px_rgba(0,0,0,0.6)] space-y-4"
     >
       {/* Header + Progress Pills */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">

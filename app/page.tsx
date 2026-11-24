@@ -227,6 +227,18 @@ export default function KiteWorkspacePage() {
   const hasAutoPromptedSetupRef = useRef<boolean>(false);
   const chatHydratedRef = useRef<boolean>(false);
   const lastLocalProfileWriteRef = useRef<number>(0);
+  const authUserIdRef = useRef<string | null>(null);
+  const authUserEmailRef = useRef<string>("");
+  const profileRef = useRef<UserProfile>(profile);
+  profileRef.current = profile;
+  const tasksRef = useRef<TaskItem[]>(tasks);
+  tasksRef.current = tasks;
+  const workspaceConfigSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const pendingWorkspaceConfigJsonRef = useRef<Record<string, unknown> | null>(
+    null
+  );
 
   const workspaceConfig = useMemo(() => getWorkspaceConfig(profile), [profile]);
 
@@ -417,6 +429,8 @@ export default function KiteWorkspacePage() {
         } = await supabase.auth.getUser();
 
         if (user) {
+          authUserIdRef.current = user.id;
+          authUserEmailRef.current = user.email || "";
           setIsAuthenticated(true);
 
           // 1. Fetch Profile
@@ -702,14 +716,14 @@ export default function KiteWorkspacePage() {
 
     initSession(false);
 
-    // 4. Tab Visibility & Window Focus Auto-Resync
+    // 4. Tab Visibility & Window Focus Auto-Resync (fallback behind Supabase Realtime)
     const handleVisibilityOrFocus = () => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") {
         return;
       }
       const now = Date.now();
-      // Throttle re-queries to at most once every 4 seconds
-      if (now - lastRefetchTimestamp < 4000) return;
+      // Throttle full DB re-queries to at most once every 60 seconds (Realtime handles live sync)
+      if (now - lastRefetchTimestamp < 60000) return;
       lastRefetchTimestamp = now;
       initSession(true);
     };
@@ -836,61 +850,86 @@ export default function KiteWorkspacePage() {
     [isAuthenticated, profile.id, profile.email, showToast]
   );
 
-  // 4. Update Workspace Customization Config (persisted in custom_theme_json & localStorage)
+  // 4. Update Workspace Customization Config (persisted in localStorage + debounced Supabase write)
   const handleUpdateWorkspaceConfig = useCallback(
     async (updates: Partial<WorkspaceConfig>) => {
       lastLocalProfileWriteRef.current = Date.now();
+      const prevProfile = profileRef.current;
+      const currentConfig = getWorkspaceConfig(prevProfile);
+      const mergedConfig: WorkspaceConfig = {
+        ...currentConfig,
+        ...updates,
+        columnHeaders: {
+          ...currentConfig.columnHeaders,
+          ...(updates.columnHeaders || {}),
+        },
+      };
 
-      setProfile((prev) => {
-        const currentConfig = getWorkspaceConfig(prev);
-        const mergedConfig: WorkspaceConfig = {
-          ...currentConfig,
-          ...updates,
-          columnHeaders: {
-            ...currentConfig.columnHeaders,
-            ...(updates.columnHeaders || {}),
-          },
-        };
+      const nextJsonSnapshot = mergedConfig as unknown as Record<string, unknown>;
+      const fallbackProfileId =
+        prevProfile.id !== "user-default" ? prevProfile.id : null;
+      const fallbackEmail = prevProfile.email || "";
 
-        if (typeof window !== "undefined") {
-          try {
-            localStorage.setItem(
-              LOCAL_STORAGE_CONFIG_KEY,
-              JSON.stringify(mergedConfig)
-            );
-          } catch {}
+      const nextProfile: UserProfile = {
+        ...prevProfile,
+        custom_theme_json: nextJsonSnapshot,
+      };
+      profileRef.current = nextProfile;
+      setProfile(nextProfile);
+
+      pendingWorkspaceConfigJsonRef.current = nextJsonSnapshot;
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(
+            LOCAL_STORAGE_CONFIG_KEY,
+            JSON.stringify(nextJsonSnapshot)
+          );
+        } catch {}
+      }
+
+      if (isSupabaseConfigured() && isAuthenticated) {
+        if (workspaceConfigSaveTimerRef.current) {
+          clearTimeout(workspaceConfigSaveTimerRef.current);
         }
-
-        const nextJson = mergedConfig as unknown as Record<string, unknown>;
-
-        if (isSupabaseConfigured() && isAuthenticated) {
-          const supabase = createClient();
-          supabase.auth.getUser().then(async ({ data: { user } }) => {
-            const targetId =
-              user?.id || (prev.id !== "user-default" ? prev.id : null);
+        workspaceConfigSaveTimerRef.current = setTimeout(async () => {
+          const payloadJson = pendingWorkspaceConfigJsonRef.current;
+          if (!payloadJson) return;
+          try {
+            const supabase = createClient();
+            let targetId = authUserIdRef.current || fallbackProfileId;
+            let email = authUserEmailRef.current || fallbackEmail;
+            if (!targetId) {
+              const {
+                data: { user },
+              } = await supabase.auth.getUser();
+              if (user) {
+                authUserIdRef.current = user.id;
+                authUserEmailRef.current = user.email || "";
+                targetId = user.id;
+                email = user.email || email;
+              }
+            }
             if (targetId) {
               const { data: updatedRows, error: updateErr } = await supabase
                 .from("profiles")
-                .update({ custom_theme_json: nextJson })
+                .update({ custom_theme_json: payloadJson })
                 .eq("id", targetId)
                 .select("id");
 
               if (updateErr || !updatedRows || updatedRows.length === 0) {
                 await supabase.from("profiles").upsert({
                   id: targetId,
-                  email: user?.email || prev.email || "",
-                  custom_theme_json: nextJson,
+                  email,
+                  custom_theme_json: payloadJson,
                 });
               }
             }
-          });
-        }
-
-        return {
-          ...prev,
-          custom_theme_json: nextJson,
-        };
-      });
+          } catch (err) {
+            console.warn("Debounced workspace config save error:", err);
+          }
+        }, 800);
+      }
     },
     [isAuthenticated]
   );
@@ -1334,9 +1373,10 @@ export default function KiteWorkspacePage() {
     ]
   );
 
-  // 9. Reorder Tasks & Movable Headers (persists BOTH order_index AND section_group to Supabase)
+  // 9. Reorder Tasks & Movable Headers (persists ONLY changed rows to Supabase)
   const handleReorderTasks = useCallback(
     (newTasks: TaskItem[]) => {
+      const prevById = new Map(tasksRef.current.map((t) => [t.id, t]));
       const indexed = syncTasksWithHeadersAndFilter(newTasks, {
         filterPastDue: true,
         hideCompleted: false,
@@ -1347,11 +1387,15 @@ export default function KiteWorkspacePage() {
       if (isSupabaseConfigured() && isAuthenticated) {
         const supabase = createClient();
         for (const item of indexed) {
-          const isUuid =
-            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-              item.id
-            );
-          if (isUuid) {
+          const prev = prevById.get(item.id);
+          if (
+            prev &&
+            prev.order_index === item.order_index &&
+            prev.section_group === item.section_group
+          ) {
+            continue;
+          }
+          if (UUID_REGEX.test(item.id)) {
             supabase
               .from("tasks")
               .update({
@@ -1936,6 +1980,19 @@ export default function KiteWorkspacePage() {
     [handleCreateTask, profile.id, workspaceConfig.statuses, tasks.length]
   );
 
+  const handleResetChatToHero = useCallback(() => {
+    setHeroResetNonce((n) => n + 1);
+  }, []);
+
+  const handleOpenCustomizeSettings = useCallback(() => {
+    setSettingsTab("customize");
+    setIsSettingsOpen(true);
+  }, []);
+
+  const handleOpenApiKeySetup = useCallback(() => {
+    setIsGeminiSetupOpen(true);
+  }, []);
+
   const effectiveTab: WorkspaceTab =
     aiTemporarilyDisabled && activeTab === "chat" ? "tasks" : activeTab;
 
@@ -1977,13 +2034,10 @@ export default function KiteWorkspacePage() {
               activeTaskCount={activeTaskCount}
               isSyncingCanvas={isSyncingCanvas}
               onSelectTab={setActiveTab}
-              onResetChatToHero={() => setHeroResetNonce((n) => n + 1)}
+              onResetChatToHero={handleResetChatToHero}
               onUpdateProfile={handleUpdateProfile}
               onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
-              onOpenSettings={() => {
-                setSettingsTab("customize");
-                setIsSettingsOpen(true);
-              }}
+              onOpenSettings={handleOpenCustomizeSettings}
               onQuickSyncCanvas={handleOpenCanvasSyncModal}
               onGoogleSignIn={handleGoogleSignIn}
               onSignOut={handleSignOut}
@@ -2010,7 +2064,7 @@ export default function KiteWorkspacePage() {
                     handleSaveApiKey(key, provider, nvidiaModel)
                   }
                   onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
-                  onOpenApiKeySetup={() => setIsGeminiSetupOpen(true)}
+                  onOpenApiKeySetup={handleOpenApiKeySetup}
                   onOptOutTemporary={() => handleSetAiTemporarilyDisabled(true)}
                   onChangeTone={(tone) => handleUpdateProfile({ ai_tone: tone })}
                   onOpenSettings={() => {
@@ -2033,7 +2087,7 @@ export default function KiteWorkspacePage() {
                   aiTemporarilyDisabled={aiTemporarilyDisabled}
                   onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
                   onUpdateTask={handleUpdateTask}
-                  onOpenApiKeySetup={() => setIsGeminiSetupOpen(true)}
+                  onOpenApiKeySetup={handleOpenApiKeySetup}
                   onShowToast={showToast}
                   onLaunchGuidedDayPlan={() => {
                     setActiveTab("chat");
@@ -2051,7 +2105,7 @@ export default function KiteWorkspacePage() {
                   hasApiKey={hasGeminiApiKey}
                   effectiveApiKey={effectiveApiKey}
                   onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
-                  onOpenApiKeySetup={() => setIsGeminiSetupOpen(true)}
+                  onOpenApiKeySetup={handleOpenApiKeySetup}
                   onShowToast={showToast}
                   onPushMilestoneToTasks={handlePushMilestoneToTasks}
                 />
@@ -2063,7 +2117,7 @@ export default function KiteWorkspacePage() {
                   hasApiKey={hasGeminiApiKey}
                   effectiveApiKey={effectiveApiKey}
                   onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
-                  onOpenApiKeySetup={() => setIsGeminiSetupOpen(true)}
+                  onOpenApiKeySetup={handleOpenApiKeySetup}
                   onShowToast={showToast}
                 />
               ) : (
@@ -2160,7 +2214,7 @@ export default function KiteWorkspacePage() {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-primary/40 theme-panel px-4 py-2 text-xs font-medium text-white shadow-2xl backdrop-blur-md">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-primary/40 theme-panel px-4 py-2 text-xs font-medium text-white shadow-2xl">
           <CheckCircle2 className="w-4 h-4 text-primary" />
           <span>{toastMessage}</span>
         </div>
