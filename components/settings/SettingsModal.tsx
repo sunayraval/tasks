@@ -558,7 +558,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               label: "2. Themes & Background",
               icon: Palette,
             },
-            { id: "view", label: "3. Task View Mode", icon: LayoutPanelLeft },
+            { id: "view", label: "3. Layout & View Mode", icon: LayoutPanelLeft },
             { id: "ai", label: "4. AI Agent & API Key", icon: Bot },
             { id: "memory", label: "5. Life Context & Memory", icon: Brain },
             {
@@ -1138,18 +1138,120 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 3: TASK DOCUMENT VIEW PREFERENCE */}
+          {/* TAB 3: LAYOUT & TASK DOCUMENT VIEW PREFERENCE */}
           {activeTab === "view" && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-bold text-white mb-1">
-                  Task Document Opening Behavior
-                </h3>
-                <p className="text-xs text-white/55">
-                  Choose how the TipTap rich-text document editor opens when you
-                  click the &ldquo;Doc&rdquo; button on a task row.
-                </p>
+            <div className="space-y-6">
+              {/* Navigation Bar Position (Left Sidebar vs Top Bar) */}
+              <div className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-bold text-white mb-1">
+                    Navigation Bar Position
+                  </h3>
+                  <p className="text-xs text-white/55">
+                    Switch between the organized Claude-style left sidebar or
+                    the classic horizontal top navigation bar.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {(
+                    [
+                      {
+                        id: "left",
+                        title: "Left Sidebar (Claude Style)",
+                        desc: "Organized vertical sidebar on the left with collapsible rail, grouped workspace sections, and bottom utility dock.",
+                      },
+                      {
+                        id: "top",
+                        title: "Top Navigation Bar",
+                        desc: "Classic horizontal pill bar pinned at the top of your workspace.",
+                      },
+                    ] as Array<{
+                      id: "left" | "top";
+                      title: string;
+                      desc: string;
+                    }>
+                  ).map((pos) => {
+                    const currentPos = workspaceConfig.navPosition || "left";
+                    const active = currentPos === pos.id;
+                    return (
+                      <button
+                        key={pos.id}
+                        type="button"
+                        onClick={() =>
+                          onUpdateWorkspaceConfig({ navPosition: pos.id })
+                        }
+                        className={`flex flex-col gap-3 rounded-xl border p-4 text-left transition-all ${
+                          active
+                            ? "border-primary bg-primary/15 shadow-neon"
+                            : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
+                        }`}
+                      >
+                        {/* Mini Layout Wireframe Preview */}
+                        <div className="w-full h-14 rounded-lg border border-white/15 bg-black/40 overflow-hidden flex">
+                          {pos.id === "left" ? (
+                            <>
+                              <div className="w-10 h-full border-r border-white/15 bg-primary/20 p-1.5 flex flex-col justify-between">
+                                <div className="space-y-1">
+                                  <div className="h-1.5 w-full rounded bg-primary/70" />
+                                  <div className="h-1 w-4/5 rounded bg-white/30" />
+                                  <div className="h-1 w-3/4 rounded bg-white/20" />
+                                </div>
+                                <div className="h-1.5 w-5 rounded bg-white/25" />
+                              </div>
+                              <div className="flex-1 p-2 flex flex-col gap-1.5">
+                                <div className="h-2 w-1/3 rounded bg-white/20" />
+                                <div className="h-2 w-2/3 rounded bg-white/10" />
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex flex-col w-full h-full">
+                              <div className="h-4 w-full border-b border-white/15 bg-primary/20 px-2 flex items-center justify-between">
+                                <div className="h-1.5 w-6 rounded bg-primary/70" />
+                                <div className="flex gap-1">
+                                  <div className="h-1.5 w-5 rounded bg-white/35" />
+                                  <div className="h-1.5 w-5 rounded bg-white/25" />
+                                  <div className="h-1.5 w-5 rounded bg-white/25" />
+                                </div>
+                                <div className="h-1.5 w-4 rounded bg-white/25" />
+                              </div>
+                              <div className="flex-1 p-2 flex flex-col gap-1.5">
+                                <div className="h-2 w-1/3 rounded bg-white/20" />
+                                <div className="h-2 w-2/3 rounded bg-white/10" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-white">
+                              {pos.title}
+                            </span>
+                            {active && (
+                              <Check className="w-4 h-4 text-primary shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-[11px] text-white/55 leading-relaxed">
+                            {pos.desc}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+
+              <div className="border-t border-white/10 pt-5 space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white mb-1">
+                    Task Document Opening Behavior
+                  </h3>
+                  <p className="text-xs text-white/55">
+                    Choose how the TipTap rich-text document editor opens when you
+                    click the &ldquo;Doc&rdquo; button on a task row.
+                  </p>
+                </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {(
@@ -1199,6 +1301,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                   );
                 })}
+              </div>
               </div>
 
               {/* Show Completed Tasks Preference */}

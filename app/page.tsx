@@ -24,6 +24,7 @@ import { createClient, isSupabaseConfigured } from "@/utils/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { VideoBackground } from "@/components/background/VideoBackground";
 import { TopNavBar } from "@/components/dashboard/TopNavBar";
+import { LeftSidebarNav } from "@/components/dashboard/LeftSidebarNav";
 import { GeminiHeroChat } from "@/components/ai/GeminiHeroChat";
 import {
   EnrichedMyDayBlock,
@@ -2061,30 +2062,57 @@ export default function KiteWorkspacePage() {
             onGoogleSignIn={handleGoogleSignIn}
           />
         ) : (
-          <>
-            {/* Top Navbar */}
-            <TopNavBar
-              profile={profile}
-              workspaceConfig={workspaceConfig}
-              isAuthenticated={isAuthenticated}
-              canAccessWorkspace={canAccessWorkspace}
-              activeTab={effectiveTab}
-              aiTemporarilyDisabled={aiTemporarilyDisabled}
-              hasGeminiApiKey={hasGeminiApiKey}
-              activeTaskCount={activeTaskCount}
-              isSyncingCanvas={isSyncingCanvas}
-              onSelectTab={setActiveTab}
-              onResetChatToHero={handleResetChatToHero}
-              onUpdateProfile={handleUpdateProfile}
-              onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
-              onOpenSettings={handleOpenCustomizeSettings}
-              onQuickSyncCanvas={handleOpenCanvasSyncModal}
-              onGoogleSignIn={handleGoogleSignIn}
-              onSignOut={handleSignOut}
-            />
+          <div
+            className={`flex flex-1 min-h-screen w-full ${
+              (workspaceConfig.navPosition || "left") === "left"
+                ? "flex-col lg:flex-row"
+                : "flex-col"
+            }`}
+          >
+            {(workspaceConfig.navPosition || "left") === "left" ? (
+              <LeftSidebarNav
+                profile={profile}
+                workspaceConfig={workspaceConfig}
+                isAuthenticated={isAuthenticated}
+                canAccessWorkspace={canAccessWorkspace}
+                activeTab={effectiveTab}
+                aiTemporarilyDisabled={aiTemporarilyDisabled}
+                hasGeminiApiKey={hasGeminiApiKey}
+                activeTaskCount={activeTaskCount}
+                isSyncingCanvas={isSyncingCanvas}
+                onSelectTab={setActiveTab}
+                onResetChatToHero={handleResetChatToHero}
+                onUpdateProfile={handleUpdateProfile}
+                onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
+                onOpenSettings={handleOpenCustomizeSettings}
+                onQuickSyncCanvas={handleOpenCanvasSyncModal}
+                onGoogleSignIn={handleGoogleSignIn}
+                onSignOut={handleSignOut}
+              />
+            ) : (
+              <TopNavBar
+                profile={profile}
+                workspaceConfig={workspaceConfig}
+                isAuthenticated={isAuthenticated}
+                canAccessWorkspace={canAccessWorkspace}
+                activeTab={effectiveTab}
+                aiTemporarilyDisabled={aiTemporarilyDisabled}
+                hasGeminiApiKey={hasGeminiApiKey}
+                activeTaskCount={activeTaskCount}
+                isSyncingCanvas={isSyncingCanvas}
+                onSelectTab={setActiveTab}
+                onResetChatToHero={handleResetChatToHero}
+                onUpdateProfile={handleUpdateProfile}
+                onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
+                onOpenSettings={handleOpenCustomizeSettings}
+                onQuickSyncCanvas={handleOpenCanvasSyncModal}
+                onGoogleSignIn={handleGoogleSignIn}
+                onSignOut={handleSignOut}
+              />
+            )}
 
             {/* Main Content Area */}
-            <main className="flex-1 flex flex-col mx-auto w-full max-w-[1600px] px-2.5 sm:px-6 lg:px-8 py-3.5 sm:py-6">
+            <main className="flex-1 min-w-0 flex flex-col mx-auto w-full max-w-[1600px] px-2.5 sm:px-6 lg:px-8 py-3.5 sm:py-6">
               {effectiveTab === "chat" ? (
                 /* my chat: Hero Homepage + Autonomous Workspace Agent */
                 <GeminiHeroChat
@@ -2197,7 +2225,7 @@ export default function KiteWorkspacePage() {
                 </div>
               )}
             </main>
-          </>
+          </div>
         )}
       </div>
 

@@ -261,7 +261,10 @@ export interface WorkspaceConfig {
   studySession?: StudySessionState | null;
   journeyState?: JourneyWorkspaceState | null;
   cursingMode?: boolean;
+  navPosition?: NavPosition;
 }
+
+export type NavPosition = "left" | "top";
 
 export type WorkspaceTab = "chat" | "tasks" | "my_day" | "journey" | "stats" | "study";
 
@@ -862,5 +865,6 @@ export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
     studySession: raw.studySession || null,
     journeyState: raw.journeyState || null,
     cursingMode: Boolean(raw.cursingMode),
+    navPosition: raw.navPosition === "top" ? "top" : "left",
   };
 }
