@@ -48,7 +48,7 @@ interface TopNavBarProps {
   onSignOut: () => void;
 }
 
-export const TopNavBar: React.FC<TopNavBarProps> = ({
+export const TopNavBar: React.FC<TopNavBarProps> = React.memo(({
   profile,
   workspaceConfig,
   isAuthenticated,
@@ -73,7 +73,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
     THEME_OPTIONS.find((t) => t.id === profile.theme) || THEME_OPTIONS[0];
 
   return (
-    <header className="sticky top-0 z-30 border-b theme-header-bg backdrop-blur-xl transition-colors duration-300">
+    <header className="sticky top-0 z-30 border-b theme-header-bg backdrop-blur-md transition-colors duration-300">
       <div className="mx-auto max-w-[1600px] px-2.5 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-1.5 sm:gap-3">
         {/* Left: Brand Identity matching user screenshot, strictly non-editable */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 select-none">
@@ -115,12 +115,12 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           </a>
         </div>
 
-        {/* Center: Workspace Mode Switcher (Chat hidden when user opts out of AI; Tasks & my day always available) */}
+        {/* Center: Workspace Mode Switcher — consistent "my <feature>" naming */}
         {canAccessWorkspace && (
           <div
             role="tablist"
             aria-label="Workspace View Switcher"
-            className="inline-flex items-center rounded-full border border-white/15 bg-black/45 p-1 backdrop-blur-xl shadow-inner shrink-0"
+            className="inline-flex items-center rounded-full border border-white/15 bg-black/45 p-1 shadow-inner shrink-0"
           >
             {!aiTemporarilyDisabled && (
               <button
@@ -131,7 +131,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                   onSelectTab("chat");
                   onResetChatToHero?.();
                 }}
-                className={`relative inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-all ${
+                className={`relative inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-colors ${
                   activeTab === "chat"
                     ? "bg-white/15 text-white shadow-sm border border-white/15"
                     : "text-white/60 hover:text-white border border-transparent"
@@ -142,11 +142,11 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                     activeTab === "chat" ? "text-primary" : "text-white/50"
                   }`}
                 />
-                <span>Chat</span>
+                <span className="whitespace-nowrap">my chat</span>
                 {!hasGeminiApiKey && (
                   <span
                     className="h-1.5 w-1.5 rounded-full bg-amber-400"
-                    title="Google AI API key required"
+                    title="AI API key required"
                   />
                 )}
               </button>
@@ -157,7 +157,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               role="tab"
               aria-selected={activeTab === "tasks"}
               onClick={() => onSelectTab("tasks")}
-              className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-all ${
+              className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-colors ${
                 activeTab === "tasks"
                   ? "bg-white/15 text-white shadow-sm border border-white/15"
                   : "text-white/60 hover:text-white border border-transparent"
@@ -168,7 +168,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                   activeTab === "tasks" ? "text-primary" : "text-white/50"
                 }`}
               />
-              <span>Tasks</span>
+              <span className="whitespace-nowrap">my tasks</span>
               {activeTaskCount > 0 && (
                 <span
                   className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
@@ -187,7 +187,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               role="tab"
               aria-selected={activeTab === "my_day"}
               onClick={() => onSelectTab("my_day")}
-              className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-all ${
+              className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-colors ${
                 activeTab === "my_day"
                   ? "bg-white/15 text-white shadow-sm border border-white/15"
                   : "text-white/60 hover:text-white border border-transparent"
@@ -198,7 +198,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                   activeTab === "my_day" ? "text-primary" : "text-white/50"
                 }`}
               />
-              <span>my day</span>
+              <span className="whitespace-nowrap">my day</span>
               {(workspaceConfig.myDaySchedule?.blocks.length || 0) > 0 && (
                 <span
                   className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
@@ -224,7 +224,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                   role="tab"
                   aria-selected={activeTab === "journey"}
                   onClick={() => onSelectTab("journey")}
-                  className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-all ${
+                  className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-colors ${
                     activeTab === "journey"
                       ? "bg-white/15 text-white shadow-sm border border-white/15"
                       : "text-white/60 hover:text-white border border-transparent"
@@ -256,7 +256,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               role="tab"
               aria-selected={activeTab === "study"}
               onClick={() => onSelectTab("study")}
-              className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-all ${
+              className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-colors ${
                 activeTab === "study"
                   ? "bg-white/15 text-white shadow-sm border border-white/15"
                   : "text-white/60 hover:text-white border border-transparent"
@@ -267,7 +267,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                   activeTab === "study" ? "text-primary" : "text-white/50"
                 }`}
               />
-              <span>flo</span>
+              <span className="whitespace-nowrap">my flo</span>
               {workspaceConfig.studySession?.syllabus && (
                 <span
                   className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
@@ -462,4 +462,6 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
       </div>
     </header>
   );
-};
+});
+
+TopNavBar.displayName = "TopNavBar";

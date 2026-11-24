@@ -40,7 +40,7 @@ interface JourneyMilestoneCardProps {
   onSendToTasks?: (milestone: JourneyMilestone) => void;
 }
 
-export const JourneyMilestoneCard: React.FC<JourneyMilestoneCardProps> = ({
+export const JourneyMilestoneCard: React.FC<JourneyMilestoneCardProps> = React.memo(({
   milestone,
   index,
   totalCount,
@@ -96,7 +96,9 @@ export const JourneyMilestoneCard: React.FC<JourneyMilestoneCardProps> = ({
         damping: 28,
         mass: 0.85,
       }}
-      className="relative flex items-start gap-4 sm:gap-5 group"
+      className={`relative flex items-start gap-4 sm:gap-5 group ${
+        index >= 4 ? "perf-offscreen-card" : ""
+      }`}
     >
       {/* Timeline Waypoint Node anchored on the vertical journey spine */}
       <div className="relative z-10 flex flex-col items-center pt-5 shrink-0">
@@ -151,7 +153,7 @@ export const JourneyMilestoneCard: React.FC<JourneyMilestoneCardProps> = ({
 
       {/* Semantic Milestone Card (<article>) */}
       <article
-        className={`journey-milestone-card relative flex-1 min-w-0 rounded-2xl border p-4 sm:p-5 backdrop-blur-xl transition-all duration-300 ${
+        className={`journey-milestone-card relative flex-1 min-w-0 rounded-2xl border p-4 sm:p-5 backdrop-blur-md transition-colors duration-200 ${
           isHighlighted
             ? "theme-panel border-primary/80 shadow-[0_0_32px_-4px_color-mix(in_srgb,var(--primary)_55%,transparent)]"
             : isDone
@@ -242,7 +244,7 @@ export const JourneyMilestoneCard: React.FC<JourneyMilestoneCardProps> = ({
               <button
                 type="button"
                 onClick={() => onSendToTasks(milestone)}
-                title="Add to daily Tasks list"
+                title="Add to my tasks"
                 className="rounded-lg p-1.5 text-white/50 hover:text-primary hover:bg-white/10 transition-colors"
               >
                 <ListPlus className="w-3.5 h-3.5" />
@@ -432,4 +434,6 @@ export const JourneyMilestoneCard: React.FC<JourneyMilestoneCardProps> = ({
       </article>
     </motion.div>
   );
-};
+});
+
+JourneyMilestoneCard.displayName = "JourneyMilestoneCard";

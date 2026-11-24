@@ -890,26 +890,26 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
           onSelectTab("chat");
           setShowConversation(false);
         }}
-        className={`rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-all ${
+        className={`rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-colors ${
           activeTab === "chat"
             ? "bg-[#282a2f]/95 border border-white/[0.14] text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
             : "border border-transparent text-white/60 hover:text-white hover:bg-white/[0.06]"
         }`}
       >
-        Chat
+        my chat
       </button>
       <button
         type="button"
         role="tab"
         aria-selected={activeTab === "tasks"}
         onClick={() => onSelectTab("tasks")}
-        className={`inline-flex items-center gap-1.5 rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-all ${
+        className={`inline-flex items-center gap-1.5 rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-colors ${
           activeTab === "tasks"
             ? "bg-[#282a2f]/95 border border-white/[0.14] text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
             : "border border-transparent text-white/60 hover:text-white hover:bg-white/[0.06]"
         }`}
       >
-        <span>Tasks</span>
+        <span>my tasks</span>
         {activeTaskCount > 0 && (
           <span className="rounded-full bg-white/10 px-1.5 py-0.2 text-[10px] font-semibold text-white/75">
             {activeTaskCount}
@@ -921,7 +921,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
         role="tab"
         aria-selected={activeTab === "my_day"}
         onClick={() => onSelectTab("my_day")}
-        className={`inline-flex items-center gap-1.5 rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-all ${
+        className={`inline-flex items-center gap-1.5 rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-colors ${
           activeTab === "my_day"
             ? "bg-[#282a2f]/95 border border-white/[0.14] text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
             : "border border-transparent text-white/60 hover:text-white hover:bg-white/[0.06]"
@@ -933,6 +933,32 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
             {workspaceConfig.myDaySchedule?.blocks.length}
           </span>
         )}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "journey"}
+        onClick={() => onSelectTab("journey")}
+        className={`inline-flex items-center gap-1.5 rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-colors ${
+          activeTab === "journey"
+            ? "bg-[#282a2f]/95 border border-white/[0.14] text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
+            : "border border-transparent text-white/60 hover:text-white hover:bg-white/[0.06]"
+        }`}
+      >
+        <span>my journey</span>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "study"}
+        onClick={() => onSelectTab("study")}
+        className={`inline-flex items-center gap-1.5 rounded-full px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-[13px] font-medium transition-colors ${
+          activeTab === "study"
+            ? "bg-[#282a2f]/95 border border-white/[0.14] text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
+            : "border border-transparent text-white/60 hover:text-white hover:bg-white/[0.06]"
+        }`}
+      >
+        <span>my flo</span>
       </button>
     </div>
   );
@@ -1715,7 +1741,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
             className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/10 px-2.5 sm:px-3 py-1 text-xs text-white/75 hover:text-white transition-colors"
           >
             <Table2 className="w-3.5 h-3.5 text-primary" />
-            <span>Open Table</span>
+            <span>my tasks</span>
           </button>
           <button
             type="button"
@@ -1783,7 +1809,7 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
                             className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/80 hover:text-white transition-colors"
                           >
                             <Table2 className="w-3 h-3 text-primary" />
-                            <span>View in Tasks</span>
+                            <span>View in my tasks</span>
                           </button>
                         )}
 

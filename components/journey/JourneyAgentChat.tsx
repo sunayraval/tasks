@@ -295,7 +295,7 @@ export const JourneyAgentChat: React.FC<JourneyAgentChatProps> = ({
   return (
     <aside
       aria-label="Journey Agent Chat"
-      className="flex flex-col rounded-2xl border theme-panel backdrop-blur-2xl overflow-hidden lg:sticky lg:top-[76px] h-[540px] lg:h-[calc(100vh-100px)]"
+      className="flex flex-col rounded-2xl border theme-panel backdrop-blur-md overflow-hidden lg:sticky lg:top-[76px] h-[540px] lg:h-[calc(100vh-100px)]"
     >
       {/* Agent Chat Header */}
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-white/10 bg-black/25 shrink-0">

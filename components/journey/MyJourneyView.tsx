@@ -1020,7 +1020,7 @@ export const MyJourneyView: React.FC<MyJourneyViewProps> = ({
       {/* ================================================================ */}
       <section aria-label="My Journey Visual Roadmap" className="min-w-0 space-y-5">
         {/* Clean Header Card */}
-        <div className="relative overflow-hidden rounded-2xl border theme-panel p-5 sm:p-6 backdrop-blur-2xl">
+        <div className="relative overflow-hidden rounded-2xl border theme-panel p-5 sm:p-6 backdrop-blur-md">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               {/* Top tiny label + Journey switcher */}

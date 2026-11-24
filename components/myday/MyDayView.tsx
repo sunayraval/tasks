@@ -531,11 +531,22 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
   const blocks = useMemo(() => schedule?.blocks || [], [schedule]);
   const autoCascadeTimes = schedule?.autoCascadeTimes ?? true;
 
-  // Live tick so active block highlighting in timeline stays synced every 15s
+  // Live tick so active block highlighting in timeline stays synced every 10s (pauses when tab is hidden)
   const [nowTick, setNowTick] = useState<Date>(() => new Date());
   useEffect(() => {
-    const id = setInterval(() => setNowTick(new Date()), 10000);
-    return () => clearInterval(id);
+    const id = window.setInterval(() => {
+      if (!document.hidden) {
+        setNowTick(new Date());
+      }
+    }, 10000);
+    const onVisibility = () => {
+      if (!document.hidden) setNowTick(new Date());
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   const tableTasks = useMemo(
@@ -1081,8 +1092,8 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
                       <div className="py-5 px-3 text-center space-y-2.5 text-xs text-white/50">
                         <div>
                           {tableTasks.length === 0
-                            ? "Your Tasks list is currently empty."
-                            : "No matching tasks found in your Tasks table."}
+                            ? "Your my tasks list is currently empty."
+                            : "No matching tasks found in my tasks."}
                         </div>
                         {activeTableTasks.length === 0 &&
                           !aiTemporarilyDisabled &&

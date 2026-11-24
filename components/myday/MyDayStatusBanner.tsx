@@ -36,15 +36,45 @@ export const MyDayStatusBanner: React.FC<MyDayStatusBannerProps> = ({
   onToggleBlockComplete,
   onOpenMyDay,
 }) => {
-  // Hydrate live clock safely to prevent SSR/CSR mismatch
+  // Hydrate live clock safely & pause 1s timer when tab is backgrounded
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
     setNow(new Date());
-    const interval = setInterval(() => {
-      setNow(new Date());
-    }, 1000);
-    return () => clearInterval(interval);
+    let intervalId: number | null = null;
+
+    const startTimer = () => {
+      if (intervalId !== null) return;
+      intervalId = window.setInterval(() => {
+        if (!document.hidden) {
+          setNow(new Date());
+        }
+      }, 1000);
+    };
+
+    const stopTimer = () => {
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        stopTimer();
+      } else {
+        setNow(new Date());
+        startTimer();
+      }
+    };
+
+    if (!document.hidden) startTimer();
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      stopTimer();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   const effectiveDate = useMemo(() => now ?? new Date(), [now]);

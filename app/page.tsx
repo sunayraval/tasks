@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import dynamic from "next/dynamic";
 import {
   AIProvider,
   AgentUndoSnapshot,
@@ -23,13 +24,7 @@ import { createClient, isSupabaseConfigured } from "@/utils/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { VideoBackground } from "@/components/background/VideoBackground";
 import { TopNavBar } from "@/components/dashboard/TopNavBar";
-import { CircularProgress } from "@/components/dashboard/CircularProgress";
-import { TaskTable } from "@/components/tasks/TaskTable";
 import { GeminiHeroChat } from "@/components/ai/GeminiHeroChat";
-import { GeminiSetupModal } from "@/components/ai/GeminiSetupModal";
-import { MyDayView } from "@/components/myday/MyDayView";
-import { MyJourneyView } from "@/components/journey/MyJourneyView";
-import { StudyModeView } from "@/components/study/StudyModeView";
 import {
   EnrichedMyDayBlock,
   getLocalDateYMD,
@@ -37,15 +32,81 @@ import {
   pruneAndSyncMyDaySchedule,
   syncTasksWithHeadersAndFilter,
 } from "@/utils/myDayUtils";
-import { KiteMarketingPage } from "@/components/marketing/KiteMarketingPage";
 import { KiteFlyingLoader } from "@/components/ui/KiteBrand";
-import {
-  SettingsModal,
-  SettingsTabId,
-} from "@/components/settings/SettingsModal";
-import { QuickCreateTaskModal } from "@/components/tasks/QuickCreateTaskModal";
-import { CanvasSyncModal } from "@/components/canvas/CanvasSyncModal";
+import type { SettingsTabId } from "@/components/settings/SettingsModal";
 import { CheckCircle2 } from "lucide-react";
+
+const TabLoader = () => (
+  <div className="flex-1 flex items-center justify-center py-20">
+    <KiteFlyingLoader label="loading view" compact />
+  </div>
+);
+
+const CircularProgress = dynamic(
+  () =>
+    import("@/components/dashboard/CircularProgress").then(
+      (m) => m.CircularProgress
+    ),
+  { ssr: false }
+);
+
+const TaskTable = dynamic(
+  () => import("@/components/tasks/TaskTable").then((m) => m.TaskTable),
+  { ssr: false, loading: TabLoader }
+);
+
+const MyDayView = dynamic(
+  () => import("@/components/myday/MyDayView").then((m) => m.MyDayView),
+  { ssr: false, loading: TabLoader }
+);
+
+const MyJourneyView = dynamic(
+  () =>
+    import("@/components/journey/MyJourneyView").then((m) => m.MyJourneyView),
+  { ssr: false, loading: TabLoader }
+);
+
+const StudyModeView = dynamic(
+  () =>
+    import("@/components/study/StudyModeView").then((m) => m.StudyModeView),
+  { ssr: false, loading: TabLoader }
+);
+
+const KiteMarketingPage = dynamic(
+  () =>
+    import("@/components/marketing/KiteMarketingPage").then(
+      (m) => m.KiteMarketingPage
+    ),
+  { ssr: false, loading: TabLoader }
+);
+
+const GeminiSetupModal = dynamic(
+  () =>
+    import("@/components/ai/GeminiSetupModal").then((m) => m.GeminiSetupModal),
+  { ssr: false }
+);
+
+const SettingsModal = dynamic(
+  () =>
+    import("@/components/settings/SettingsModal").then((m) => m.SettingsModal),
+  { ssr: false }
+);
+
+const QuickCreateTaskModal = dynamic(
+  () =>
+    import("@/components/tasks/QuickCreateTaskModal").then(
+      (m) => m.QuickCreateTaskModal
+    ),
+  { ssr: false }
+);
+
+const CanvasSyncModal = dynamic(
+  () =>
+    import("@/components/canvas/CanvasSyncModal").then(
+      (m) => m.CanvasSyncModal
+    ),
+  { ssr: false }
+);
 
 const LOCAL_STORAGE_CONFIG_KEY = "taskit_workspace_config_v1";
 const LOCAL_STORAGE_PROFILE_PREFS_KEY = "kite_profile_prefs_v1";
@@ -879,7 +940,7 @@ export default function KiteWorkspacePage() {
         return insertedList;
       });
 
-      showToast(`Added to Tasks: "${created.title}"`);
+      showToast(`Added to my tasks: "${created.title}"`);
 
       if (isSupabaseConfigured() && isAuthenticated) {
         try {
@@ -1883,6 +1944,7 @@ export default function KiteWorkspacePage() {
       {/* Ambient Theme & Video Background */}
       <VideoBackground
         preset={profile.video_bg_preset}
+        theme={profile.theme}
         dim={profile.video_bg_dim}
         blur={profile.video_bg_blur}
         customVideoVersion={customVideoVersion}
@@ -1928,9 +1990,9 @@ export default function KiteWorkspacePage() {
             />
 
             {/* Main Content Area */}
-            <main className="flex-1 flex flex-col mx-auto w-full max-w-[1600px] px-2.5 sm:px-6 lg:px-8 py-3.5 sm:py-6 transition-all duration-300">
+            <main className="flex-1 flex flex-col mx-auto w-full max-w-[1600px] px-2.5 sm:px-6 lg:px-8 py-3.5 sm:py-6">
               {effectiveTab === "chat" ? (
-                /* Hero Homepage: "What's on your mind?" + Autonomous Workspace Agent */
+                /* my chat: Hero Homepage + Autonomous Workspace Agent */
                 <GeminiHeroChat
                   tasks={visibleBoardTasks}
                   profile={profile}
@@ -1961,7 +2023,7 @@ export default function KiteWorkspacePage() {
                   onToggleMyDayBlockComplete={handleToggleMyDayBlockComplete}
                 />
               ) : effectiveTab === "my_day" ? (
-                /* MY DAY Tab: Live Centered Clock + Dual Status Bars + Manual & AI Auto-Arrange Builder */
+                /* my day: Live Centered Clock + Dual Status Bars + Manual & AI Auto-Arrange Builder */
                 <MyDayView
                   tasks={visibleBoardTasks}
                   profile={profile}
@@ -1982,7 +2044,7 @@ export default function KiteWorkspacePage() {
                   }}
                 />
               ) : effectiveTab === "journey" ? (
-                /* MY JOURNEY Tab: Visual Milestone Roadmap + Sequential Journey AI Agent */
+                /* my journey: Visual Milestone Roadmap + Sequential Journey AI Agent */
                 <MyJourneyView
                   profile={profile}
                   workspaceConfig={workspaceConfig}
@@ -1994,7 +2056,7 @@ export default function KiteWorkspacePage() {
                   onPushMilestoneToTasks={handlePushMilestoneToTasks}
                 />
               ) : effectiveTab === "study" ? (
-                /* STUDY MODE (flo study) Tab: Editable Curriculum + Bite-Sized Teaching + Visuals + Checkpoints */
+                /* my flo: Editable Curriculum + Bite-Sized Teaching + Visuals + Checkpoints */
                 <StudyModeView
                   profile={profile}
                   workspaceConfig={workspaceConfig}
@@ -2005,7 +2067,7 @@ export default function KiteWorkspacePage() {
                   onShowToast={showToast}
                 />
               ) : (
-                /* Tasks Tab: Telemetry Header + Document-Style Resizable Task Table */
+                /* my tasks: Telemetry Header + Document-Style Resizable Task Table */
                 <div className="space-y-5">
                   <CircularProgress
                     tasks={syncedTasks}
@@ -2038,8 +2100,8 @@ export default function KiteWorkspacePage() {
         )}
       </div>
 
-      {/* NVIDIA NIM + Google Gemini API Key Onboarding & Setup Modal */}
-      {canAccessWorkspace && (
+      {/* Lazily mounted modals — chunks only load when actually opened */}
+      {canAccessWorkspace && isGeminiSetupOpen && (
         <GeminiSetupModal
           isOpen={isGeminiSetupOpen}
           initialKey={effectiveApiKey}
@@ -2055,8 +2117,7 @@ export default function KiteWorkspacePage() {
         />
       )}
 
-      {/* Settings & Customization Modal */}
-      {canAccessWorkspace && (
+      {canAccessWorkspace && isSettingsOpen && (
         <SettingsModal
           isOpen={isSettingsOpen}
           initialTab={settingsTab}
@@ -2076,18 +2137,18 @@ export default function KiteWorkspacePage() {
         />
       )}
 
-      {/* Interactive Canvas LMS Assignment Selection Modal */}
-      <CanvasSyncModal
-        isOpen={isCanvasSyncModalOpen}
-        onClose={handleCloseCanvasSyncModal}
-        feedUrl={profile.canvas_feed_url || ""}
-        existingTasks={syncedTasks}
-        onCommitSelected={handleCommitCanvasSelected}
-        isCommitting={isCommittingCanvas}
-      />
+      {isCanvasSyncModalOpen && (
+        <CanvasSyncModal
+          isOpen={isCanvasSyncModalOpen}
+          onClose={handleCloseCanvasSyncModal}
+          feedUrl={profile.canvas_feed_url || ""}
+          existingTasks={syncedTasks}
+          onCommitSelected={handleCommitCanvasSelected}
+          isCommitting={isCommittingCanvas}
+        />
+      )}
 
-      {/* Quick Create Task Modal */}
-      {canAccessWorkspace && (
+      {canAccessWorkspace && isNewTaskModalOpen && (
         <QuickCreateTaskModal
           isOpen={isNewTaskModalOpen}
           defaultSection={newTaskDefaultSection}
@@ -2099,7 +2160,7 @@ export default function KiteWorkspacePage() {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-primary/40 theme-panel px-4 py-2 text-xs font-medium text-white shadow-2xl backdrop-blur-xl">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-primary/40 theme-panel px-4 py-2 text-xs font-medium text-white shadow-2xl backdrop-blur-md">
           <CheckCircle2 className="w-4 h-4 text-primary" />
           <span>{toastMessage}</span>
         </div>
