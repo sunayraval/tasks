@@ -143,7 +143,7 @@ body {
   background-color: var(--bg-base);
   color: #f4f4f5;
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow-x: clip;
   transition: background-color 0.35s ease;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }

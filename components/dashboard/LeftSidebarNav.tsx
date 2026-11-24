@@ -657,14 +657,21 @@ export const LeftSidebarNav: React.FC<LeftSidebarNavProps> = React.memo(
 
     return (
       <>
-        {/* Desktop Persistent Left Rail */}
+        {/* Desktop Persistent Fixed Left Rail (always stays full-height across screen while scrolling) */}
         <aside
-          className={`hidden lg:flex flex-col sticky top-0 h-screen shrink-0 border-r theme-header-bg z-30 transition-[width] duration-200 ease-out ${
+          className={`hidden lg:flex flex-col fixed inset-y-0 left-0 h-dvh border-r theme-header-bg z-30 transition-[width] duration-200 ease-out ${
             collapsed ? "w-[64px]" : "w-[244px]"
           }`}
         >
           {renderSidebarInner(false)}
         </aside>
+        {/* Matching layout spacer so main content never slides under the fixed sidebar */}
+        <div
+          aria-hidden="true"
+          className={`hidden lg:block shrink-0 transition-[width] duration-200 ease-out ${
+            collapsed ? "w-[64px]" : "w-[244px]"
+          }`}
+        />
 
         {/* Mobile Compact Top Header Bar */}
         <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-3 py-2.5 border-b theme-header-bg">
