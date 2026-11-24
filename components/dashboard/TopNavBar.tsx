@@ -7,12 +7,14 @@ import {
   UserProfile,
   WorkspaceConfig,
   WorkspaceTab,
+  computeJourneyProgress,
   computeSyllabusProgress,
 } from "@/types/taskit";
 import {
   CalendarClock,
   Check,
   ChevronDown,
+  Compass,
   GraduationCap,
   LogIn,
   LogOut,
@@ -209,6 +211,45 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
                 </span>
               )}
             </button>
+
+            {(() => {
+              const jState = workspaceConfig.journeyState;
+              const activeJ =
+                jState?.journeys?.find((j) => j.id === jState.activeJourneyId) ||
+                jState?.journeys?.[0];
+              const jProg = computeJourneyProgress(activeJ);
+              return (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "journey"}
+                  onClick={() => onSelectTab("journey")}
+                  className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-all ${
+                    activeTab === "journey"
+                      ? "bg-white/15 text-white shadow-sm border border-white/15"
+                      : "text-white/60 hover:text-white border border-transparent"
+                  }`}
+                >
+                  <Compass
+                    className={`w-3.5 h-3.5 ${
+                      activeTab === "journey" ? "text-primary" : "text-white/50"
+                    }`}
+                  />
+                  <span className="whitespace-nowrap">my journey</span>
+                  {jProg.total > 0 && (
+                    <span
+                      className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
+                        activeTab === "journey"
+                          ? "bg-primary/25 text-highlight"
+                          : "bg-white/10 text-white/65"
+                      }`}
+                    >
+                      {jProg.completed}/{jProg.total}
+                    </span>
+                  )}
+                </button>
+              );
+            })()}
 
             <button
               type="button"

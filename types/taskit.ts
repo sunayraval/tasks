@@ -235,7 +235,9 @@ export interface UserMemoryNote {
 }
 
 import type { StudySessionState } from "@/types/study";
+import type { JourneyWorkspaceState } from "@/types/journey";
 export * from "@/types/study";
+export * from "@/types/journey";
 
 export interface WorkspaceConfig {
   workspaceTitle: string;
@@ -257,10 +259,11 @@ export interface WorkspaceConfig {
   myDaySchedule?: MyDaySchedule | null;
   memoryNotes?: UserMemoryNote[];
   studySession?: StudySessionState | null;
+  journeyState?: JourneyWorkspaceState | null;
   cursingMode?: boolean;
 }
 
-export type WorkspaceTab = "chat" | "tasks" | "my_day" | "study";
+export type WorkspaceTab = "chat" | "tasks" | "my_day" | "journey" | "study";
 
 export type AIModelChoice = "flash" | "pro";
 
@@ -765,6 +768,7 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
   myDaySchedule: null,
   memoryNotes: [],
   studySession: null,
+  journeyState: null,
   cursingMode: false,
 };
 
@@ -856,6 +860,7 @@ export function getWorkspaceConfig(profile: UserProfile): WorkspaceConfig {
         : null,
     memoryNotes: Array.isArray(raw.memoryNotes) ? raw.memoryNotes : [],
     studySession: raw.studySession || null,
+    journeyState: raw.journeyState || null,
     cursingMode: Boolean(raw.cursingMode),
   };
 }

@@ -3104,7 +3104,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
 
       workspace_utilities: tool({
         description:
-          "Open the Canvas LMS assignment selection picker or switch the user's active tab between Chat, Tasks table, and MY DAY.",
+          "Open the Canvas LMS assignment selection picker or switch the user's active tab between Chat, Tasks table, MY DAY, MY JOURNEY, and flo study.",
         parameters: z.object({
           sync_canvas: z
             .boolean()
@@ -3113,10 +3113,10 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               "Set true when user asks to sync, import, or refresh Canvas assignments so the assignment selection UI opens for them"
             ),
           switch_to_tab: z
-            .enum(["chat", "tasks", "my_day", "study"])
+            .enum(["chat", "tasks", "my_day", "journey", "study"])
             .optional()
             .describe(
-              "Set to 'tasks', 'my_day', or 'study' (Study Mode / flo study) when the user explicitly asks to switch to or open that tab"
+              "Set to 'tasks', 'my_day', 'journey' (my journey milestone roadmap), or 'study' (Study Mode / flo study) when the user explicitly asks to switch to or open that tab"
             ),
         }),
         execute: async ({ sync_canvas, switch_to_tab }) => {

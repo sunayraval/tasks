@@ -630,6 +630,31 @@ progress.taskit-progress::-moz-progress-bar {
     0 0 0 1px var(--panel-border);
 }
 
+/* Modern intrinsic size transitions + My Journey visual helpers */
+:root {
+  interpolate-size: allow-keywords;
+}
+
+.journey-milestone-card {
+  container-type: inline-size;
+}
+
+@keyframes journeyNodePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.65;
+  }
+  50% {
+    transform: scale(1.42);
+    opacity: 0;
+  }
+}
+
+.animate-journey-beacon {
+  animation: journeyNodePulse 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .kite-glider,
   .kite-tail-ribbon,
@@ -648,7 +673,8 @@ progress.taskit-progress::-moz-progress-bar {
   .animate-sharingan-pulse,
   .animate-sharingan-aura,
   .animate-sakura-spin,
-  .animate-sakura-tree-sway {
+  .animate-sakura-tree-sway,
+  .animate-journey-beacon {
     animation: none;
   }
 }

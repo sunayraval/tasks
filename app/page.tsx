@@ -9,6 +9,7 @@ import {
   DEFAULT_WORKSPACE_CONFIG,
   getWorkspaceConfig,
   HeroChatMessage,
+  JourneyMilestone,
   normalizeVideoPreset,
   SectionGroup,
   SubTask,
@@ -27,6 +28,7 @@ import { TaskTable } from "@/components/tasks/TaskTable";
 import { GeminiHeroChat } from "@/components/ai/GeminiHeroChat";
 import { GeminiSetupModal } from "@/components/ai/GeminiSetupModal";
 import { MyDayView } from "@/components/myday/MyDayView";
+import { MyJourneyView } from "@/components/journey/MyJourneyView";
 import { StudyModeView } from "@/components/study/StudyModeView";
 import {
   EnrichedMyDayBlock,
@@ -832,7 +834,7 @@ export default function KiteWorkspacePage() {
     [isAuthenticated]
   );
 
-  // 5. Create Task (from Modal or Copilot) with real UUID
+  // 5. Create Task (from Modal, Journey, or Copilot) with real UUID
   const handleCreateTask = useCallback(
     async (newTaskInput: Omit<TaskItem, "id" | "created_at" | "updated_at">) => {
       const nowISO = new Date().toISOString();
@@ -844,8 +846,40 @@ export default function KiteWorkspacePage() {
         updated_at: nowISO,
       };
 
-      setTasks((prev) => [...prev, created]);
-      showToast(`Created: "${created.title}"`);
+      const targetSection = (created.section_group || "TODAY").toUpperCase();
+      let insertedList: TaskItem[] = [];
+      let syncedCreated: TaskItem = created;
+
+      setTasks((prev) => {
+        const copy = [...prev];
+        const headerIdx = copy.findIndex(
+          (t) =>
+            Boolean(t.custom_properties?.is_header) &&
+            (t.section_group || "").toUpperCase() === targetSection
+        );
+        if (headerIdx !== -1) {
+          let insertIdx = copy.length;
+          for (let i = headerIdx + 1; i < copy.length; i++) {
+            if (copy[i].custom_properties?.is_header) {
+              insertIdx = i;
+              break;
+            }
+          }
+          copy.splice(insertIdx, 0, created);
+        } else {
+          copy.push(created);
+        }
+        insertedList = syncTasksWithHeadersAndFilter(copy, {
+          filterPastDue: true,
+          hideCompleted: false,
+          defaultSectionGroup: workspaceConfig.sections[0]?.id || "TODAY",
+        });
+        syncedCreated =
+          insertedList.find((t) => t.id === newUuid) || created;
+        return insertedList;
+      });
+
+      showToast(`Added to Tasks: "${created.title}"`);
 
       if (isSupabaseConfigured() && isAuthenticated) {
         try {
@@ -859,20 +893,20 @@ export default function KiteWorkspacePage() {
             await supabase.from("tasks").insert({
               id: newUuid,
               user_id: targetUserId,
-              title: created.title,
-              content: created.content,
-              status: created.status,
-              type: created.type,
-              priority: created.priority,
-              due_date: created.due_date,
-              estimated_minutes: created.estimated_minutes,
-              tags: created.tags,
-              notes: created.notes,
-              is_canvas_assignment: created.is_canvas_assignment,
-              canvas_course_code: created.canvas_course_code,
-              custom_properties: created.custom_properties || {},
-              section_group: created.section_group,
-              order_index: created.order_index,
+              title: syncedCreated.title,
+              content: syncedCreated.content,
+              status: syncedCreated.status,
+              type: syncedCreated.type,
+              priority: syncedCreated.priority,
+              due_date: syncedCreated.due_date,
+              estimated_minutes: syncedCreated.estimated_minutes,
+              tags: syncedCreated.tags,
+              notes: syncedCreated.notes,
+              is_canvas_assignment: syncedCreated.is_canvas_assignment,
+              canvas_course_code: syncedCreated.canvas_course_code,
+              custom_properties: syncedCreated.custom_properties || {},
+              section_group: syncedCreated.section_group,
+              order_index: syncedCreated.order_index,
             });
           }
         } catch (err) {
@@ -880,7 +914,7 @@ export default function KiteWorkspacePage() {
         }
       }
     },
-    [showToast, isAuthenticated, profile.id]
+    [showToast, isAuthenticated, profile.id, workspaceConfig.sections]
   );
 
   // 6a. Inline Create Task Row directly in Table (at bottom or right after a specific row/header)
@@ -1806,6 +1840,41 @@ export default function KiteWorkspacePage() {
     ]
   );
 
+  const handlePushMilestoneToTasks = useCallback(
+    (milestone: JourneyMilestone) => {
+      const nextStep = milestone.checkpoints.find((c) => !c.completed);
+      const taskTitle = nextStep
+        ? `${milestone.title}: ${nextStep.title}`
+        : milestone.title;
+      const nowISO = new Date().toISOString();
+
+      handleCreateTask({
+        user_id: profile.id,
+        title: taskTitle,
+        content: milestone.description ? `<p>${milestone.description}</p>` : "",
+        status: workspaceConfig.statuses[0]?.label || "To Do",
+        type:
+          milestone.category === "academics"
+            ? "School"
+            : milestone.category === "career" || milestone.category === "startup"
+            ? "Work"
+            : "Personal",
+        priority: milestone.status === "in_progress" ? "High" : "Medium",
+        due_date: nowISO,
+        estimated_minutes: 45,
+        tags: ["#Journey"],
+        notes: `Milestone (${milestone.timeframe})`,
+        is_canvas_assignment: false,
+        canvas_course_code: null,
+        custom_properties: {},
+        section_group: "TODAY",
+        order_index: tasks.length,
+        completed_at: null,
+      });
+    },
+    [handleCreateTask, profile.id, workspaceConfig.statuses, tasks.length]
+  );
+
   const effectiveTab: WorkspaceTab =
     aiTemporarilyDisabled && activeTab === "chat" ? "tasks" : activeTab;
 
@@ -1911,6 +1980,18 @@ export default function KiteWorkspacePage() {
                       text: "Help me plan my day",
                     });
                   }}
+                />
+              ) : effectiveTab === "journey" ? (
+                /* MY JOURNEY Tab: Visual Milestone Roadmap + Sequential Journey AI Agent */
+                <MyJourneyView
+                  profile={profile}
+                  workspaceConfig={workspaceConfig}
+                  hasApiKey={hasGeminiApiKey}
+                  effectiveApiKey={effectiveApiKey}
+                  onUpdateWorkspaceConfig={handleUpdateWorkspaceConfig}
+                  onOpenApiKeySetup={() => setIsGeminiSetupOpen(true)}
+                  onShowToast={showToast}
+                  onPushMilestoneToTasks={handlePushMilestoneToTasks}
                 />
               ) : effectiveTab === "study" ? (
                 /* STUDY MODE (flo study) Tab: Editable Curriculum + Bite-Sized Teaching + Visuals + Checkpoints */
