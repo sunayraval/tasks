@@ -1594,77 +1594,47 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
   );
 
   // ---------------------------------------------------------------------------
-  // STATE B: Clean Centered "What's on your mind?" Hero Screen (Always First)
+  // STATE B: Ultra-Minimalist Centered Hero Screen
   // ---------------------------------------------------------------------------
   if (isHeroEmpty) {
     return (
-      <div className="relative flex-1 flex flex-col items-center justify-center min-h-[calc(100vh-6rem)] px-3 sm:px-4 py-6 sm:py-10">
-        {/* Subtle Radial Ambient Glow */}
-        <div
-          className="pointer-events-none absolute inset-x-0 top-1/4 mx-auto h-72 max-w-2xl rounded-full blur-[120px] opacity-20"
-          style={{ backgroundColor: "var(--primary)" }}
-        />
-
-        <div className="relative z-10 w-full max-w-[760px] flex flex-col items-center">
-          {/* Minimalist Kite Crest / Sharingan Crest */}
-          <div
-            className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-medium select-none transition-all ${
-              profile.theme === "sharingan"
-                ? "border-red-500/40 bg-red-950/30 text-red-300 shadow-[0_0_16px_rgba(255,31,56,0.35)]"
-                : "border-white/[0.09] bg-white/[0.03] text-white/60"
-            }`}
-          >
-            {profile.theme === "sharingan" ? (
-              <>
-                <SharinganIcon size={16} animate speed="normal" glow interactive />
-                <span className="font-semibold tracking-wider text-red-200">
-                  UCHIHA CLAN DOMAIN
-                </span>
-              </>
-            ) : (
-              <>
-                <KiteLogoMark className="w-3.5 h-3.5 text-primary" />
-                <span>kite workspace</span>
-              </>
-            )}
-          </div>
-
-          {/* Hero Prompt Headline */}
-          <h1 className="text-2xl sm:text-[32px] md:text-[44px] font-normal tracking-[-0.025em] text-white/95 text-center mb-6 sm:mb-9 select-none">
+      <div className="relative flex-1 flex flex-col items-center justify-center min-h-[calc(100vh-6rem)] px-3 sm:px-6 py-8">
+        <div className="w-full max-w-[680px] flex flex-col items-center">
+          {/* Minimalist Greeting Headline */}
+          <h1 className="text-2xl sm:text-3xl md:text-[40px] font-medium tracking-[-0.025em] text-white/95 text-center mb-6 sm:mb-8 select-none">
             What&apos;s on your mind?
           </h1>
 
-          {/* Live Voice Dictation Indicator */}
+          {/* Live Voice Dictation Indicator (only when actively listening) */}
           {isListening && (
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-red-400/35 bg-red-500/15 px-3.5 py-1 text-xs font-medium text-red-200 animate-pulse">
               <Mic className="w-3.5 h-3.5 text-red-400" />
-              <span>Listening — speak your mind, then press Enter...</span>
+              <span>Listening…</span>
             </div>
           )}
 
-          {/* Stadium Input Pill */}
+          {/* Centered Input Pill */}
           {GeminiInputBar}
 
-          {/* One-Click "View Chat" Pill when previous messages exist */}
+          {/* Subtle Resume Link (only if prior messages exist) */}
           {messages.length > 0 && (
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <div className="mt-4 flex items-center justify-center gap-3 text-xs text-white/50">
               <button
                 type="button"
                 onClick={() => setShowConversation(true)}
-                className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/15 hover:bg-primary/25 px-4 py-1.5 text-xs font-semibold text-highlight shadow-sm transition-all"
+                className="inline-flex items-center gap-1.5 hover:text-white transition-colors"
               >
-                <MessageSquare className="w-3.5 h-3.5 text-primary" />
+                <MessageSquare className="w-3.5 h-3.5 text-primary/80" />
                 <span>
-                  View Chat ({messages.length}{" "}
+                  Resume chat ({messages.length}{" "}
                   {messages.length === 1 ? "message" : "messages"})
                 </span>
-                <ArrowRight className="w-3.5 h-3.5" />
               </button>
-
+              <span className="text-white/20">·</span>
               <button
                 type="button"
                 onClick={() => setMessages([])}
-                className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] px-3 py-1.5 text-xs text-white/50 hover:text-white/85 transition-colors"
+                className="inline-flex items-center gap-1 hover:text-white/85 transition-colors"
                 title="Start a fresh conversation"
               >
                 <RotateCcw className="w-3 h-3" />
@@ -1672,67 +1642,6 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
               </button>
             </div>
           )}
-
-          {/* Centered [ Chat | Tasks | my day ] Switcher Pill */}
-          <div className="mt-6">{ModeSwitcherPill}</div>
-
-          {/* Subtle Optional Quick Prompts */}
-          <div className="mt-6 sm:mt-9 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 max-w-2xl px-2">
-            {(activeTaskCount === 0
-              ? [
-                  {
-                    label: "Help me plan my day",
-                    prompt: "Help me plan my day",
-                  },
-                  {
-                    label: "Show my day schedule",
-                    prompt:
-                      "Show my current my day schedule, display the live status bar UI, and pull my schedule logistics.",
-                  },
-                  {
-                    label: "Break down a project",
-                    prompt:
-                      "Help me plan and break down a big project I need to tackle today.",
-                  },
-                  {
-                    label: "Change workspace theme",
-                    prompt:
-                      "Switch my workspace theme to Electric Lavender with Lofi Bokeh ambiance.",
-                  },
-                ]
-              : [
-                  {
-                    label: "Show my day schedule",
-                    prompt:
-                      "Show my current my day schedule, display the live status bar UI, and pull my schedule logistics.",
-                  },
-                  {
-                    label: "Auto-arrange my day",
-                    prompt:
-                      "Auto-arrange all my active tasks into my my day schedule for the next 4 hours starting right now.",
-                  },
-                  {
-                    label: "Organize & clean up board",
-                    prompt:
-                      "Sort my tasks by priority inside each section and clean up anything out of place.",
-                  },
-                  {
-                    label: "Change workspace theme",
-                    prompt:
-                      "Switch my workspace theme to Electric Lavender with Lofi Bokeh ambiance.",
-                  },
-                ]
-            ).map((chip) => (
-              <button
-                key={chip.label}
-                type="button"
-                onClick={() => sendPrompt(chip.prompt)}
-                className="rounded-full border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs text-white/50 hover:text-white/85 transition-all"
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
     );
@@ -2031,11 +1940,8 @@ export const GeminiHeroChat: React.FC<GeminiHeroChatProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Bottom Sticky Input Pill + Mode Switcher */}
-      <div className="pt-3 space-y-3">
-        {GeminiInputBar}
-        <div className="flex justify-center">{ModeSwitcherPill}</div>
-      </div>
+      {/* Bottom Sticky Input Pill */}
+      <div className="pt-3">{GeminiInputBar}</div>
     </div>
   );
 };
