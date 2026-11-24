@@ -1,3 +1,11 @@
+const {
+  animations,
+  components,
+  palette,
+  rounded,
+  shade,
+} = require("@tailus/themer");
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["class"],
@@ -5,14 +13,19 @@ module.exports = {
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./utils/**/*.{js,ts,jsx,tsx,mdx}",
+    "./node_modules/@tailus/themer/dist/**/*.{js,ts}",
   ],
   theme: {
     extend: {
       colors: {
         "bg-base": "var(--bg-base)",
         surface: "var(--surface)",
-        accent: "var(--accent)",
-        primary: "var(--primary)",
+        accent: {
+          DEFAULT: "var(--accent)",
+        },
+        primary: {
+          DEFAULT: "var(--primary)",
+        },
         highlight: "var(--highlight)",
       },
       fontFamily: {
@@ -25,6 +38,6 @@ module.exports = {
       },
     },
   },
-  plugins: [],
+  plugins: [components, rounded, palette, shade, animations],
 };
 

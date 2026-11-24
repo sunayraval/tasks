@@ -56,6 +56,14 @@ import {
   CheckSquare,
 } from "lucide-react";
 import { TaskDocumentEditor } from "@/components/editor/TaskDocumentEditor";
+import {
+  Badge,
+  Button,
+  Card,
+  Input,
+  Progress,
+  Tabs,
+} from "@/components/tailus-ui";
 
 interface TaskTableProps {
   tasks: TaskItem[];
@@ -284,15 +292,17 @@ const PillPopoverDropdown: React.FC<{
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-all hover:brightness-110 ${badgeClasses}`}
+        className={`inline-flex items-center gap-1.5 rounded-[--badge-radius] border px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-all hover:brightness-110 ${badgeClasses}`}
       >
         <span>{value || options[0]?.label || "Select"}</span>
-        <ChevronDown className="w-3 h-3 opacity-70" />
+        <ChevronDown className="size-3 opacity-70" />
       </button>
 
       {open && (
-        <div
-          className="absolute left-0 top-full mt-1.5 w-56 rounded-xl border theme-popover p-2 z-50 space-y-2 backdrop-blur-2xl"
+        <Card
+          variant="elevated"
+          fancy
+          className="absolute left-0 top-full mt-1.5 w-56 p-2 z-50 space-y-2 shadow-2xl backdrop-blur-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="max-h-44 overflow-y-auto space-y-1 pr-0.5">
@@ -307,20 +317,22 @@ const PillPopoverDropdown: React.FC<{
                     onSelect(opt.label);
                     setOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs transition-colors ${
+                  className={`w-full flex items-center justify-between rounded-[--btn-radius] px-2 py-1.5 text-left text-xs transition-colors ${
                     isSelected
-                      ? "bg-white/15 text-white font-semibold"
-                      : "text-white/80 hover:bg-white/10 hover:text-white"
+                      ? "bg-primary-500/15 text-title font-semibold"
+                      : "text-body hover:bg-[--ui-soft-bg] hover:text-title"
                   }`}
                 >
                   <span
-                    className={`rounded border px-2 py-0.5 text-[11px] font-medium ${getBadgeClasses(
+                    className={`rounded-[--badge-radius] border px-2 py-0.5 text-[11px] font-medium ${getBadgeClasses(
                       opt.color
                     )}`}
                   >
                     {opt.label}
                   </span>
-                  {isSelected && <Check className="w-3.5 h-3.5 text-primary" />}
+                  {isSelected && (
+                    <Check className="size-3.5 text-primary-400" />
+                  )}
                 </button>
               );
             })}
@@ -329,22 +341,27 @@ const PillPopoverDropdown: React.FC<{
           {/* Quick Add New Option Inline */}
           <form
             onSubmit={handleCreate}
-            className="border-t border-white/10 pt-2 space-y-1.5"
+            className="border-t border-[--ui-border-color] pt-2 space-y-1.5"
           >
             <div className="flex items-center gap-1">
-              <input
+              <Input
                 type="text"
+                variant="outlined"
+                size="sm"
                 value={newLabel}
                 onChange={(e) => setNewLabel(e.target.value)}
                 placeholder={placeholder}
-                className="flex-1 rounded-lg border border-white/15 bg-black/75 px-2 py-1 text-[11px] text-white placeholder-white/40 focus:border-primary focus:outline-none"
+                className="flex-1 h-7 text-[11px]"
               />
-              <button
+              <Button.Root
                 type="submit"
-                className="rounded-lg bg-primary px-2 py-1 text-[11px] font-bold text-black hover:brightness-110"
+                variant="solid"
+                intent="primary"
+                size="xs"
+                className="h-7 px-2.5 text-[11px] font-semibold"
               >
-                Add
-              </button>
+                <Button.Label>Add</Button.Label>
+              </Button.Root>
             </div>
             <div className="flex flex-wrap gap-1 pt-0.5">
               {BADGE_COLOR_KEYS.slice(0, 10).map((ck) => (
@@ -352,7 +369,7 @@ const PillPopoverDropdown: React.FC<{
                   key={ck}
                   type="button"
                   onClick={() => setNewColor(ck)}
-                  className={`h-3.5 w-3.5 rounded-full border ${
+                  className={`size-3.5 rounded-full border ${
                     newColor === ck
                       ? "ring-2 ring-white scale-110"
                       : "opacity-60 hover:opacity-100"
@@ -370,12 +387,12 @@ const PillPopoverDropdown: React.FC<{
               setOpen(false);
               onOpenManage();
             }}
-            className="w-full flex items-center justify-center gap-1 border-t border-white/10 pt-1.5 text-[11px] text-primary hover:underline"
+            className="w-full flex items-center justify-center gap-1 border-t border-[--ui-border-color] pt-1.5 text-[11px] text-primary-400 hover:underline"
           >
-            <Settings2 className="w-3 h-3" />
+            <Settings2 className="size-3" />
             <span>Edit Options in Settings</span>
           </button>
-        </div>
+        </Card>
       )}
     </div>
   );
@@ -407,37 +424,41 @@ const DurationPopoverCell: React.FC<{
 
   return (
     <div ref={containerRef} className="relative inline-block">
-      <button
-        type="button"
+      <Button.Root
+        variant="outlined"
+        intent="gray"
+        size="xs"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-black/40 px-2 py-1 text-xs font-mono text-white/90 hover:border-primary/60 transition-colors"
+        className="h-7 px-2 gap-1 text-xs font-mono"
       >
-        <span>{formatEstimatedTime(minutes || 30)}</span>
-        <ChevronDown className="w-3 h-3 opacity-60" />
-      </button>
+        <Button.Label>{formatEstimatedTime(minutes || 30)}</Button.Label>
+        <Button.Icon type="trailing" size="xs">
+          <ChevronDown className="opacity-60" />
+        </Button.Icon>
+      </Button.Root>
 
       {open && (
-        <div
-          className="absolute left-0 top-full mt-1.5 w-44 rounded-xl border theme-popover p-2 z-50 space-y-2 backdrop-blur-2xl"
+        <Card
+          variant="elevated"
+          fancy
+          className="absolute left-0 top-full mt-1.5 w-44 p-2 z-50 space-y-2 shadow-2xl backdrop-blur-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="grid grid-cols-2 gap-1">
             {presets.map((p) => (
-              <button
+              <Button.Root
                 key={p}
-                type="button"
+                variant={minutes === p ? "solid" : "soft"}
+                intent={minutes === p ? "primary" : "gray"}
+                size="xs"
                 onClick={() => {
                   onChange(p);
                   setOpen(false);
                 }}
-                className={`rounded-lg px-2 py-1 text-xs font-mono text-center transition-colors ${
-                  minutes === p
-                    ? "bg-primary text-black font-bold"
-                    : "bg-white/5 text-white/80 hover:bg-white/15 hover:text-white"
-                }`}
+                className="h-7 font-mono text-xs"
               >
-                {formatEstimatedTime(p)}
-              </button>
+                <Button.Label>{formatEstimatedTime(p)}</Button.Label>
+              </Button.Root>
             ))}
           </div>
           <form
@@ -447,25 +468,30 @@ const DurationPopoverCell: React.FC<{
               onChange(val);
               setOpen(false);
             }}
-            className="flex items-center gap-1 border-t border-white/10 pt-1.5"
+            className="flex items-center gap-1 border-t border-[--ui-border-color] pt-1.5"
           >
-            <input
+            <Input
               type="number"
               min={5}
               max={600}
+              variant="outlined"
+              size="sm"
               value={customMins}
               onChange={(e) => setCustomMins(e.target.value)}
               placeholder="Mins"
-              className="w-full rounded border border-white/15 bg-black/75 px-2 py-1 text-xs text-white font-mono focus:border-primary focus:outline-none"
+              className="h-7 text-xs font-mono"
             />
-            <button
+            <Button.Root
               type="submit"
-              className="rounded bg-primary px-2 py-1 text-[11px] font-bold text-black"
+              variant="solid"
+              intent="primary"
+              size="xs"
+              className="h-7 px-2.5 text-[11px] font-semibold"
             >
-              Set
-            </button>
+              <Button.Label>Set</Button.Label>
+            </Button.Root>
           </form>
-        </div>
+        </Card>
       )}
     </div>
   );
@@ -494,32 +520,44 @@ const FilterDropdown: React.FC<{
 
   return (
     <div ref={ref} className="relative">
-      <button
-        type="button"
+      <Button.Root
+        variant="outlined"
+        intent="gray"
+        size="sm"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 rounded-lg border theme-input px-2.5 py-1.5 text-xs text-white/90 hover:border-primary/50 transition-colors"
+        className="gap-1.5 text-xs"
       >
-        <Filter className="w-3 h-3 text-primary" />
-        <span>{value === "ALL" ? `All ${label}` : value}</span>
-        <ChevronDown className="w-3 h-3 opacity-60" />
-      </button>
+        <Button.Icon type="leading" size="xs">
+          <Filter className="text-primary-400" />
+        </Button.Icon>
+        <Button.Label>
+          {value === "ALL" ? `All ${label}` : value}
+        </Button.Label>
+        <Button.Icon type="trailing" size="xs">
+          <ChevronDown className="opacity-60" />
+        </Button.Icon>
+      </Button.Root>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1.5 w-48 rounded-xl border theme-popover p-1.5 z-50 space-y-1 backdrop-blur-2xl">
+        <Card
+          variant="elevated"
+          fancy
+          className="absolute left-0 top-full mt-1.5 w-48 p-1.5 z-50 space-y-1 shadow-2xl backdrop-blur-2xl"
+        >
           <button
             type="button"
             onClick={() => {
               onChange("ALL");
               setOpen(false);
             }}
-            className={`w-full flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
+            className={`w-full flex items-center justify-between rounded-[--btn-radius] px-2.5 py-1.5 text-xs transition-colors ${
               value === "ALL"
-                ? "bg-primary/20 text-highlight font-semibold"
-                : "text-white/75 hover:bg-white/10 hover:text-white"
+                ? "bg-primary-500/15 text-primary-300 font-semibold"
+                : "text-body hover:bg-[--ui-soft-bg] hover:text-title"
             }`}
           >
             <span>All {label}</span>
-            {value === "ALL" && <Check className="w-3.5 h-3.5 text-primary" />}
+            {value === "ALL" && <Check className="size-3.5 text-primary-400" />}
           </button>
           {options.map((opt) => (
             <button
@@ -529,25 +567,25 @@ const FilterDropdown: React.FC<{
                 onChange(opt.label);
                 setOpen(false);
               }}
-              className={`w-full flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
+              className={`w-full flex items-center justify-between rounded-[--btn-radius] px-2.5 py-1.5 text-xs transition-colors ${
                 value === opt.label
-                  ? "bg-white/15 text-white font-semibold"
-                  : "text-white/75 hover:bg-white/10 hover:text-white"
+                  ? "bg-primary-500/15 text-title font-semibold"
+                  : "text-body hover:bg-[--ui-soft-bg] hover:text-title"
               }`}
             >
               <span
-                className={`rounded border px-1.5 py-0.5 text-[10px] ${getBadgeClasses(
+                className={`rounded-[--badge-radius] border px-1.5 py-0.5 text-[10px] ${getBadgeClasses(
                   opt.color
                 )}`}
               >
                 {opt.label}
               </span>
               {value === opt.label && (
-                <Check className="w-3.5 h-3.5 text-primary" />
+                <Check className="size-3.5 text-primary-400" />
               )}
             </button>
           ))}
-        </div>
+        </Card>
       )}
     </div>
   );
@@ -585,13 +623,13 @@ const SortableDocumentRow: React.FC<{
       style={style}
       className={
         isHeader
-          ? "group border-y theme-section-bg transition-colors"
-          : `group border-b border-white/10 transition-colors ${
+          ? "group border-y border-[--ui-border-color] bg-[--ui-soft-bg]/60 transition-colors"
+          : `group border-b border-[--ui-border-color]/80 transition-colors ${
               isSelected
-                ? "bg-primary/15"
+                ? "bg-primary-500/10"
                 : item.status === "Done"
-                ? "bg-black/25 opacity-60 hover:opacity-95"
-                : "theme-row-hover"
+                ? "bg-[--ui-soft-bg]/25 opacity-60 hover:opacity-95"
+                : "hover:bg-[--ui-soft-bg]/45"
             }`
       }
     >
@@ -1197,150 +1235,120 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   return (
     <div className="space-y-4">
       {/* Top Filter & Quick Actions Bar */}
-      <div className="flex flex-col gap-3 rounded-xl border theme-panel p-3.5 backdrop-blur-xl">
+      <Card variant="mixed" fancy className="p-3.5 backdrop-blur-xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2.5 flex-1">
             {/* Search Input */}
             <div className="relative flex-1 min-w-[140px] sm:min-w-[180px] max-w-xs">
-              <Search className="w-4 h-4 text-white/45 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
+              <Search className="size-4 text-caption absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Input
                 type="text"
+                variant="outlined"
+                size="sm"
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
                 placeholder="Search tasks, #tags, notes..."
-                className="w-full rounded-lg border theme-input pl-9 pr-3 py-1.5 text-xs text-white placeholder-white/40 focus:outline-none"
+                className="pl-9"
               />
             </div>
 
-            {/* Quick Status Segmented Filter Bar: All/Active | To Do | In Progress | Completed */}
-            <div className="flex items-center gap-1 p-0.5 rounded-lg border border-white/10 bg-black/40 backdrop-blur-md overflow-x-auto no-scrollbar max-w-full shrink-0">
-              <button
-                type="button"
-                onClick={() => setStatusFilter("ALL")}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-all ${
-                  statusFilter === "ALL"
-                    ? "bg-primary text-black font-bold shadow-sm"
-                    : "text-white/65 hover:text-white hover:bg-white/5"
-                }`}
+            {/* Quick Status Segmented Filter Bar via Tailus Tabs */}
+            <Tabs.Root
+              value={statusFilter}
+              onValueChange={(v) =>
+                setStatusFilter(
+                  v as "ALL" | "TODO" | "IN_PROGRESS" | "COMPLETED"
+                )
+              }
+              className="overflow-x-auto no-scrollbar max-w-full shrink-0"
+            >
+              <Tabs.List
+                aria-label="Filter tasks by status"
+                variant="soft"
+                triggerVariant="softToSoft"
+                size="sm"
+                intent="primary"
+                className="bg-[--ui-soft-bg]/90 border border-[--ui-border-color] p-0.5 gap-0.5"
               >
-                <span>
-                  {workspaceConfig.showCompletedTasks ? "All" : "Active"}
-                </span>
-                <span
-                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                    statusFilter === "ALL"
-                      ? "bg-black/20 text-black font-bold"
-                      : "bg-white/10 text-white/50"
-                  }`}
+                <Tabs.Trigger
+                  value="ALL"
+                  className="gap-1.5 text-xs data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
                 >
-                  {workspaceConfig.showCompletedTasks
-                    ? counts.all
-                    : counts.active}
-                </span>
-              </button>
+                  <span>
+                    {workspaceConfig.showCompletedTasks ? "All" : "Active"}
+                  </span>
+                  <Badge variant="soft" intent="gray" size="xs" className="px-1.5 py-0 text-[10px]">
+                    {workspaceConfig.showCompletedTasks
+                      ? counts.all
+                      : counts.active}
+                  </Badge>
+                </Tabs.Trigger>
 
-              <button
-                type="button"
-                onClick={() => setStatusFilter("TODO")}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-all ${
-                  statusFilter === "TODO"
-                    ? "bg-slate-200 text-slate-900 font-bold shadow-sm"
-                    : "text-white/65 hover:text-white hover:bg-white/5"
-                }`}
-              >
-                <span>To Do</span>
-                <span
-                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                    statusFilter === "TODO"
-                      ? "bg-slate-900/20 text-slate-900 font-bold"
-                      : "bg-white/10 text-white/50"
-                  }`}
+                <Tabs.Trigger
+                  value="TODO"
+                  className="gap-1.5 text-xs data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
                 >
-                  {counts.todo}
-                </span>
-              </button>
+                  <span>To Do</span>
+                  <Badge variant="soft" intent="gray" size="xs" className="px-1.5 py-0 text-[10px]">
+                    {counts.todo}
+                  </Badge>
+                </Tabs.Trigger>
 
-              <button
-                type="button"
-                onClick={() => setStatusFilter("IN_PROGRESS")}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-all ${
-                  statusFilter === "IN_PROGRESS"
-                    ? "bg-sky-400 text-sky-950 font-bold shadow-sm"
-                    : "text-white/65 hover:text-white hover:bg-white/5"
-                }`}
-              >
-                <span>In Progress</span>
-                <span
-                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                    statusFilter === "IN_PROGRESS"
-                      ? "bg-sky-950/20 text-sky-950 font-bold"
-                      : "bg-white/10 text-white/50"
-                  }`}
+                <Tabs.Trigger
+                  value="IN_PROGRESS"
+                  className="gap-1.5 text-xs data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
                 >
-                  {counts.inProgress}
-                </span>
-              </button>
+                  <span>In Progress</span>
+                  <Badge variant="soft" intent="info" size="xs" className="px-1.5 py-0 text-[10px]">
+                    {counts.inProgress}
+                  </Badge>
+                </Tabs.Trigger>
 
-              <button
-                type="button"
-                onClick={() => setStatusFilter("COMPLETED")}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-all ${
-                  statusFilter === "COMPLETED"
-                    ? "bg-emerald-400 text-emerald-950 font-bold shadow-sm"
-                    : "text-white/65 hover:text-white hover:bg-white/5"
-                }`}
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Completed</span>
-                <span
-                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                    statusFilter === "COMPLETED"
-                      ? "bg-emerald-950/20 text-emerald-950 font-bold"
-                      : "bg-emerald-400/15 text-emerald-300"
-                  }`}
+                <Tabs.Trigger
+                  value="COMPLETED"
+                  className="gap-1.5 text-xs data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
                 >
-                  {counts.completed}
-                </span>
-              </button>
-            </div>
+                  <CheckCircle2 className="size-3.5 text-success-400" />
+                  <span>Completed</span>
+                  <Badge variant="soft" intent="success" size="xs" className="px-1.5 py-0 text-[10px]">
+                    {counts.completed}
+                  </Badge>
+                </Tabs.Trigger>
+              </Tabs.List>
+            </Tabs.Root>
 
             {/* Show Completed Tasks Setting Toggle Button */}
-            <button
-              type="button"
+            <Button.Root
+              variant={workspaceConfig.showCompletedTasks ? "soft" : "outlined"}
+              intent={workspaceConfig.showCompletedTasks ? "success" : "gray"}
+              size="sm"
               onClick={() =>
                 onUpdateWorkspaceConfig({
                   showCompletedTasks: !workspaceConfig.showCompletedTasks,
                 })
               }
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all ${
-                workspaceConfig.showCompletedTasks
-                  ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-300"
-                  : "border-white/10 bg-white/5 text-white/55 hover:text-white hover:bg-white/10"
-              }`}
+              className="gap-1.5 text-xs"
               title={
                 workspaceConfig.showCompletedTasks
                   ? "Show completed tasks: ON (completed tasks stay visible in the table). Click to hide."
                   : "Show completed tasks: OFF (checked off tasks disappear into Completed). Click to show."
               }
             >
-              <CheckCircle2
-                className={`w-3.5 h-3.5 ${
-                  workspaceConfig.showCompletedTasks
-                    ? "text-emerald-400"
-                    : "text-white/40"
-                }`}
-              />
-              <span className="hidden sm:inline">Show completed</span>
-              <span
-                className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
-                  workspaceConfig.showCompletedTasks
-                    ? "bg-emerald-400/20 text-emerald-200"
-                    : "bg-white/10 text-white/45"
-                }`}
+              <Button.Icon type="leading" size="xs">
+                <CheckCircle2 />
+              </Button.Icon>
+              <Button.Label className="hidden sm:inline">
+                Show completed
+              </Button.Label>
+              <Badge
+                variant="soft"
+                intent={workspaceConfig.showCompletedTasks ? "success" : "gray"}
+                size="xs"
+                className="px-1.5 py-0 text-[10px]"
               >
                 {counts.completed}
-              </span>
-            </button>
+              </Badge>
+            </Button.Root>
 
             {/* Custom Dark-Glass Category Filter */}
             <FilterDropdown
@@ -1350,60 +1358,80 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               onChange={setTypeFilter}
             />
 
-            <button
-              type="button"
+            <Button.Root
+              variant="outlined"
+              intent="gray"
+              size="sm"
               onClick={() => onOpenSettingsTab("customize")}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-highlight hover:border-primary/50 hover:bg-primary/10 transition-colors"
+              className="text-xs"
               title="Edit tags, statuses, categories & colors in Settings"
             >
-              <Settings2 className="w-3.5 h-3.5 text-primary" />
-              <span>Customize</span>
-            </button>
+              <Button.Icon type="leading" size="xs">
+                <Settings2 className="text-primary-400" />
+              </Button.Icon>
+              <Button.Label>Customize</Button.Label>
+            </Button.Root>
 
             {isAnyColumnResized && (
-              <button
-                type="button"
+              <Button.Root
+                variant="outlined"
+                intent="gray"
+                size="sm"
                 onClick={resetAllColumnWidths}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                className="text-xs"
                 title="Reset all column widths to default"
               >
-                <RotateCcw className="w-3.5 h-3.5 text-primary" />
-                <span>Reset Widths</span>
-              </button>
+                <Button.Icon type="leading" size="xs">
+                  <RotateCcw className="text-primary-400" />
+                </Button.Icon>
+                <Button.Label>Reset Widths</Button.Label>
+              </Button.Root>
             )}
           </div>
 
-        {/* Right: Quick Add Task or Header Buttons */}
-        <div className="flex items-center gap-2 self-end md:self-center shrink-0">
-          <button
-            type="button"
-            onClick={() => handleCreateHeaderClick()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-semibold text-highlight hover:bg-primary/25 transition-all"
-            title="Insert a movable header divider row"
-          >
-            <Heading className="w-3.5 h-3.5 text-primary" />
-            <span>+ New Header</span>
-          </button>
+          {/* Right: Quick Add Task or Header Buttons */}
+          <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+            <Button.Root
+              variant="soft"
+              intent="primary"
+              size="sm"
+              onClick={() => handleCreateHeaderClick()}
+              className="text-xs"
+              title="Insert a movable header divider row"
+            >
+              <Button.Icon type="leading" size="xs">
+                <Heading />
+              </Button.Icon>
+              <Button.Label>+ New Header</Button.Label>
+            </Button.Root>
 
-          <button
-            type="button"
-            onClick={() => handleCreateTaskClick()}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-black shadow-neon hover:brightness-110 transition-all"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>+ New Task</span>
-          </button>
+            <Button.Root
+              variant="solid"
+              intent="primary"
+              size="sm"
+              onClick={() => handleCreateTaskClick()}
+              className="text-xs font-semibold"
+            >
+              <Button.Icon type="leading" size="xs">
+                <Plus className="stroke-[2.5]" />
+              </Button.Icon>
+              <Button.Label>+ New Task</Button.Label>
+            </Button.Root>
+          </div>
         </div>
-      </div>
-    </div>
+      </Card>
 
-      {/* Main Document-Style Table Container with smooth horizontal scrolling */}
-      <div className="rounded-xl border theme-panel overflow-hidden backdrop-blur-xl shadow-2xl">
+      {/* Main Document-Style Table Container */}
+      <Card
+        variant="mixed"
+        fancy
+        className="p-0 overflow-hidden backdrop-blur-xl shadow-xl"
+      >
         <div
           tabIndex={0}
           role="region"
           aria-label="Tasks document table"
-          className="w-full overflow-x-auto overflow-y-visible custom-scrollbar focus:outline-none focus:ring-1 focus:ring-primary/40"
+          className="w-full overflow-x-auto overflow-y-visible custom-scrollbar focus:outline-none focus:ring-1 focus:ring-primary-500/40"
         >
           <DndContext
             sensors={sensors}
@@ -1436,7 +1464,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
                 {/* Editable & Resizable Column Headers */}
                 <thead>
-                  <tr className="border-b theme-header-bg text-[11px] font-semibold uppercase tracking-wider text-highlight/90">
+                  <tr className="border-b border-[--ui-border-color] bg-[--ui-soft-bg]/80 text-[11px] font-semibold uppercase tracking-wider text-caption">
                     <th
                       className="w-10 pl-3 pr-1 py-3"
                       style={{ width: 44, minWidth: 44 }}
@@ -2249,23 +2277,26 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
                         {/* Subtasks dropdown expanded row */}
                         {isSubtasksExpanded && (
-                          <tr className="bg-black/45 border-b border-primary/20 backdrop-blur-md transition-all animate-in fade-in duration-150">
+                          <tr className="bg-[--ui-soft-bg]/40 border-b border-primary-500/20 backdrop-blur-md transition-all animate-in fade-in duration-150">
                             <td className="w-10 pl-3 pr-1 py-2.5 align-top text-center">
-                              <div className="flex justify-center pt-2 text-primary/60">
-                                <CornerDownRight className="w-4 h-4" />
+                              <div className="flex justify-center pt-2 text-primary-400/70">
+                                <CornerDownRight className="size-4" />
                               </div>
                             </td>
                             <td colSpan={9} className="px-3 py-3 align-top">
-                              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 shadow-inner">
+                              <Card
+                                variant="soft"
+                                className="border border-[--ui-border-color] p-3"
+                              >
                                 {/* Subtask Header Bar */}
-                                <div className="flex items-center justify-between gap-3 mb-2.5 pb-2 border-b border-white/10">
+                                <div className="flex items-center justify-between gap-3 mb-2.5 pb-2 border-b border-[--ui-border-color]">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-[11px] font-bold uppercase tracking-wider text-highlight/90 flex items-center gap-1.5">
-                                      <CheckSquare className="w-3.5 h-3.5 text-primary" />
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-title flex items-center gap-1.5">
+                                      <CheckSquare className="size-3.5 text-primary-400" />
                                       Subtasks
                                     </span>
                                     {taskSubtasks.length > 0 && (
-                                      <span className="text-[11px] text-white/60 font-medium">
+                                      <span className="text-[11px] text-caption font-medium">
                                         ({completedSubtasksCount} of{" "}
                                         {taskSubtasks.length} completed)
                                       </span>
@@ -2274,19 +2305,32 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
                                   {taskSubtasks.length > 0 && (
                                     <div className="flex items-center gap-2 w-32 sm:w-44">
-                                      <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                                        <div
-                                          className="h-full bg-primary transition-all duration-300"
+                                      <Progress.Root
+                                        value={Math.round(
+                                          (completedSubtasksCount /
+                                            taskSubtasks.length) *
+                                            100
+                                        )}
+                                        size="xs"
+                                        variant="soft"
+                                        className="flex-1"
+                                      >
+                                        <Progress.Indicator
+                                          intent="primary"
+                                          complete="success"
                                           style={{
-                                            width: `${Math.round(
-                                              (completedSubtasksCount /
-                                                taskSubtasks.length) *
-                                                100
-                                            )}%`,
+                                            transform: `translateX(-${
+                                              100 -
+                                              Math.round(
+                                                (completedSubtasksCount /
+                                                  taskSubtasks.length) *
+                                                  100
+                                              )
+                                            }%)`,
                                           }}
                                         />
-                                      </div>
-                                      <span className="text-[10px] text-white/50 shrink-0 font-mono">
+                                      </Progress.Root>
+                                      <span className="text-[10px] text-caption shrink-0 font-mono">
                                         {Math.round(
                                           (completedSubtasksCount /
                                             taskSubtasks.length) *
@@ -2305,7 +2349,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                       return (
                                         <div
                                           key={st.id || `st-${sIdx}`}
-                                          className="group/st flex items-center gap-2.5 rounded-lg bg-black/35 border border-white/5 px-2.5 py-1.5 hover:border-white/15 transition-all"
+                                          className="group/st flex items-center gap-2.5 rounded-[--btn-radius] bg-[--ui-bg] border border-[--ui-border-color] px-2.5 py-1.5 transition-all"
                                         >
                                           {/* Subtask Checkbox */}
                                           <button
@@ -2313,7 +2357,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                             onClick={() =>
                                               handleToggleSubtask(t.id, st.id)
                                             }
-                                            className="shrink-0 text-white/45 hover:text-primary transition-colors"
+                                            className="shrink-0 text-caption hover:text-primary-400 transition-colors"
                                             title={
                                               st.completed
                                                 ? "Mark subtask incomplete"
@@ -2321,9 +2365,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                             }
                                           >
                                             {st.completed ? (
-                                              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                              <CheckCircle2 className="size-4 text-success-400" />
                                             ) : (
-                                              <Circle className="w-4 h-4 hover:text-primary" />
+                                              <Circle className="size-4 hover:text-primary-400" />
                                             )}
                                           </button>
 
@@ -2351,10 +2395,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                                   e.currentTarget.blur();
                                                 }
                                               }}
-                                              className={`w-full rounded bg-transparent px-1.5 py-0.5 text-xs text-white placeholder-white/30 focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-primary/60 transition-all ${
+                                              className={`w-full rounded bg-transparent px-1.5 py-0.5 text-xs placeholder:text-placeholder focus:bg-[--ui-soft-bg] focus:outline-none focus:ring-1 focus:ring-primary-500/50 transition-all ${
                                                 st.completed
-                                                  ? "line-through text-white/40"
-                                                  : "text-white/90"
+                                                  ? "line-through text-caption"
+                                                  : "text-title"
                                               }`}
                                               placeholder="Subtask description..."
                                             />
@@ -2366,17 +2410,17 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                             onClick={() =>
                                               handleDeleteSubtask(t.id, st.id)
                                             }
-                                            className="opacity-0 group-hover/st:opacity-100 p-1 rounded text-white/30 hover:text-red-400 hover:bg-red-950/30 transition-all shrink-0"
+                                            className="opacity-0 group-hover/st:opacity-100 p-1 rounded text-caption hover:text-danger-400 hover:bg-danger-500/10 transition-all shrink-0"
                                             title="Delete subtask"
                                           >
-                                            <Trash2 className="w-3.5 h-3.5" />
+                                            <Trash2 className="size-3.5" />
                                           </button>
                                         </div>
                                       );
                                     })}
                                   </div>
                                 ) : (
-                                  <div className="text-[11px] text-white/40 italic py-1 px-1">
+                                  <div className="text-[11px] text-caption italic py-1 px-1">
                                     No subtasks yet. Type a subtask below and
                                     press Enter to add.
                                   </div>
@@ -2388,12 +2432,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                     e.preventDefault();
                                     handleAddSubtask(t.id);
                                   }}
-                                  className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5"
+                                  className="flex items-center gap-2 mt-2 pt-2 border-t border-[--ui-border-color]"
                                 >
                                   <div className="relative flex-1">
-                                    <input
+                                    <Input
                                       id={`new-subtask-input-${t.id}`}
                                       type="text"
+                                      variant="outlined"
+                                      size="sm"
                                       value={newSubtaskTitles[t.id] || ""}
                                       onChange={(e) =>
                                         setNewSubtaskTitles((prev) => ({
@@ -2402,21 +2448,25 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                         }))
                                       }
                                       placeholder="Add a subtask (press Enter)..."
-                                      className="w-full rounded-lg bg-black/50 border border-white/10 px-3 py-1.5 text-xs text-white placeholder-white/35 focus:border-primary/70 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
                                     />
                                   </div>
-                                  <button
+                                  <Button.Root
                                     type="submit"
+                                    variant="soft"
+                                    intent="primary"
+                                    size="sm"
                                     disabled={
                                       !(newSubtaskTitles[t.id] || "").trim()
                                     }
-                                    className="inline-flex items-center gap-1 rounded-lg bg-primary/20 border border-primary/40 px-3 py-1.5 text-xs font-semibold text-highlight hover:bg-primary/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                                    className="shrink-0"
                                   >
-                                    <Plus className="w-3.5 h-3.5" />
-                                    <span>Add Subtask</span>
-                                  </button>
+                                    <Button.Icon type="leading" size="xs">
+                                      <Plus />
+                                    </Button.Icon>
+                                    <Button.Label>Add Subtask</Button.Label>
+                                  </Button.Root>
                                 </form>
-                              </div>
+                              </Card>
                             </td>
                           </tr>
                         )}
@@ -2446,8 +2496,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   {visibleRows.length === 0 && (
                     <tr>
                       <td colSpan={10} className="py-12 text-center">
-                        <div className="flex flex-col items-center justify-center gap-2 text-white/50">
-                          <CheckCircle2 className="w-8 h-8 text-white/20" />
+                        <div className="flex flex-col items-center justify-center gap-2 text-caption">
+                          <CheckCircle2 className="size-8 text-gray-600" />
                           <p className="text-xs font-medium">
                             {statusFilter === "COMPLETED"
                               ? "No completed tasks yet. Check off a task to move it here!"
@@ -2463,28 +2513,36 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   )}
 
                   {/* Bottom of Document Table: Click to Add New Task Row or New Header Row */}
-                  <tr className="border-t border-white/15 bg-black/35">
+                  <tr className="border-t border-[--ui-border-color] bg-[--ui-soft-bg]/45">
                     <td colSpan={10} className="p-2.5">
                       <div className="flex flex-wrap items-center gap-2.5 px-2">
-                        <button
-                          type="button"
+                        <Button.Root
+                          variant="soft"
+                          intent="primary"
+                          size="sm"
                           onClick={() => handleCreateTaskClick()}
-                          className="flex-1 min-w-[200px] flex items-center gap-2 rounded-lg border border-dashed border-primary/50 bg-primary/10 hover:bg-primary/20 px-4 py-2.5 text-xs font-bold text-highlight transition-all text-left"
+                          className="flex-1 min-w-[200px] justify-start border border-dashed border-primary-500/45 font-semibold"
                         >
-                          <Plus className="w-4 h-4 text-primary stroke-[2.5]" />
-                          <span>
+                          <Button.Icon type="leading" size="xs">
+                            <Plus className="stroke-[2.5]" />
+                          </Button.Icon>
+                          <Button.Label>
                             New Task — Click to add a row and start typing
-                          </span>
-                        </button>
+                          </Button.Label>
+                        </Button.Root>
 
-                        <button
-                          type="button"
+                        <Button.Root
+                          variant="outlined"
+                          intent="gray"
+                          size="sm"
                           onClick={() => handleCreateHeaderClick()}
-                          className="inline-flex items-center gap-2 rounded-lg border border-dashed border-white/25 bg-white/5 hover:bg-white/10 hover:border-primary/50 px-4 py-2.5 text-xs font-semibold text-white/85 hover:text-white transition-all"
+                          className="border-dashed"
                         >
-                          <Heading className="w-4 h-4 text-primary" />
-                          <span>+ Add Movable Header Row</span>
-                        </button>
+                          <Button.Icon type="leading" size="xs">
+                            <Heading className="text-primary-400" />
+                          </Button.Icon>
+                          <Button.Label>+ Add Movable Header Row</Button.Label>
+                        </Button.Root>
                       </div>
                     </td>
                   </tr>
@@ -2493,7 +2551,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             </table>
           </DndContext>
         </div>
-      </div>
+      </Card>
 
       {/* Slide Drawer or Center Modal */}
       {viewMode !== "inline" && selectedTaskObj && (

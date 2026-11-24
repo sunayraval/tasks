@@ -70,6 +70,16 @@ import {
   Wand2,
   X,
 } from "lucide-react";
+import {
+  Badge,
+  Button,
+  Card,
+  Input,
+  Progress,
+  Tabs,
+  Text,
+  Title,
+} from "@/components/tailus-ui";
 
 interface MyDayViewProps {
   tasks: TaskItem[];
@@ -168,21 +178,22 @@ const SortableScheduleBlockCard: React.FC<SortableBlockCardProps> = ({
   };
 
   return (
-    <div
+    <Card
       ref={setNodeRef}
       style={style}
-      className={`group rounded-2xl border transition-all ${
+      variant={isDragging ? "elevated" : "soft"}
+      className={`group p-0 border transition-all ${
         isDragging
-          ? "border-primary bg-[#1c2029] shadow-2xl scale-[1.01] opacity-95"
+          ? "border-primary-500 shadow-2xl scale-[1.01] opacity-95"
           : isSwapSource
-          ? "border-amber-400 bg-amber-500/10 ring-1 ring-amber-400/40"
+          ? "border-warning-400 bg-warning-500/10 ring-1 ring-warning-400/40"
           : isSwapCandidate
-          ? "border-amber-400/45 bg-black/55 hover:border-amber-300"
+          ? "border-warning-400/45 bg-[--ui-soft-bg] hover:border-warning-300"
           : isActiveNow
-          ? "border-primary/65 bg-primary/[0.11] shadow-[0_0_30px_rgba(0,0,0,0.45)] ring-1 ring-primary/35"
+          ? "border-primary-500/60 bg-primary-500/10 ring-1 ring-primary-500/30"
           : block.isCompleted
-          ? "border-emerald-500/25 bg-emerald-500/[0.05] opacity-80"
-          : "border-white/12 bg-black/40 hover:border-white/25"
+          ? "border-success-500/25 bg-success-500/5 opacity-80"
+          : "border-[--ui-border-color] hover:border-gray-600"
       }`}
     >
       <div className="p-3.5 sm:p-4 flex flex-col gap-3">
@@ -193,10 +204,10 @@ const SortableScheduleBlockCard: React.FC<SortableBlockCardProps> = ({
             {...attributes}
             {...listeners}
             aria-label="Drag to reorder schedule block"
-            className="mt-1 cursor-grab active:cursor-grabbing rounded-lg p-1 text-white/35 hover:bg-white/10 hover:text-white/80 transition-colors shrink-0"
+            className="mt-1 cursor-grab active:cursor-grabbing rounded-[--btn-radius] p-1 text-caption hover:bg-[--ui-bg] hover:text-title transition-colors shrink-0"
             title="Drag to move in schedule"
           >
-            <GripVertical className="w-4 h-4" />
+            <GripVertical className="size-4" />
           </button>
 
           {/* Check-off Button */}
@@ -215,77 +226,88 @@ const SortableScheduleBlockCard: React.FC<SortableBlockCardProps> = ({
               }
             >
               {block.isCompleted ? (
-                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                <CheckCircle2 className="size-5 text-success-400" />
               ) : (
-                <Circle className="w-5 h-5 text-white/40 hover:text-primary" />
+                <Circle className="size-5 text-caption hover:text-primary-400" />
               )}
             </button>
           ) : (
-            <div className="mt-1 flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-amber-300 shrink-0">
-              <Coffee className="w-3 h-3" />
+            <div className="mt-1 flex size-5 items-center justify-center rounded-full bg-[--ui-bg] text-warning-400 shrink-0">
+              <Coffee className="size-3" />
             </div>
           )}
 
           {/* Timeframe & Title Info */}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
+              <Button.Root
+                variant="outlined"
+                intent="gray"
+                size="xs"
                 onClick={() => onStartEdit(block)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-white/12 bg-white/[0.06] hover:border-primary/50 px-2.5 py-0.5 font-mono text-xs font-bold text-highlight transition-colors"
+                className="h-6 px-2 gap-1 font-mono text-xs"
                 title="Click to edit timeframe"
               >
-                <Clock className="w-3 h-3 text-primary" />
-                <span>
+                <Button.Icon type="leading" size="xs">
+                  <Clock className="text-primary-400" />
+                </Button.Icon>
+                <Button.Label>
                   {formatTime12h(block.startTime)} –{" "}
                   {formatTime12h(block.endTime)}
-                </span>
-              </button>
+                </Button.Label>
+              </Button.Root>
 
-              <span className="rounded-md bg-white/[0.06] px-2 py-0.5 font-mono text-[11px] text-white/60">
+              <Badge variant="soft" intent="gray" size="xs" className="font-mono">
                 {formatDurationCompact(block.durationMinutes)}
-              </span>
+              </Badge>
 
               {isActiveNow && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-black">
-                  <span className="h-1.5 w-1.5 rounded-full bg-black animate-ping" />
+                <Badge
+                  variant="solid"
+                  intent="primary"
+                  size="xs"
+                  className="inline-flex items-center gap-1 rounded-full uppercase tracking-wide"
+                >
+                  <span className="size-1.5 rounded-full bg-white animate-ping" />
                   NOW • {Math.round(block.liveProgressPct)}%
-                </span>
+                </Badge>
               )}
 
               {block.priority && !block.isBreak && (
-                <span
-                  className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold ${
+                <Badge
+                  variant="soft"
+                  intent={
                     block.priority.toLowerCase() === "urgent"
-                      ? "border-red-400/40 bg-red-500/15 text-red-200"
+                      ? "danger"
                       : block.priority.toLowerCase() === "high"
-                      ? "border-orange-400/40 bg-orange-500/15 text-orange-200"
-                      : "border-white/10 bg-white/5 text-white/65"
-                  }`}
+                      ? "warning"
+                      : "gray"
+                  }
+                  size="xs"
                 >
                   {block.priority}
-                </span>
+                </Badge>
               )}
 
               {block.category && (
-                <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[10px] text-white/55">
+                <Badge variant="outlined" intent="gray" size="xs">
                   {block.category}
-                </span>
+                </Badge>
               )}
             </div>
 
             <h4
               className={`mt-1.5 text-sm sm:text-[15px] font-semibold leading-snug ${
                 block.isCompleted
-                  ? "line-through text-white/45"
-                  : "text-white/95"
+                  ? "line-through text-caption"
+                  : "text-title"
               }`}
             >
               {block.title}
             </h4>
 
             {block.notes && !isEditing && (
-              <p className="mt-1 text-xs text-white/50 line-clamp-2">
+              <p className="mt-1 text-xs text-caption line-clamp-2">
                 {block.notes}
               </p>
             )}
@@ -293,12 +315,19 @@ const SortableScheduleBlockCard: React.FC<SortableBlockCardProps> = ({
             {/* Live Mini Bar when Active */}
             {isActiveNow && (
               <div className="mt-2.5">
-                <progress
-                  className="taskit-progress w-full h-1.5 block"
+                <Progress.Root
                   value={Math.min(100, Math.max(0, block.liveProgressPct))}
-                  max={100}
+                  size="xs"
+                  variant="soft"
                   aria-label={`${block.title} progress`}
-                />
+                >
+                  <Progress.Indicator
+                    intent="primary"
+                    style={{
+                      transform: `translateX(-${100 - Math.min(100, Math.max(0, block.liveProgressPct))}%)`,
+                    }}
+                  />
+                </Progress.Root>
               </div>
             )}
           </div>
@@ -306,83 +335,102 @@ const SortableScheduleBlockCard: React.FC<SortableBlockCardProps> = ({
           {/* Right Action Controls: Swap, Move Up/Down, Edit, Delete */}
           <div className="flex items-center gap-1 shrink-0">
             {isSwapCandidate ? (
-              <button
-                type="button"
+              <Button.Root
+                variant="solid"
+                intent="warning"
+                size="xs"
                 onClick={() => onCompleteSwap(block.id)}
-                className="inline-flex items-center gap-1 rounded-xl bg-amber-400 px-3 py-1.5 text-xs font-extrabold text-black shadow-lg hover:brightness-110 transition-all"
+                className="font-semibold"
               >
-                <ArrowLeftRight className="w-3.5 h-3.5" />
-                <span>Swap Here</span>
-              </button>
+                <Button.Icon type="leading" size="xs">
+                  <ArrowLeftRight />
+                </Button.Icon>
+                <Button.Label>Swap Here</Button.Label>
+              </Button.Root>
             ) : isSwapSource ? (
-              <button
-                type="button"
+              <Button.Root
+                variant="soft"
+                intent="warning"
+                size="xs"
                 onClick={onCancelSwap}
-                className="inline-flex items-center gap-1 rounded-xl border border-amber-400/50 bg-amber-500/20 px-2.5 py-1 text-xs font-semibold text-amber-200 hover:bg-amber-500/30 transition-colors"
               >
-                <X className="w-3.5 h-3.5" />
-                <span>Cancel</span>
-              </button>
+                <Button.Icon type="leading" size="xs">
+                  <X />
+                </Button.Icon>
+                <Button.Label>Cancel</Button.Label>
+              </Button.Root>
             ) : (
               <>
-                <button
-                  type="button"
+                <Button.Root
+                  variant="outlined"
+                  intent="gray"
+                  size="xs"
                   onClick={() => onStartSwap(block.id)}
                   disabled={totalBlocks < 2}
-                  className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/10 hover:border-white/25 disabled:opacity-30 px-2 py-1 text-[11px] font-medium text-white/75 hover:text-white transition-colors"
+                  className="h-7 px-2 text-[11px]"
                   title="Swap position with another scheduled block"
                 >
-                  <ArrowLeftRight className="w-3 h-3 text-primary" />
-                  <span className="hidden sm:inline">Swap</span>
-                </button>
+                  <Button.Icon type="leading" size="xs">
+                    <ArrowLeftRight className="text-primary-400" />
+                  </Button.Icon>
+                  <Button.Label className="hidden sm:inline">Swap</Button.Label>
+                </Button.Root>
 
-                <button
-                  type="button"
+                <Button.Root
+                  variant="ghost"
+                  intent="gray"
+                  size="xs"
                   onClick={() => onMoveUp(block.index)}
                   disabled={block.index === 0}
                   aria-label="Move block earlier"
-                  className="rounded-lg p-1.5 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-25 transition-colors"
                   title="Move up"
                 >
-                  <ArrowUp className="w-3.5 h-3.5" />
-                </button>
+                  <Button.Icon type="only" size="xs">
+                    <ArrowUp />
+                  </Button.Icon>
+                </Button.Root>
 
-                <button
-                  type="button"
+                <Button.Root
+                  variant="ghost"
+                  intent="gray"
+                  size="xs"
                   onClick={() => onMoveDown(block.index)}
                   disabled={block.index === totalBlocks - 1}
                   aria-label="Move block later"
-                  className="rounded-lg p-1.5 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-25 transition-colors"
                   title="Move down"
                 >
-                  <ArrowDown className="w-3.5 h-3.5" />
-                </button>
+                  <Button.Icon type="only" size="xs">
+                    <ArrowDown />
+                  </Button.Icon>
+                </Button.Root>
 
-                <button
-                  type="button"
+                <Button.Root
+                  variant={isEditing ? "soft" : "ghost"}
+                  intent={isEditing ? "primary" : "gray"}
+                  size="xs"
                   onClick={() =>
                     isEditing ? onCancelEdit() : onStartEdit(block)
                   }
                   aria-label="Edit schedule block"
-                  className={`rounded-lg p-1.5 transition-colors ${
-                    isEditing
-                      ? "bg-primary/20 text-highlight"
-                      : "text-white/55 hover:bg-white/10 hover:text-white"
-                  }`}
                   title="Edit timeframe & details"
                 >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
+                  <Button.Icon type="only" size="xs">
+                    <Pencil />
+                  </Button.Icon>
+                </Button.Root>
 
-                <button
-                  type="button"
+                <Button.Root
+                  variant="ghost"
+                  intent="danger"
+                  size="xs"
                   onClick={() => onRemove(block.id)}
                   aria-label="Remove from schedule"
-                  className="rounded-lg p-1.5 text-white/45 hover:bg-red-500/15 hover:text-red-300 transition-colors"
                   title="Remove from My Day schedule"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                  <Button.Icon type="only" size="xs">
+                    <Trash2 />
+                  </Button.Icon>
+                </Button.Root>
               </>
             )}
           </div>
@@ -390,26 +438,32 @@ const SortableScheduleBlockCard: React.FC<SortableBlockCardProps> = ({
 
         {/* Inline Editor Drawer */}
         {isEditing && (
-          <div className="mt-1 rounded-xl border border-white/15 bg-[#12141a]/95 p-3.5 space-y-3">
+          <Card
+            variant="outlined"
+            className="mt-1 bg-[--ui-bg] p-3.5 space-y-3"
+          >
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="sm:col-span-1">
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-caption mb-1">
                   Task / Block Title
                 </label>
-                <input
+                <Input
                   type="text"
+                  variant="outlined"
+                  size="sm"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full rounded-xl border border-white/15 bg-black/60 px-3 py-1.5 text-xs text-white focus:border-primary focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-caption mb-1">
                   Start Time
                 </label>
-                <input
+                <Input
                   type="time"
+                  variant="outlined"
+                  size="sm"
                   value={editStart}
                   onChange={(e) => {
                     const nextStart = e.target.value;
@@ -417,58 +471,59 @@ const SortableScheduleBlockCard: React.FC<SortableBlockCardProps> = ({
                     setEditStart(nextStart);
                     setEditEnd(addMinutesToTime(nextStart, prevDur));
                   }}
-                  className="w-full rounded-xl border border-white/15 bg-black/60 px-3 py-1.5 text-xs font-mono text-white focus:border-primary focus:outline-none"
+                  className="font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-caption mb-1">
                   End Time ({formatDurationCompact(previewDuration)})
                 </label>
-                <input
+                <Input
                   type="time"
+                  variant="outlined"
+                  size="sm"
                   value={editEnd}
                   onChange={(e) => setEditEnd(e.target.value)}
-                  className="w-full rounded-xl border border-white/15 bg-black/60 px-3 py-1.5 text-xs font-mono text-white focus:border-primary focus:outline-none"
+                  className="font-mono"
                 />
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] uppercase tracking-wider text-white/45 mr-1">
+              <span className="text-[10px] uppercase tracking-wider text-caption mr-1">
                 Quick Duration:
               </span>
               {[15, 30, 45, 60, 90, 120].map((m) => (
-                <button
+                <Button.Root
                   key={m}
-                  type="button"
+                  variant={previewDuration === m ? "soft" : "outlined"}
+                  intent={previewDuration === m ? "primary" : "gray"}
+                  size="xs"
                   onClick={() => applyQuickEditDuration(m)}
-                  className={`rounded-lg border px-2 py-0.5 text-[11px] font-mono transition-colors ${
-                    previewDuration === m
-                      ? "border-primary bg-primary/20 text-highlight font-bold"
-                      : "border-white/10 bg-white/5 text-white/65 hover:text-white"
-                  }`}
+                  className="h-6 px-2 text-[11px] font-mono"
                 >
-                  {formatDurationCompact(m)}
-                </button>
+                  <Button.Label>{formatDurationCompact(m)}</Button.Label>
+                </Button.Root>
               ))}
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-caption mb-1">
                 Focus Note (Optional)
               </label>
-              <input
+              <Input
                 type="text"
+                variant="outlined"
+                size="sm"
                 value={editNotes}
                 onChange={(e) => setEditNotes(e.target.value)}
                 placeholder="Goal or deliverable for this timeframe..."
-                className="w-full rounded-xl border border-white/15 bg-black/60 px-3 py-1.5 text-xs text-white placeholder-white/30 focus:border-primary focus:outline-none"
               />
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-              <label className="inline-flex items-center gap-2 text-xs text-white/70 cursor-pointer select-none">
+              <label className="inline-flex items-center gap-2 text-xs text-body cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={cascadeEdit}
@@ -479,15 +534,18 @@ const SortableScheduleBlockCard: React.FC<SortableBlockCardProps> = ({
               </label>
 
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
+                <Button.Root
+                  variant="outlined"
+                  intent="gray"
+                  size="xs"
                   onClick={onCancelEdit}
-                  className="rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 px-3 py-1.5 text-xs font-medium text-white/75"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="button"
+                  <Button.Label>Cancel</Button.Label>
+                </Button.Root>
+                <Button.Root
+                  variant="solid"
+                  intent="primary"
+                  size="xs"
                   onClick={() =>
                     onSaveEdit(
                       block.id,
@@ -500,17 +558,19 @@ const SortableScheduleBlockCard: React.FC<SortableBlockCardProps> = ({
                       cascadeEdit
                     )
                   }
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-black hover:brightness-110 shadow-neon"
+                  className="font-semibold"
                 >
-                  <Check className="w-3.5 h-3.5" />
-                  <span>Save Changes</span>
-                </button>
+                  <Button.Icon type="leading" size="xs">
+                    <Check />
+                  </Button.Icon>
+                  <Button.Label>Save Changes</Button.Label>
+                </Button.Root>
               </div>
             </div>
-          </div>
+          </Card>
         )}
       </div>
-    </div>
+    </Card>
   );
 };
 
@@ -1005,91 +1065,103 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
       {/* 2. WORKSPACE GRID: BUILDER PANEL (LEFT) + SWAPPABLE/EDITABLE TIMELINE (RIGHT) */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         {/* LEFT COLUMN: MANUAL BUILD & AI AUTO-ARRANGE */}
-        <div className="xl:col-span-5 rounded-3xl border theme-panel p-5 sm:p-6 shadow-2xl backdrop-blur-2xl space-y-5">
+        <Card
+          variant="mixed"
+          fancy
+          className="xl:col-span-5 p-5 sm:p-6 backdrop-blur-2xl space-y-5"
+        >
           {/* Mode Switcher Tabs */}
-          <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-white/12 bg-black/45 p-1">
-            <button
-              type="button"
-              onClick={() => setBuilderMode("manual")}
-              className={`inline-flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 text-xs font-bold transition-all ${
-                builderMode === "manual"
-                  ? "bg-primary text-black shadow-neon"
-                  : "text-white/65 hover:text-white hover:bg-white/5"
-              }`}
+          <Tabs.Root
+            value={builderMode}
+            onValueChange={(v) => setBuilderMode(v as "manual" | "ai")}
+          >
+            <Tabs.List
+              variant="soft"
+              triggerVariant="softToSoft"
+              size="md"
+              intent="primary"
+              className="grid grid-cols-2 w-full bg-[--ui-soft-bg]/90 border border-[--ui-border-color] p-1"
             >
-              <ListPlus className="w-4 h-4" />
-              <span>Manual Build</span>
-            </button>
+              <Tabs.Trigger
+                value="manual"
+                className="justify-center gap-2 text-xs font-semibold data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
+              >
+                <ListPlus className="size-4 text-primary-400" />
+                <span>Manual Build</span>
+              </Tabs.Trigger>
 
-            <button
-              type="button"
-              onClick={() => setBuilderMode("ai")}
-              className={`inline-flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 text-xs font-bold transition-all ${
-                builderMode === "ai"
-                  ? "bg-primary text-black shadow-neon"
-                  : "text-white/65 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              <Wand2 className="w-4 h-4" />
-              <span>AI Auto-Arrange</span>
-            </button>
-          </div>
+              <Tabs.Trigger
+                value="ai"
+                className="justify-center gap-2 text-xs font-semibold data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
+              >
+                <Wand2 className="size-4 text-primary-400" />
+                <span>AI Auto-Arrange</span>
+              </Tabs.Trigger>
+            </Tabs.List>
+          </Tabs.Root>
 
           {builderMode === "manual" ? (
             /* ---------------- MANUAL BUILD FORM ---------------- */
             <form onSubmit={handleManualAddBlock} className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <div>
-                  <h3 className="text-sm font-bold text-white">
+                  <Title as="h3" className="text-sm" size="base" weight="semibold">
                     Manually Build Your Day
-                  </h3>
-                  <p className="text-xs text-white/55">
+                  </Title>
+                  <Text size="sm" className="text-caption">
                     Pick a task from your table and assign its timeframe.
-                  </p>
+                  </Text>
                 </div>
 
-                <div className="inline-flex rounded-xl border border-white/10 bg-black/40 p-0.5 text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => setManualSourceMode("table")}
-                    className={`rounded-lg px-2.5 py-1 font-semibold transition-colors ${
-                      manualSourceMode === "table"
-                        ? "bg-white/15 text-white"
-                        : "text-white/55 hover:text-white"
-                    }`}
+                <Tabs.Root
+                  value={manualSourceMode}
+                  onValueChange={(v) =>
+                    setManualSourceMode(v as "table" | "custom")
+                  }
+                >
+                  <Tabs.List
+                    variant="soft"
+                    triggerVariant="softToSoft"
+                    size="sm"
+                    className="border border-[--ui-border-color] bg-[--ui-soft-bg] p-0.5 text-[11px]"
                   >
-                    Table Task
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setManualSourceMode("custom")}
-                    className={`rounded-lg px-2.5 py-1 font-semibold transition-colors ${
-                      manualSourceMode === "custom"
-                        ? "bg-white/15 text-white"
-                        : "text-white/55 hover:text-white"
-                    }`}
-                  >
-                    Custom / Break
-                  </button>
-                </div>
+                    <Tabs.Trigger
+                      value="table"
+                      className="px-2.5 text-[11px] font-medium data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title"
+                    >
+                      Table Task
+                    </Tabs.Trigger>
+                    <Tabs.Trigger
+                      value="custom"
+                      className="px-2.5 text-[11px] font-medium data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title"
+                    >
+                      Custom / Break
+                    </Tabs.Trigger>
+                  </Tabs.List>
+                </Tabs.Root>
               </div>
 
               {manualSourceMode === "table" ? (
                 <div className="space-y-2.5">
                   <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
+                    <Search className="size-3.5 text-caption absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Input
                       type="text"
+                      variant="outlined"
+                      size="sm"
                       value={manualSearch}
                       onChange={(e) => setManualSearch(e.target.value)}
                       placeholder="Filter tasks from your table..."
-                      className="w-full rounded-xl border border-white/12 bg-black/50 pl-8 pr-3 py-2 text-xs text-white placeholder-white/35 focus:border-primary focus:outline-none"
+                      className="pl-8"
                     />
                   </div>
 
-                  <div className="max-h-56 overflow-y-auto space-y-1.5 rounded-2xl border border-white/10 bg-black/35 p-2">
+                  <Card
+                    variant="outlined"
+                    className="max-h-56 overflow-y-auto space-y-1.5 bg-[--ui-soft-bg]/30 p-2"
+                  >
                     {filteredManualTasks.length === 0 ? (
-                      <div className="py-5 px-3 text-center space-y-2.5 text-xs text-white/50">
+                      <div className="py-5 px-3 text-center space-y-2.5 text-xs text-caption">
                         <div>
                           {tableTasks.length === 0
                             ? "Your my tasks list is currently empty."
@@ -1098,14 +1170,19 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
                         {activeTableTasks.length === 0 &&
                           !aiTemporarilyDisabled &&
                           onLaunchGuidedDayPlan && (
-                            <button
-                              type="button"
+                            <Button.Root
+                              variant="soft"
+                              intent="primary"
+                              size="xs"
                               onClick={onLaunchGuidedDayPlan}
-                              className="inline-flex items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/15 hover:bg-primary/25 px-3 py-1.5 text-[11px] font-semibold text-highlight transition-colors"
                             >
-                              <HelpCircle className="w-3.5 h-3.5 text-primary" />
-                              <span>Ask AI Q&amp;A to Plan My Day</span>
-                            </button>
+                              <Button.Icon type="leading" size="xs">
+                                <HelpCircle />
+                              </Button.Icon>
+                              <Button.Label>
+                                Ask AI Q&amp;A to Plan My Day
+                              </Button.Label>
+                            </Button.Root>
                           )}
                       </div>
                     ) : (
@@ -1125,59 +1202,72 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
                                 addMinutesToTime(manualStart, recMins)
                               );
                             }}
-                            className={`w-full flex items-center justify-between gap-2.5 rounded-xl border px-3 py-2 text-left text-xs transition-all ${
+                            className={`w-full flex items-center justify-between gap-2.5 rounded-[--btn-radius] border px-3 py-2 text-left text-xs transition-all ${
                               isSelected
-                                ? "border-primary bg-primary/20 text-white shadow-sm"
-                                : "border-transparent bg-white/[0.03] hover:bg-white/[0.08] text-white/80"
+                                ? "border-primary-500/60 bg-primary-500/15 text-title shadow-sm"
+                                : "border-transparent bg-[--ui-bg]/60 hover:bg-[--ui-soft-bg] text-body"
                             }`}
                           >
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5">
                                 <span
                                   className={`font-semibold truncate ${
-                                    isDone ? "line-through text-white/45" : ""
+                                    isDone
+                                      ? "line-through text-caption"
+                                      : "text-title"
                                   }`}
                                 >
                                   {t.title}
                                 </span>
                                 {alreadyScheduled && (
-                                  <span className="rounded bg-primary/25 px-1.5 py-0.2 text-[9px] font-bold uppercase text-highlight shrink-0">
+                                  <Badge
+                                    variant="soft"
+                                    intent="primary"
+                                    size="xs"
+                                    className="uppercase shrink-0"
+                                  >
                                     In Plan
-                                  </span>
+                                  </Badge>
                                 )}
                               </div>
-                              <div className="text-[10px] text-white/45 mt-0.5">
+                              <div className="text-[10px] text-caption mt-0.5">
                                 {t.type} • {t.priority}
                                 {t.section_group ? ` • ${t.section_group}` : ""}
                               </div>
                             </div>
 
-                            <span className="rounded-lg border border-white/10 bg-black/40 px-2 py-0.5 font-mono text-[10px] text-highlight shrink-0">
+                            <Badge
+                              variant="outlined"
+                              intent="gray"
+                              size="xs"
+                              className="font-mono shrink-0"
+                            >
                               {t.estimated_minutes > 0
                                 ? `${t.estimated_minutes}m est`
                                 : `~${recMins}m`}
-                            </span>
+                            </Badge>
                           </button>
                         );
                       })
                     )}
-                  </div>
+                  </Card>
                 </div>
               ) : (
                 <div className="space-y-2.5">
                   <div>
-                    <label className="block text-[11px] font-semibold text-white/65 mb-1">
+                    <label className="block text-[11px] font-semibold text-caption mb-1">
                       Custom Block Title
                     </label>
-                    <input
+                    <Input
                       type="text"
+                      variant="outlined"
+                      size="sm"
                       value={customBlockTitle}
                       onChange={(e) => setCustomBlockTitle(e.target.value)}
                       placeholder="e.g. Lunch Break, Gym, Review Lecture Notes..."
-                      className="w-full rounded-xl border border-white/15 bg-black/50 px-3 py-2 text-xs text-white placeholder-white/35 focus:border-primary focus:outline-none"
                     />
                   </div>
-                  <label className="inline-flex items-center gap-2 text-xs text-white/70 cursor-pointer select-none">
+                  <label className="inline-flex items-center gap-2 text-xs text-body cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={customIsBreak}
@@ -1190,13 +1280,18 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
               )}
 
               {/* Timeframe Inputs */}
-              <div className="rounded-2xl border border-white/12 bg-black/40 p-3.5 space-y-3">
+              <Card
+                variant="soft"
+                className="border border-[--ui-border-color] p-3.5 space-y-3"
+              >
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-caption">
                     Timeframe ({formatDurationCompact(manualDurationPreview)})
                   </span>
-                  <button
-                    type="button"
+                  <Button.Root
+                    variant="ghost"
+                    intent="primary"
+                    size="xs"
                     onClick={() => {
                       const nowStr = minutesToTimeString(
                         new Date().getHours() * 60 + new Date().getMinutes()
@@ -1206,19 +1301,21 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
                         addMinutesToTime(nowStr, manualDurationPreview)
                       );
                     }}
-                    className="text-[11px] font-semibold text-primary hover:underline"
+                    className="h-6 px-2 text-[11px]"
                   >
-                    Set Start to Right Now
-                  </button>
+                    <Button.Label>Set Start to Right Now</Button.Label>
+                  </Button.Root>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-semibold text-white/50 mb-1">
+                    <label className="block text-[10px] font-semibold text-caption mb-1">
                       Start Time
                     </label>
-                    <input
+                    <Input
                       type="time"
+                      variant="outlined"
+                      size="sm"
                       value={manualStart}
                       onChange={(e) => {
                         const nextS = e.target.value;
@@ -1229,83 +1326,100 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
                         setManualStart(nextS);
                         setManualEnd(addMinutesToTime(nextS, curDur));
                       }}
-                      className="w-full rounded-xl border border-white/15 bg-black/60 px-3 py-2 text-xs font-mono text-white focus:border-primary focus:outline-none"
+                      className="font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-white/50 mb-1">
+                    <label className="block text-[10px] font-semibold text-caption mb-1">
                       End Time
                     </label>
-                    <input
+                    <Input
                       type="time"
+                      variant="outlined"
+                      size="sm"
                       value={manualEnd}
                       onChange={(e) => setManualEnd(e.target.value)}
-                      className="w-full rounded-xl border border-white/15 bg-black/60 px-3 py-2 text-xs font-mono text-white focus:border-primary focus:outline-none"
+                      className="font-mono"
                     />
                   </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5">
                   {[15, 25, 30, 45, 60, 90, 120].map((mins) => (
-                    <button
+                    <Button.Root
                       key={mins}
-                      type="button"
+                      variant={
+                        manualDurationPreview === mins ? "soft" : "outlined"
+                      }
+                      intent={
+                        manualDurationPreview === mins ? "primary" : "gray"
+                      }
+                      size="xs"
                       onClick={() =>
                         setManualEnd(addMinutesToTime(manualStart, mins))
                       }
-                      className={`rounded-lg border px-2.5 py-1 text-[11px] font-mono transition-colors ${
-                        manualDurationPreview === mins
-                          ? "border-primary bg-primary/20 text-highlight font-bold"
-                          : "border-white/10 bg-white/5 text-white/60 hover:text-white"
-                      }`}
+                      className="h-6 px-2 text-[11px] font-mono"
                     >
-                      {formatDurationCompact(mins)}
-                    </button>
+                      <Button.Label>
+                        {formatDurationCompact(mins)}
+                      </Button.Label>
+                    </Button.Root>
                   ))}
                 </div>
-              </div>
+              </Card>
 
               <div>
-                <input
+                <Input
                   type="text"
+                  variant="outlined"
+                  size="sm"
                   value={manualNotes}
                   onChange={(e) => setManualNotes(e.target.value)}
                   placeholder="Optional focus note for this time block..."
-                  className="w-full rounded-xl border border-white/12 bg-black/45 px-3 py-2 text-xs text-white placeholder-white/35 focus:border-primary focus:outline-none"
                 />
               </div>
 
-              <button
+              <Button.Root
                 type="submit"
-                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-primary py-3 px-4 text-xs sm:text-sm font-extrabold text-black shadow-neon hover:brightness-110 transition-all"
+                variant="solid"
+                intent="primary"
+                size="md"
+                className="w-full font-semibold"
               >
-                <Plus className="w-4 h-4 stroke-[2.5]" />
-                <span>Add to My Day Schedule</span>
-              </button>
+                <Button.Icon type="leading" size="sm">
+                  <Plus className="stroke-[2.5]" />
+                </Button.Icon>
+                <Button.Label>Add to My Day Schedule</Button.Label>
+              </Button.Root>
             </form>
           ) : (
             /* ---------------- AI AUTO-ARRANGE FORM ---------------- */
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-primary" />
+                <Title as="h3" size="base" weight="semibold" className="text-sm flex items-center gap-1.5">
+                  <Sparkles className="size-4 text-primary-400" />
                   <span>AI Auto-Arrange Schedule</span>
-                </h3>
-                <p className="text-xs text-white/55 mt-0.5">
+                </Title>
+                <Text size="sm" className="text-caption mt-0.5">
                   Choose your start &amp; planned end time plus the tasks you
                   want to accomplish—AI fits each task using its time
                   recommendations, priority, and due date.
-                </p>
+                </Text>
               </div>
 
               {/* Start & Planned End Time */}
-              <div className="rounded-2xl border border-white/12 bg-black/40 p-3.5 space-y-3">
+              <Card
+                variant="soft"
+                className="border border-[--ui-border-color] p-3.5 space-y-3"
+              >
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-caption">
                     Available Window ({formatDurationCompact(aiWindowMinutes)})
                   </span>
-                  <button
-                    type="button"
+                  <Button.Root
+                    variant="ghost"
+                    intent="primary"
+                    size="xs"
                     onClick={() => {
                       const nowStr = minutesToTimeString(
                         new Date().getHours() * 60 + new Date().getMinutes()
@@ -1313,81 +1427,96 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
                       setAiStartTime(nowStr);
                       setAiEndTime(addMinutesToTime(nowStr, 240));
                     }}
-                    className="text-[11px] font-semibold text-primary hover:underline"
+                    className="h-6 px-2 text-[11px]"
                   >
-                    Start Right Now (+4h)
-                  </button>
+                    <Button.Label>Start Right Now (+4h)</Button.Label>
+                  </Button.Root>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-semibold text-white/50 mb-1">
+                    <label className="block text-[10px] font-semibold text-caption mb-1">
                       Start Time
                     </label>
-                    <input
+                    <Input
                       type="time"
+                      variant="outlined"
+                      size="sm"
                       value={aiStartTime}
                       onChange={(e) => setAiStartTime(e.target.value)}
-                      className="w-full rounded-xl border border-white/15 bg-black/60 px-3 py-2 text-xs font-mono text-white focus:border-primary focus:outline-none"
+                      className="font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-white/50 mb-1">
+                    <label className="block text-[10px] font-semibold text-caption mb-1">
                       Planned End Time
                     </label>
-                    <input
+                    <Input
                       type="time"
+                      variant="outlined"
+                      size="sm"
                       value={aiEndTime}
                       onChange={(e) => setAiEndTime(e.target.value)}
-                      className="w-full rounded-xl border border-white/15 bg-black/60 px-3 py-2 text-xs font-mono text-white focus:border-primary focus:outline-none"
+                      className="font-mono"
                     />
                   </div>
                 </div>
-              </div>
+              </Card>
 
               {/* Task Multi-Select + Add All */}
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-white/80">
+                  <span className="text-xs font-semibold text-body">
                     Tasks to Accomplish ({aiSelectedIds.size} selected • ~
                     {formatDurationCompact(aiSelectedTotalRecMinutes)} est.)
                   </span>
                   <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
+                    <Button.Root
+                      variant="soft"
+                      intent="primary"
+                      size="xs"
                       onClick={() =>
                         setAiSelectedIds(
                           new Set(activeTableTasks.map((t) => t.id))
                         )
                       }
-                      className="rounded-lg border border-primary/40 bg-primary/15 hover:bg-primary/25 px-2.5 py-1 text-[11px] font-semibold text-highlight transition-colors"
+                      className="h-6 px-2.5 text-[11px]"
                     >
-                      Add All Active ({activeTableTasks.length})
-                    </button>
-                    <button
-                      type="button"
+                      <Button.Label>
+                        Add All Active ({activeTableTasks.length})
+                      </Button.Label>
+                    </Button.Root>
+                    <Button.Root
+                      variant="outlined"
+                      intent="gray"
+                      size="xs"
                       onClick={() => setAiSelectedIds(new Set())}
-                      className="rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 px-2 py-1 text-[11px] text-white/60 hover:text-white transition-colors"
+                      className="h-6 px-2 text-[11px]"
                     >
-                      Clear
-                    </button>
+                      <Button.Label>Clear</Button.Label>
+                    </Button.Root>
                   </div>
                 </div>
 
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
+                  <Search className="size-3.5 text-caption absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Input
                     type="text"
+                    variant="outlined"
+                    size="sm"
                     value={aiSearchFilter}
                     onChange={(e) => setAiSearchFilter(e.target.value)}
                     placeholder="Search tasks to include..."
-                    className="w-full rounded-xl border border-white/12 bg-black/50 pl-8 pr-3 py-1.5 text-xs text-white placeholder-white/35 focus:border-primary focus:outline-none"
+                    className="pl-8"
                   />
                 </div>
 
-                <div className="max-h-52 overflow-y-auto space-y-1 rounded-2xl border border-white/10 bg-black/35 p-2">
+                <Card
+                  variant="outlined"
+                  className="max-h-52 overflow-y-auto space-y-1 bg-[--ui-soft-bg]/30 p-2"
+                >
                   {filteredAiTasks.length === 0 ? (
-                    <div className="py-5 px-3 text-center space-y-2.5 text-xs text-white/50">
+                    <div className="py-5 px-3 text-center space-y-2.5 text-xs text-caption">
                       <div>
                         {tableTasks.length === 0
                           ? "No tasks on your list yet."
@@ -1396,14 +1525,19 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
                       {activeTableTasks.length === 0 &&
                         !aiTemporarilyDisabled &&
                         onLaunchGuidedDayPlan && (
-                          <button
-                            type="button"
+                          <Button.Root
+                            variant="soft"
+                            intent="primary"
+                            size="xs"
                             onClick={onLaunchGuidedDayPlan}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/15 hover:bg-primary/25 px-3 py-1.5 text-[11px] font-semibold text-highlight transition-colors"
                           >
-                            <HelpCircle className="w-3.5 h-3.5 text-primary" />
-                            <span>Let AI Ask Questions &amp; Build My Day</span>
-                          </button>
+                            <Button.Icon type="leading" size="xs">
+                              <HelpCircle />
+                            </Button.Icon>
+                            <Button.Label>
+                              Let AI Ask Questions &amp; Build My Day
+                            </Button.Label>
+                          </Button.Root>
                         )}
                     </div>
                   ) : (
@@ -1415,10 +1549,10 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
                       return (
                         <label
                           key={t.id}
-                          className={`flex items-center justify-between gap-2.5 rounded-xl border px-3 py-2 text-xs cursor-pointer transition-colors ${
+                          className={`flex items-center justify-between gap-2.5 rounded-[--btn-radius] border px-3 py-2 text-xs cursor-pointer transition-colors ${
                             checked
-                              ? "border-primary/45 bg-primary/15 text-white"
-                              : "border-transparent bg-white/[0.02] hover:bg-white/[0.06] text-white/70"
+                              ? "border-primary-500/45 bg-primary-500/15 text-title"
+                              : "border-transparent bg-[--ui-bg]/50 hover:bg-[--ui-soft-bg] text-body"
                           }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
@@ -1438,30 +1572,37 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
                             <div className="min-w-0">
                               <div
                                 className={`font-medium truncate ${
-                                  done ? "line-through text-white/45" : ""
+                                  done
+                                    ? "line-through text-caption"
+                                    : "text-title"
                                 }`}
                               >
                                 {t.title}
                               </div>
-                              <div className="text-[10px] text-white/45">
+                              <div className="text-[10px] text-caption">
                                 {t.priority} • {t.type}
                               </div>
                             </div>
                           </div>
 
-                          <span className="rounded-md border border-white/10 bg-black/40 px-2 py-0.5 font-mono text-[10px] text-highlight shrink-0">
+                          <Badge
+                            variant="outlined"
+                            intent="gray"
+                            size="xs"
+                            className="font-mono shrink-0"
+                          >
                             {t.estimated_minutes > 0
                               ? `${t.estimated_minutes}m rec`
                               : `~${recMins}m`}
-                          </span>
+                          </Badge>
                         </label>
                       );
                     })
                   )}
-                </div>
+                </Card>
               </div>
 
-              <label className="inline-flex items-center gap-2 text-xs text-white/75 cursor-pointer select-none">
+              <label className="inline-flex items-center gap-2 text-xs text-body cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={aiIncludeBreaks}
@@ -1472,105 +1613,125 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
               </label>
 
               {!hasApiKey && !aiTemporarilyDisabled && (
-                <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 flex items-center justify-between gap-2 text-xs text-amber-100">
+                <Card
+                  variant="outlined"
+                  className="border-warning-500/35 bg-warning-500/10 p-3 flex items-center justify-between gap-2 text-xs text-warning-200"
+                >
                   <span>
                     Add your Google AI key for Gemini reasoning, or run Smart
                     Auto-Arrange directly.
                   </span>
-                  <button
-                    type="button"
+                  <Button.Root
+                    variant="soft"
+                    intent="warning"
+                    size="xs"
                     onClick={onOpenApiKeySetup}
-                    className="inline-flex items-center gap-1 rounded-lg border border-amber-300/40 bg-amber-400/20 px-2.5 py-1 font-semibold text-amber-100 hover:bg-amber-400/30 shrink-0"
+                    className="shrink-0"
                   >
-                    <KeyRound className="w-3 h-3" />
-                    <span>Add Key</span>
-                  </button>
-                </div>
+                    <Button.Icon type="leading" size="xs">
+                      <KeyRound />
+                    </Button.Icon>
+                    <Button.Label>Add Key</Button.Label>
+                  </Button.Root>
+                </Card>
               )}
 
-              <button
-                type="button"
+              <Button.Root
+                variant="solid"
+                intent="primary"
+                size="md"
                 disabled={isAiArranging || aiSelectedIds.size === 0}
                 onClick={handleAiAutoArrange}
-                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-primary py-3 px-4 text-xs sm:text-sm font-extrabold text-black shadow-neon hover:brightness-110 disabled:opacity-45 transition-all"
+                className="w-full font-semibold"
               >
-                {isAiArranging ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Gemini Arranging Your Optimal Schedule...</span>
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="w-4 h-4" />
-                    <span>
-                      {hasApiKey && !aiTemporarilyDisabled
-                        ? "Auto-Arrange My Day with AI"
-                        : "Smart Auto-Arrange Selected Tasks"}
-                    </span>
-                  </>
-                )}
-              </button>
+                <Button.Icon type="leading" size="sm">
+                  {isAiArranging ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <Wand2 />
+                  )}
+                </Button.Icon>
+                <Button.Label>
+                  {isAiArranging
+                    ? "Gemini Arranging Your Optimal Schedule..."
+                    : hasApiKey && !aiTemporarilyDisabled
+                    ? "Auto-Arrange My Day with AI"
+                    : "Smart Auto-Arrange Selected Tasks"}
+                </Button.Label>
+              </Button.Root>
             </div>
           )}
-        </div>
+        </Card>
 
         {/* RIGHT COLUMN: INTERACTIVE SWAPPABLE, MOVABLE, EDITABLE SCHEDULE */}
-        <div className="xl:col-span-7 rounded-3xl border theme-panel p-5 sm:p-6 shadow-2xl backdrop-blur-2xl space-y-4">
+        <Card
+          variant="mixed"
+          fancy
+          className="xl:col-span-7 p-5 sm:p-6 backdrop-blur-2xl space-y-4"
+        >
           {/* Header & Logistics Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[--ui-border-color] pb-4">
             <div>
-              <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                <CalendarClock className="w-5 h-5 text-primary" />
+              <Title as="h3" size="lg" weight="bold" className="flex items-center gap-2">
+                <CalendarClock className="size-5 text-primary-400" />
                 <span>Today&apos;s Interactive Schedule</span>
                 {blocks.length > 0 && (
-                  <span className="rounded-full bg-primary/20 border border-primary/35 px-2.5 py-0.5 text-xs font-mono text-highlight">
+                  <Badge variant="soft" intent="primary" size="xs" className="font-mono">
                     {blocks.length} {blocks.length === 1 ? "slot" : "slots"}
-                  </span>
+                  </Badge>
                 )}
-              </h3>
-              <p className="text-xs text-white/55 mt-0.5">
+              </Title>
+              <Text size="sm" className="text-caption mt-0.5">
                 Drag to reorder, click Swap to trade slots, or click any
                 timeframe to edit.
-              </p>
+              </Text>
             </div>
 
             {blocks.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  type="button"
+                <Button.Root
+                  variant="soft"
+                  intent="primary"
+                  size="xs"
                   onClick={handleAlignStartToNow}
-                  className="inline-flex items-center gap-1 rounded-xl border border-primary/40 bg-primary/15 hover:bg-primary/25 px-2.5 py-1.5 text-xs font-semibold text-highlight transition-colors"
                   title="Shift entire schedule so the first block begins right now"
                 >
-                  <Play className="w-3 h-3 fill-current" />
-                  <span>Start Now</span>
-                </button>
-                <button
-                  type="button"
+                  <Button.Icon type="leading" size="xs">
+                    <Play className="fill-current" />
+                  </Button.Icon>
+                  <Button.Label>Start Now</Button.Label>
+                </Button.Root>
+                <Button.Root
+                  variant="outlined"
+                  intent="gray"
+                  size="xs"
                   onClick={() => handleShiftAll(-15)}
-                  className="rounded-xl border border-white/12 bg-white/5 hover:bg-white/10 px-2.5 py-1.5 text-xs font-mono text-white/75 hover:text-white transition-colors"
+                  className="font-mono"
                   title="Shift all blocks 15 minutes earlier"
                 >
-                  -15m
-                </button>
-                <button
-                  type="button"
+                  <Button.Label>-15m</Button.Label>
+                </Button.Root>
+                <Button.Root
+                  variant="outlined"
+                  intent="gray"
+                  size="xs"
                   onClick={() => handleShiftAll(15)}
-                  className="rounded-xl border border-white/12 bg-white/5 hover:bg-white/10 px-2.5 py-1.5 text-xs font-mono text-white/75 hover:text-white transition-colors"
+                  className="font-mono"
                   title="Push all blocks 15 minutes later"
                 >
-                  +15m
-                </button>
-                <button
-                  type="button"
+                  <Button.Label>+15m</Button.Label>
+                </Button.Root>
+                <Button.Root
+                  variant="soft"
+                  intent="danger"
+                  size="xs"
                   onClick={() => {
                     saveSchedule([], { aiSummary: null });
                     onShowToast("Cleared My Day schedule.");
                   }}
-                  className="rounded-xl border border-red-400/25 bg-red-500/10 hover:bg-red-500/20 px-2.5 py-1.5 text-xs font-medium text-red-200 transition-colors"
                 >
-                  Clear Day
-                </button>
+                  <Button.Label>Clear Day</Button.Label>
+                </Button.Root>
               </div>
             )}
           </div>
@@ -1578,7 +1739,7 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
           {/* Reorder Reflow Toggle + AI Strategy Note */}
           {blocks.length > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-              <label className="inline-flex items-center gap-2 text-white/70 cursor-pointer select-none">
+              <label className="inline-flex items-center gap-2 text-body cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={autoCascadeTimes}
@@ -1594,7 +1755,7 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
                 </span>
               </label>
 
-              <span className="font-mono text-[11px] text-white/50">
+              <span className="font-mono text-[11px] text-caption">
                 Total:{" "}
                 {formatDurationCompact(telemetry.totalScheduledMinutes)}
               </span>
@@ -1602,71 +1763,88 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
           )}
 
           {schedule?.aiSummary && blocks.length > 0 && (
-            <div className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 flex items-start gap-2.5 text-xs text-white/90">
-              <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+            <Card
+              variant="soft"
+              className="border border-primary-500/30 bg-primary-500/10 px-4 py-3 flex items-start gap-2.5 text-xs text-title"
+            >
+              <Sparkles className="size-4 text-primary-400 shrink-0 mt-0.5" />
               <div className="leading-relaxed">{schedule.aiSummary}</div>
-            </div>
+            </Card>
           )}
 
           {swapSourceId && (
-            <div className="rounded-2xl border border-amber-400/50 bg-amber-500/15 px-4 py-2.5 flex items-center justify-between gap-2 text-xs text-amber-100">
+            <Card
+              variant="outlined"
+              className="border-warning-500/45 bg-warning-500/10 px-4 py-2.5 flex items-center justify-between gap-2 text-xs text-warning-200"
+            >
               <div className="flex items-center gap-2">
-                <ArrowLeftRight className="w-4 h-4 text-amber-300" />
+                <ArrowLeftRight className="size-4 text-warning-300" />
                 <span>
                   Select <strong>&ldquo;Swap Here&rdquo;</strong> on another
                   schedule component to swap positions.
                 </span>
               </div>
-              <button
-                type="button"
+              <Button.Root
+                variant="outlined"
+                intent="warning"
+                size="xs"
                 onClick={() => setSwapSourceId(null)}
-                className="rounded-lg border border-amber-300/40 px-2.5 py-1 font-semibold hover:bg-amber-400/20"
               >
-                Cancel
-              </button>
-            </div>
+                <Button.Label>Cancel</Button.Label>
+              </Button.Root>
+            </Card>
           )}
 
           {/* Sortable Schedule Blocks List */}
           {telemetry.enrichedBlocks.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-white/15 bg-black/25 py-16 px-6 text-center space-y-3">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 text-primary">
-                <CalendarClock className="w-6 h-6" />
+            <Card
+              variant="soft"
+              className="border border-dashed border-[--ui-border-color] py-16 px-6 text-center space-y-3"
+            >
+              <div className="mx-auto flex size-12 items-center justify-center rounded-[--card-radius] border border-primary-500/30 bg-primary-500/10 text-primary-400">
+                <CalendarClock className="size-6" />
               </div>
               <div className="space-y-1 max-w-md mx-auto">
-                <h4 className="text-base font-bold text-white">
+                <Title as="h4" size="base" weight="semibold" align="center">
                   Your my day schedule is open
-                </h4>
-                <p className="text-xs text-white/55 leading-relaxed">
+                </Title>
+                <Text size="sm" align="center" className="text-caption leading-relaxed">
                   {activeTableTasks.length === 0
                     ? "Don't have tasks on your list yet? Let kite ask you a few quick questions to populate both your Tasks list and your my day schedule."
                     : "Use Manual Build on the left to pick tasks with custom timeframes, or switch to AI Auto-Arrange to automatically fit your tasks between your start and end time."}
-                </p>
+                </Text>
               </div>
               <div className="pt-1 flex flex-wrap items-center justify-center gap-2">
                 {activeTableTasks.length === 0 &&
                 !aiTemporarilyDisabled &&
                 onLaunchGuidedDayPlan ? (
-                  <button
-                    type="button"
+                  <Button.Root
+                    variant="solid"
+                    intent="primary"
+                    size="sm"
                     onClick={onLaunchGuidedDayPlan}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-extrabold text-black shadow-neon hover:brightness-110 transition-all"
+                    className="font-semibold"
                   >
-                    <HelpCircle className="w-3.5 h-3.5" />
-                    <span>Plan My Day via Guided Q&amp;A</span>
-                  </button>
+                    <Button.Icon type="leading" size="xs">
+                      <HelpCircle />
+                    </Button.Icon>
+                    <Button.Label>Plan My Day via Guided Q&amp;A</Button.Label>
+                  </Button.Root>
                 ) : (
-                  <button
-                    type="button"
+                  <Button.Root
+                    variant="soft"
+                    intent="primary"
+                    size="sm"
                     onClick={() => setBuilderMode("ai")}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/15 hover:bg-primary/25 px-4 py-2 text-xs font-bold text-highlight transition-colors"
                   >
-                    <Wand2 className="w-3.5 h-3.5" />
-                    <span>Try AI Auto-Arrange</span>
-                  </button>
+                    <Button.Icon type="leading" size="xs">
+                      <Wand2 />
+                    </Button.Icon>
+                    <Button.Label>Try AI Auto-Arrange</Button.Label>
+                  </Button.Root>
                 )}
               </div>
-            </div>
+            </Card>
           ) : (
             <DndContext
               sensors={sensors}
@@ -1701,7 +1879,7 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
               </SortableContext>
             </DndContext>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import {
   THEME_OPTIONS,
   ThemeName,
@@ -27,6 +27,12 @@ import {
 import { KiteLogoMark } from "@/components/ui/KiteBrand";
 import { SharinganIcon } from "@/components/ui/SharinganIcon";
 import { SakuraIcon } from "@/components/ui/SakuraIcon";
+import {
+  Badge,
+  Button,
+  DropdownMenu,
+  Tabs,
+} from "@/components/tailus-ui";
 
 interface TopNavBarProps {
   profile: UserProfile;
@@ -61,402 +67,406 @@ export const TopNavBar: React.FC<TopNavBarProps> = React.memo(({
   onSelectTab,
   onResetChatToHero,
   onUpdateProfile,
-  onUpdateWorkspaceConfig,
   onOpenSettings,
   onQuickSyncCanvas,
   onGoogleSignIn,
   onSignOut,
 }) => {
-  const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
-
   const activeThemeMeta =
     THEME_OPTIONS.find((t) => t.id === profile.theme) || THEME_OPTIONS[0];
 
+  const jState = workspaceConfig.journeyState;
+  const activeJ =
+    jState?.journeys?.find((j) => j.id === jState.activeJourneyId) ||
+    jState?.journeys?.[0];
+  const jProg = computeJourneyProgress(activeJ);
+
   return (
-    <header className="sticky top-0 z-30 border-b theme-header-bg backdrop-blur-md transition-colors duration-300">
-      <div className="mx-auto max-w-[1600px] px-2.5 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-1.5 sm:gap-3">
-        {/* Left: Brand Identity matching user screenshot, strictly non-editable */}
+    <header className="sticky top-0 z-30 border-b border-[--ui-border-color] bg-[--ui-bg]/85 backdrop-blur-xl transition-colors duration-300">
+      <div className="mx-auto max-w-[1600px] px-3 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-2 sm:gap-4">
+        {/* Left: Brand Identity */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 select-none">
           {profile.theme === "sharingan" ? (
             <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#140305] border border-red-500/50 shadow-[0_0_24px_rgba(255,31,56,0.65)] transition-all cursor-pointer"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[--btn-radius] bg-[#140305] border border-danger-500/50 shadow-[0_0_20px_rgba(255,31,56,0.5)] transition-all cursor-pointer"
               title="Uchiha Clan Sharingan Eye (Spinning 3-Tomoe)"
             >
-              <SharinganIcon size={24} animate speed="normal" glow interactive />
+              <SharinganIcon size={20} animate speed="normal" glow interactive />
             </div>
           ) : profile.theme === "sakura" ? (
             <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#240b18] border border-pink-400/50 shadow-[0_0_24px_rgba(255,126,182,0.55)] transition-all cursor-pointer"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[--btn-radius] bg-[#240b18] border border-primary-400/50 shadow-[0_0_20px_rgba(255,126,182,0.45)] transition-all cursor-pointer"
               title="Sakura Blossom"
             >
-              <SakuraIcon size={24} animate glow />
+              <SakuraIcon size={20} animate glow />
             </div>
           ) : (
             <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-[0_0_24px_rgba(250,204,21,0.55)] transition-transform"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[--btn-radius] shadow-sm transition-transform"
               style={{
                 backgroundColor: "#facc15",
                 color: "#09090b",
               }}
             >
-              <KiteLogoMark className="w-5 h-5 text-black" strokeWidth={2.4} />
+              <KiteLogoMark className="w-4 h-4 text-black" strokeWidth={2.4} />
             </div>
           )}
-          <span className="text-xl font-extrabold tracking-tight text-white leading-none">
+          <span className="text-lg font-bold tracking-tight text-title leading-none">
             kite
           </span>
           <a
             href="https://sunayraval.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center rounded-full border border-white/25 bg-white/10 hover:bg-white/20 hover:border-white/45 px-2.5 py-0.5 text-xs font-mono font-medium text-white/90 hover:text-white transition-all leading-none"
+            className="hidden sm:inline-flex items-center rounded-full border border-[--ui-border-color] bg-[--ui-soft-bg] px-2.5 py-0.5 text-[11px] font-mono font-medium text-[--body-text-color] hover:text-title hover:border-primary-500/50 transition-colors leading-none"
           >
             by sunayraval
           </a>
         </div>
 
-        {/* Center: Workspace Mode Switcher — consistent "my <feature>" naming */}
+        {/* Center: Tailus Tabs Workspace Mode Switcher — consistent "my <feature>" naming */}
         {canAccessWorkspace && (
-          <div
-            role="tablist"
-            aria-label="Workspace View Switcher"
-            className="inline-flex items-center rounded-full border border-white/15 bg-black/45 p-1 shadow-inner shrink-0"
+          <Tabs.Root
+            value={activeTab}
+            onValueChange={(val) => {
+              const next = val as WorkspaceTab;
+              onSelectTab(next);
+              if (next === "chat") {
+                onResetChatToHero?.();
+              }
+            }}
+            className="shrink-0 overflow-x-auto max-w-full"
           >
-            {!aiTemporarilyDisabled && (
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "chat"}
-                onClick={() => {
-                  onSelectTab("chat");
-                  onResetChatToHero?.();
-                }}
-                className={`relative inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-colors ${
-                  activeTab === "chat"
-                    ? "bg-white/15 text-white shadow-sm border border-white/15"
-                    : "text-white/60 hover:text-white border border-transparent"
-                }`}
-              >
-                <Sparkles
-                  className={`w-3.5 h-3.5 ${
-                    activeTab === "chat" ? "text-primary" : "text-white/50"
-                  }`}
-                />
-                <span className="whitespace-nowrap">my chat</span>
-                {!hasGeminiApiKey && (
-                  <span
-                    className="h-1.5 w-1.5 rounded-full bg-amber-400"
-                    title="AI API key required"
-                  />
-                )}
-              </button>
-            )}
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "tasks"}
-              onClick={() => onSelectTab("tasks")}
-              className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-colors ${
-                activeTab === "tasks"
-                  ? "bg-white/15 text-white shadow-sm border border-white/15"
-                  : "text-white/60 hover:text-white border border-transparent"
-              }`}
+            <Tabs.List
+              aria-label="Workspace View Switcher"
+              variant="soft"
+              triggerVariant="softToSoft"
+              size="sm"
+              intent="primary"
+              className="bg-[--ui-soft-bg]/90 border border-[--ui-border-color] p-1 gap-0.5"
             >
-              <Table2
-                className={`w-3.5 h-3.5 ${
-                  activeTab === "tasks" ? "text-primary" : "text-white/50"
-                }`}
-              />
-              <span className="whitespace-nowrap">my tasks</span>
-              {activeTaskCount > 0 && (
-                <span
-                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
-                    activeTab === "tasks"
-                      ? "bg-primary/25 text-highlight"
-                      : "bg-white/10 text-white/65"
-                  }`}
+              {!aiTemporarilyDisabled && (
+                <Tabs.Trigger
+                  value="chat"
+                  onClick={() => {
+                    if (activeTab === "chat") {
+                      onResetChatToHero?.();
+                    }
+                  }}
+                  className="gap-1.5 text-xs font-medium px-2.5 sm:px-3 data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
                 >
-                  {activeTaskCount}
-                </span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "my_day"}
-              onClick={() => onSelectTab("my_day")}
-              className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-colors ${
-                activeTab === "my_day"
-                  ? "bg-white/15 text-white shadow-sm border border-white/15"
-                  : "text-white/60 hover:text-white border border-transparent"
-              }`}
-            >
-              <CalendarClock
-                className={`w-3.5 h-3.5 ${
-                  activeTab === "my_day" ? "text-primary" : "text-white/50"
-                }`}
-              />
-              <span className="whitespace-nowrap">my day</span>
-              {(workspaceConfig.myDaySchedule?.blocks.length || 0) > 0 && (
-                <span
-                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
-                    activeTab === "my_day"
-                      ? "bg-primary/25 text-highlight"
-                      : "bg-white/10 text-white/65"
-                  }`}
-                >
-                  {workspaceConfig.myDaySchedule?.blocks.length}
-                </span>
-              )}
-            </button>
-
-            {(() => {
-              const jState = workspaceConfig.journeyState;
-              const activeJ =
-                jState?.journeys?.find((j) => j.id === jState.activeJourneyId) ||
-                jState?.journeys?.[0];
-              const jProg = computeJourneyProgress(activeJ);
-              return (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "journey"}
-                  onClick={() => onSelectTab("journey")}
-                  className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-colors ${
-                    activeTab === "journey"
-                      ? "bg-white/15 text-white shadow-sm border border-white/15"
-                      : "text-white/60 hover:text-white border border-transparent"
-                  }`}
-                >
-                  <Compass
-                    className={`w-3.5 h-3.5 ${
-                      activeTab === "journey" ? "text-primary" : "text-white/50"
+                  <Sparkles
+                    className={`size-3.5 ${
+                      activeTab === "chat"
+                        ? "text-primary-400"
+                        : "text-caption"
                     }`}
                   />
-                  <span className="whitespace-nowrap">my journey</span>
-                  {jProg.total > 0 && (
+                  <span className="whitespace-nowrap">my chat</span>
+                  {!hasGeminiApiKey && (
                     <span
-                      className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
-                        activeTab === "journey"
-                          ? "bg-primary/25 text-highlight"
-                          : "bg-white/10 text-white/65"
-                      }`}
-                    >
-                      {jProg.completed}/{jProg.total}
-                    </span>
+                      className="size-1.5 rounded-full bg-warning-400"
+                      title="AI API key required"
+                    />
                   )}
-                </button>
-              );
-            })()}
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "study"}
-              onClick={() => onSelectTab("study")}
-              className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1 text-xs font-semibold transition-colors ${
-                activeTab === "study"
-                  ? "bg-white/15 text-white shadow-sm border border-white/15"
-                  : "text-white/60 hover:text-white border border-transparent"
-              }`}
-            >
-              <GraduationCap
-                className={`w-3.5 h-3.5 ${
-                  activeTab === "study" ? "text-primary" : "text-white/50"
-                }`}
-              />
-              <span className="whitespace-nowrap">my flo</span>
-              {workspaceConfig.studySession?.syllabus && (
-                <span
-                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
-                    activeTab === "study"
-                      ? "bg-primary/25 text-highlight"
-                      : "bg-white/10 text-white/65"
-                  }`}
-                >
-                  {
-                    computeSyllabusProgress(
-                      workspaceConfig.studySession.syllabus
-                    ).percentage
-                  }
-                  %
-                </span>
+                </Tabs.Trigger>
               )}
-            </button>
-          </div>
+
+              <Tabs.Trigger
+                value="tasks"
+                className="gap-1.5 text-xs font-medium px-2.5 sm:px-3 data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
+              >
+                <Table2
+                  className={`size-3.5 ${
+                    activeTab === "tasks" ? "text-primary-400" : "text-caption"
+                  }`}
+                />
+                <span className="whitespace-nowrap">my tasks</span>
+                {activeTaskCount > 0 && (
+                  <Badge
+                    variant="soft"
+                    intent={activeTab === "tasks" ? "primary" : "gray"}
+                    size="xs"
+                    className="px-1.5 py-0 text-[10px] font-mono leading-4"
+                  >
+                    {activeTaskCount}
+                  </Badge>
+                )}
+              </Tabs.Trigger>
+
+              <Tabs.Trigger
+                value="my_day"
+                className="gap-1.5 text-xs font-medium px-2.5 sm:px-3 data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
+              >
+                <CalendarClock
+                  className={`size-3.5 ${
+                    activeTab === "my_day" ? "text-primary-400" : "text-caption"
+                  }`}
+                />
+                <span className="whitespace-nowrap">my day</span>
+                {(workspaceConfig.myDaySchedule?.blocks.length || 0) > 0 && (
+                  <Badge
+                    variant="soft"
+                    intent={activeTab === "my_day" ? "primary" : "gray"}
+                    size="xs"
+                    className="px-1.5 py-0 text-[10px] font-mono leading-4"
+                  >
+                    {workspaceConfig.myDaySchedule?.blocks.length}
+                  </Badge>
+                )}
+              </Tabs.Trigger>
+
+              <Tabs.Trigger
+                value="journey"
+                className="gap-1.5 text-xs font-medium px-2.5 sm:px-3 data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
+              >
+                <Compass
+                  className={`size-3.5 ${
+                    activeTab === "journey"
+                      ? "text-primary-400"
+                      : "text-caption"
+                  }`}
+                />
+                <span className="whitespace-nowrap">my journey</span>
+                {jProg.total > 0 && (
+                  <Badge
+                    variant="soft"
+                    intent={activeTab === "journey" ? "primary" : "gray"}
+                    size="xs"
+                    className="px-1.5 py-0 text-[10px] font-mono leading-4"
+                  >
+                    {jProg.completed}/{jProg.total}
+                  </Badge>
+                )}
+              </Tabs.Trigger>
+
+              <Tabs.Trigger
+                value="study"
+                className="gap-1.5 text-xs font-medium px-2.5 sm:px-3 data-[state=active]:bg-[--ui-bg] data-[state=active]:text-title data-[state=active]:shadow-sm"
+              >
+                <GraduationCap
+                  className={`size-3.5 ${
+                    activeTab === "study" ? "text-primary-400" : "text-caption"
+                  }`}
+                />
+                <span className="whitespace-nowrap">my flo</span>
+                {workspaceConfig.studySession?.syllabus && (
+                  <Badge
+                    variant="soft"
+                    intent={activeTab === "study" ? "primary" : "gray"}
+                    size="xs"
+                    className="px-1.5 py-0 text-[10px] font-mono leading-4"
+                  >
+                    {
+                      computeSyllabusProgress(
+                        workspaceConfig.studySession.syllabus
+                      ).percentage
+                    }
+                    %
+                  </Badge>
+                )}
+              </Tabs.Trigger>
+            </Tabs.List>
+          </Tabs.Root>
         )}
 
-        {/* Right: Controls */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-          {/* Theme Switcher */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setThemeDropdownOpen((v) => !v)}
-              className={`inline-flex items-center gap-1.5 sm:gap-2 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs transition-all ${
-                profile.theme === "sharingan"
-                  ? "border-red-500/50 bg-red-950/30 text-red-200 hover:border-red-400 shadow-[0_0_12px_rgba(255,31,56,0.3)]"
-                  : profile.theme === "sakura"
-                  ? "border-pink-400/50 bg-pink-950/30 text-pink-200 hover:border-pink-300 shadow-[0_0_12px_rgba(255,126,182,0.3)]"
-                  : "border-white/15 bg-white/5 text-white/90 hover:text-white hover:border-primary/50"
-              }`}
-              title="Switch theme"
-            >
-              {profile.theme === "sharingan" ? (
-                <SharinganIcon size={16} animate speed="fast" glow={false} />
-              ) : profile.theme === "sakura" ? (
-                <SakuraIcon size={16} animate glow={false} />
-              ) : (
-                <Palette className="w-3.5 h-3.5 text-primary" />
-              )}
-              <span className="hidden xl:inline font-medium">
-                {profile.theme === "custom" ? "Custom Theme" : activeThemeMeta.name}
-              </span>
-              <div className="flex items-center -space-x-1">
-                <span
-                  className="h-2.5 w-2.5 rounded-full border border-black/50"
-                  style={{ backgroundColor: "var(--primary)" }}
-                />
-                <span
-                  className="h-2.5 w-2.5 rounded-full border border-black/50"
-                  style={{ backgroundColor: "var(--surface)" }}
-                />
-              </div>
-              <ChevronDown className="w-3 h-3 text-white/50" />
-            </button>
+        {/* Right: Tailus Controls */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Theme Switcher via Tailus DropdownMenu */}
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <Button.Root
+                variant="outlined"
+                intent={profile.theme === "sharingan" ? "danger" : "gray"}
+                size="xs"
+                className="gap-1.5 px-2.5 text-xs"
+                title="Switch theme"
+              >
+                {profile.theme === "sharingan" ? (
+                  <SharinganIcon size={15} animate speed="fast" glow={false} />
+                ) : profile.theme === "sakura" ? (
+                  <SakuraIcon size={15} animate glow={false} />
+                ) : (
+                  <Palette className="size-3.5 text-primary-400" />
+                )}
+                <span className="hidden xl:inline font-medium text-title">
+                  {profile.theme === "custom"
+                    ? "Custom Theme"
+                    : activeThemeMeta.name}
+                </span>
+                <span className="flex items-center -space-x-1">
+                  <span
+                    className="size-2.5 rounded-full border border-gray-950/60"
+                    style={{ backgroundColor: "var(--primary)" }}
+                  />
+                  <span
+                    className="size-2.5 rounded-full border border-gray-950/60"
+                    style={{ backgroundColor: "var(--surface)" }}
+                  />
+                </span>
+                <ChevronDown className="size-3 text-caption" />
+              </Button.Root>
+            </DropdownMenu.Trigger>
 
-            {themeDropdownOpen && (
-              <div
-                className="absolute right-0 mt-2 w-64 rounded-xl border theme-panel p-1.5 shadow-2xl backdrop-blur-2xl z-50"
-                onMouseLeave={() => setThemeDropdownOpen(false)}
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                align="end"
+                sideOffset={8}
+                mixed
+                className="w-64 p-1.5 backdrop-blur-2xl"
               >
                 {THEME_OPTIONS.map((t) => {
                   const isSelected = profile.theme === t.id;
                   const isSharingan = t.id === "sharingan";
                   const isSakura = t.id === "sakura";
                   return (
-                    <button
+                    <DropdownMenu.Item
                       key={t.id}
-                      type="button"
-                      onClick={() => {
+                      onSelect={() => {
                         onUpdateProfile({
                           theme: t.id as ThemeName,
                           ...(isSharingan ? { ai_tone: "killer_bee" } : {}),
                         });
-                        setThemeDropdownOpen(false);
                       }}
-                      className={`w-full flex items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs transition-colors ${
+                      className={`justify-between px-2.5 py-2 text-xs cursor-pointer ${
                         isSelected
-                          ? "bg-primary/20 text-highlight font-semibold border border-primary/40 shadow-sm"
+                          ? "bg-primary-500/15 text-primary-300 font-semibold"
                           : isSharingan
-                          ? "text-red-300 hover:text-white hover:bg-red-500/15"
+                          ? "text-danger-300"
                           : isSakura
-                          ? "text-pink-200 hover:text-white hover:bg-pink-500/15"
-                          : "text-white/75 hover:text-white hover:bg-white/10"
+                          ? "text-primary-200"
+                          : ""
                       }`}
                     >
-                      <div className="flex items-center gap-2.5">
+                      <span className="flex items-center gap-2.5">
                         {isSharingan ? (
-                          <SharinganIcon size={18} animate speed="normal" glow={false} />
+                          <SharinganIcon
+                            size={16}
+                            animate
+                            speed="normal"
+                            glow={false}
+                          />
                         ) : isSakura ? (
-                          <SakuraIcon size={18} animate glow={false} />
+                          <SakuraIcon size={16} animate glow={false} />
                         ) : (
-                          <div className="flex -space-x-1">
+                          <span className="flex -space-x-1">
                             <span
-                              className="h-3.5 w-3.5 rounded-full border border-black/60"
+                              className="size-3 rounded-full border border-gray-950/70"
                               style={{ backgroundColor: t.colors.bgBase }}
                             />
                             <span
-                              className="h-3.5 w-3.5 rounded-full border border-black/60"
+                              className="size-3 rounded-full border border-gray-950/70"
                               style={{ backgroundColor: t.colors.surface }}
                             />
                             <span
-                              className="h-3.5 w-3.5 rounded-full border border-black/60"
+                              className="size-3 rounded-full border border-gray-950/70"
                               style={{ backgroundColor: t.colors.primary }}
                             />
-                          </div>
+                          </span>
                         )}
                         <span className="flex items-center gap-1.5">
                           {t.name}
                           {isSharingan && (
-                            <span className="rounded bg-red-500/25 border border-red-500/40 px-1.5 py-0.2 text-[9px] font-bold text-red-300 uppercase tracking-wider">
+                            <Badge variant="soft" intent="danger" size="xs">
                               Special
-                            </span>
+                            </Badge>
                           )}
                           {isSakura && (
-                            <span className="rounded bg-pink-500/25 border border-pink-400/40 px-1.5 py-0.2 text-[9px] font-bold text-pink-200 uppercase tracking-wider">
+                            <Badge variant="soft" intent="primary" size="xs">
                               Animated
-                            </span>
+                            </Badge>
                           )}
                         </span>
-                      </div>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-primary" />}
-                    </button>
+                      </span>
+                      {isSelected && (
+                        <Check className="size-3.5 text-primary-400" />
+                      )}
+                    </DropdownMenu.Item>
                   );
                 })}
-              </div>
-            )}
-          </div>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
 
           {/* Sync Canvas */}
           {canAccessWorkspace && (
-            <button
-              type="button"
+            <Button.Root
+              variant="outlined"
+              intent="gray"
+              size="xs"
               disabled={isSyncingCanvas}
               onClick={onQuickSyncCanvas}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2 sm:px-2.5 py-1.5 text-xs text-white/85 hover:text-white hover:border-primary/50 transition-colors shrink-0"
+              className="px-2.5 text-xs"
               title="Sync Canvas Assignments"
             >
-              <RefreshCw
-                className={`w-3.5 h-3.5 ${
-                  isSyncingCanvas ? "animate-spin text-primary" : "text-primary/80"
-                }`}
-              />
-              <span className="hidden lg:inline">Sync Canvas</span>
-            </button>
+              <Button.Icon type="leading" size="xs">
+                <RefreshCw
+                  className={
+                    isSyncingCanvas
+                      ? "animate-spin text-primary-400"
+                      : "text-primary-400"
+                  }
+                />
+              </Button.Icon>
+              <Button.Label className="hidden lg:inline">
+                Sync Canvas
+              </Button.Label>
+            </Button.Root>
           )}
 
-          {/* Settings */}
+          {/* Settings / Customize */}
           {canAccessWorkspace && (
-            <button
-              type="button"
+            <Button.Root
+              variant="outlined"
+              intent="gray"
+              size="xs"
               onClick={onOpenSettings}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2 sm:px-2.5 py-1.5 text-xs text-white/85 hover:text-white hover:border-primary/50 transition-colors shrink-0"
+              className="px-2.5 text-xs"
               title="Customize Tags, Categories, Themes, AI & Settings"
             >
-              <Settings className="w-3.5 h-3.5 text-primary" />
-              <span className="hidden lg:inline">Customize</span>
-            </button>
+              <Button.Icon type="leading" size="xs">
+                <Settings className="text-primary-400" />
+              </Button.Icon>
+              <Button.Label className="hidden lg:inline">
+                Customize
+              </Button.Label>
+            </Button.Root>
           )}
 
           {/* Google Auth Status */}
           {isAuthenticated ? (
-            <button
-              type="button"
+            <Button.Root
+              variant="outlined"
+              intent="gray"
+              size="xs"
               onClick={onSignOut}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2 sm:px-2.5 py-1.5 text-xs text-white/85 hover:text-white hover:border-red-400/50 transition-colors shrink-0"
+              className="px-2.5 text-xs"
               title="Sign Out"
             >
-              <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              <span className="hidden sm:inline max-w-[110px] truncate">
+              <span className="size-2 rounded-full bg-success-400 shrink-0" />
+              <Button.Label className="hidden sm:inline max-w-[110px] truncate">
                 {profile.full_name || profile.email}
-              </span>
-              <LogOut className="w-3.5 h-3.5 text-white/50" />
-            </button>
+              </Button.Label>
+              <Button.Icon type="trailing" size="xs">
+                <LogOut className="text-caption" />
+              </Button.Icon>
+            </Button.Root>
           ) : (
-            <button
-              type="button"
+            <Button.Root
+              variant="solid"
+              intent="primary"
+              size="xs"
               onClick={onGoogleSignIn}
-              className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg bg-primary px-2.5 sm:px-3 py-1.5 text-xs font-bold text-black hover:brightness-110 transition-all shadow-neon shrink-0"
+              className="px-3 text-xs font-semibold"
             >
-              <LogIn className="w-3.5 h-3.5 shrink-0" />
-              <span>
-                <span className="inline">Sign in</span>
+              <Button.Icon type="leading" size="xs">
+                <LogIn />
+              </Button.Icon>
+              <Button.Label>
+                <span>Sign in</span>
                 <span className="hidden sm:inline">&nbsp;with Google</span>
-              </span>
-            </button>
+              </Button.Label>
+            </Button.Root>
           )}
         </div>
       </div>
@@ -465,3 +475,4 @@ export const TopNavBar: React.FC<TopNavBarProps> = React.memo(({
 });
 
 TopNavBar.displayName = "TopNavBar";
+

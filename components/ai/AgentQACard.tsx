@@ -20,6 +20,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { Badge, Button, Card, Input, Textarea } from "@/components/tailus-ui";
 
 interface AgentQACardProps {
   qaPrompt: AgentQAPrompt;
@@ -231,27 +232,27 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
   // =========================================================================
   if (status === "consent") {
     return (
-      <div className="rounded-2xl border border-primary/35 bg-[#141720]/95 p-4 sm:p-5 shadow-[0_14px_45px_rgba(0,0,0,0.55)] backdrop-blur-xl space-y-3.5">
+      <Card variant="mixed" fancy className="backdrop-blur-xl space-y-3.5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/40 bg-primary/15 text-primary shadow-neon">
-              <MessageSquarePlus className="w-4 h-4" />
+            <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-[--btn-radius] border border-primary-500/40 bg-primary-500/15 text-primary-400">
+              <MessageSquarePlus className="size-4" />
             </div>
             <div className="space-y-1">
-              <div className="inline-flex items-center gap-1.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-highlight">
-                <Sparkles className="w-3 h-3 text-primary" />
+              <div className="inline-flex items-center gap-1.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-primary-300">
+                <Sparkles className="size-3 text-primary-400" />
                 <span>Interactive Q&amp;A</span>
-                <span className="text-white/30">•</span>
-                <span className="text-white/60">
+                <span className="text-caption">•</span>
+                <span className="text-caption">
                   {questions.length} quick question
                   {questions.length === 1 ? "" : "s"}
                 </span>
               </div>
-              <h4 className="text-sm sm:text-base font-bold text-white leading-snug">
+              <h4 className="text-sm sm:text-base font-semibold text-title leading-snug">
                 {qaPrompt.consentTitle ||
                   "Can I ask a few questions to fulfill your request?"}
               </h4>
-              <p className="text-xs sm:text-[13px] text-white/65 leading-relaxed">
+              <p className="text-xs sm:text-[13px] text-caption leading-relaxed">
                 {qaPrompt.consentSubtitle}
               </p>
             </div>
@@ -259,26 +260,31 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 pt-1">
-          <button
-            type="button"
+          <Button.Root
+            variant="solid"
+            intent="primary"
+            size="sm"
             disabled={disabled}
             onClick={onAcceptConsent}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs sm:text-[13px] font-extrabold text-black shadow-neon hover:brightness-110 disabled:opacity-50 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            className="font-semibold"
           >
-            <span>Yes, ask me a few questions</span>
-            <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-          </button>
+            <Button.Label>Yes, ask me a few questions</Button.Label>
+            <Button.Icon type="trailing" size="xs">
+              <ArrowRight className="stroke-[2.5]" />
+            </Button.Icon>
+          </Button.Root>
 
-          <button
-            type="button"
+          <Button.Root
+            variant="outlined"
+            intent="gray"
+            size="sm"
             disabled={disabled}
             onClick={onDismiss}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/[0.04] hover:bg-white/[0.09] px-3.5 py-2.5 text-xs font-medium text-white/75 hover:text-white disabled:opacity-50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
-            <span>No thanks, I&apos;ll type myself</span>
-          </button>
+            <Button.Label>No thanks, I&apos;ll type myself</Button.Label>
+          </Button.Root>
         </div>
-      </div>
+      </Card>
     );
   }
 
@@ -287,18 +293,26 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
   // =========================================================================
   if (status === "dismissed") {
     return (
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2 text-xs text-white/55">
-        <span>Skipped guided Q&amp;A — type your tasks or reply directly below.</span>
-        <button
-          type="button"
+      <Card
+        variant="soft"
+        className="flex flex-wrap items-center justify-between gap-2 border border-[--ui-border-color] px-3.5 py-2 text-xs text-caption"
+      >
+        <span>
+          Skipped guided Q&amp;A — type your tasks or reply directly below.
+        </span>
+        <Button.Root
+          variant="ghost"
+          intent="primary"
+          size="xs"
           disabled={disabled}
           onClick={onReopen}
-          className="inline-flex items-center gap-1 font-semibold text-highlight hover:underline disabled:opacity-50"
         >
-          <HelpCircle className="w-3.5 h-3.5 text-primary" />
-          <span>Ask me the questions</span>
-        </button>
-      </div>
+          <Button.Icon type="leading" size="xs">
+            <HelpCircle />
+          </Button.Icon>
+          <Button.Label>Ask me the questions</Button.Label>
+        </Button.Root>
+      </Card>
     );
   }
 
@@ -308,13 +322,16 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
   if (status === "submitted") {
     const submittedList = qaPrompt.submittedAnswers || [];
     return (
-      <div className="rounded-2xl border border-emerald-400/25 bg-emerald-500/[0.06] p-3.5 sm:p-4 space-y-2.5">
+      <Card
+        variant="outlined"
+        className="border-success-500/30 bg-success-500/5 p-3.5 sm:p-4 space-y-2.5"
+      >
         <div className="flex items-center justify-between gap-2">
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+          <Badge variant="soft" intent="success" size="xs" className="inline-flex items-center gap-1.5 font-semibold uppercase tracking-wider">
+            <CheckCircle2 className="size-3.5" />
             <span>Guided Q&amp;A Completed</span>
-          </div>
-          <span className="text-[11px] font-mono text-white/45">
+          </Badge>
+          <span className="text-[11px] font-mono text-caption">
             {submittedList.length} answered
           </span>
         </div>
@@ -324,19 +341,19 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
             {submittedList.map((item) => (
               <div
                 key={item.questionId}
-                className="rounded-xl border border-white/[0.07] bg-black/35 px-3 py-2 text-xs"
+                className="rounded-[--btn-radius] border border-[--ui-border-color] bg-[--ui-bg] px-3 py-2 text-xs"
               >
-                <div className="text-[11px] text-white/50 font-medium">
+                <div className="text-[11px] text-caption font-medium">
                   {item.question}
                 </div>
-                <div className="text-white/90 font-medium mt-0.5 whitespace-pre-wrap">
+                <div className="text-title font-medium mt-0.5 whitespace-pre-wrap">
                   {item.answer}
                 </div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </Card>
     );
   }
 
@@ -396,10 +413,11 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
               </div>
             )}
 
-            <textarea
+            <Textarea
               id={fieldId}
               name={q.id}
               rows={3}
+              variant="outlined"
               aria-describedby={q.helperText ? helperId : undefined}
               value={textDrafts[q.id] || ""}
               onChange={(e) => {
@@ -410,7 +428,6 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
                 q.placeholder ||
                 "List tasks separated by commas or new lines..."
               }
-              className="w-full rounded-xl border border-white/15 bg-black/55 px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder-white/35 focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             />
           </div>
         )}
@@ -420,27 +437,29 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
           <div className="space-y-2">
             <label
               htmlFor={fieldId}
-              className="block text-sm font-bold text-white leading-snug"
+              className="block text-sm font-semibold text-title leading-snug"
             >
-              <span className="text-primary font-mono mr-1.5">
+              <span className="text-primary-400 font-mono mr-1.5">
                 {stepIdx + 1}.
               </span>
               {q.question}
               {q.required && (
-                <span className="ml-1 text-xs font-semibold text-amber-300">
+                <span className="ml-1 text-xs font-semibold text-warning-400">
                   *
                 </span>
               )}
             </label>
             {q.helperText && (
-              <p id={helperId} className="text-xs text-white/55">
+              <p id={helperId} className="text-xs text-caption">
                 {q.helperText}
               </p>
             )}
-            <input
+            <Input
               id={fieldId}
               name={q.id}
               type="text"
+              variant="outlined"
+              size="md"
               aria-describedby={q.helperText ? helperId : undefined}
               value={textDrafts[q.id] || ""}
               onChange={(e) => {
@@ -448,7 +467,6 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
                 setTextDrafts((prev) => ({ ...prev, [q.id]: e.target.value }));
               }}
               placeholder={q.placeholder || "Type your answer..."}
-              className="w-full rounded-xl border border-white/15 bg-black/55 px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder-white/35 focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             />
           </div>
         )}
@@ -456,14 +474,14 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
         {/* SINGLE CHOICE RADIO GROUP */}
         {q.inputType === "single_choice" && (
           <fieldset className="space-y-2.5">
-            <legend className="text-sm font-bold text-white leading-snug">
-              <span className="text-primary font-mono mr-1.5">
+            <legend className="text-sm font-semibold text-title leading-snug">
+              <span className="text-primary-400 font-mono mr-1.5">
                 {stepIdx + 1}.
               </span>
               {q.question}
             </legend>
             {q.helperText && (
-              <p className="text-xs text-white/55">{q.helperText}</p>
+              <p className="text-xs text-caption">{q.helperText}</p>
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -474,10 +492,10 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
                   <label
                     key={opt}
                     htmlFor={optId}
-                    className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-xs cursor-pointer transition-all ${
+                    className={`flex items-center gap-2.5 rounded-[--btn-radius] border px-3 py-2.5 text-xs cursor-pointer transition-all ${
                       selected
-                        ? "border-primary bg-primary/15 text-white font-semibold shadow-sm"
-                        : "border-white/10 bg-black/40 text-white/75 hover:border-white/25 hover:text-white"
+                        ? "border-primary-500/60 bg-primary-500/15 text-title font-semibold shadow-sm"
+                        : "border-[--ui-border-color] bg-[--ui-soft-bg]/50 text-body hover:text-title"
                     }`}
                   >
                     <input
@@ -501,14 +519,16 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
             <div>
               <label
                 htmlFor={`${fieldId}-custom`}
-                className="block text-[11px] font-medium text-white/50 mb-1"
+                className="block text-[11px] font-medium text-caption mb-1"
               >
                 Optional custom note or preference:
               </label>
-              <input
+              <Input
                 id={`${fieldId}-custom`}
                 name={`${q.id}_custom`}
                 type="text"
+                variant="outlined"
+                size="sm"
                 value={customChoiceNotes[q.id] || ""}
                 onChange={(e) =>
                   setCustomChoiceNotes((prev) => ({
@@ -517,7 +537,6 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
                   }))
                 }
                 placeholder="Add any extra detail (optional)..."
-                className="w-full rounded-xl border border-white/10 bg-black/45 px-3 py-2 text-xs text-white placeholder-white/35 focus:border-primary focus:outline-none"
               />
             </div>
           </fieldset>
@@ -526,14 +545,14 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
         {/* MULTI CHOICE CHECKBOX GROUP */}
         {q.inputType === "multi_choice" && (
           <fieldset className="space-y-2.5">
-            <legend className="text-sm font-bold text-white leading-snug">
-              <span className="text-primary font-mono mr-1.5">
+            <legend className="text-sm font-semibold text-title leading-snug">
+              <span className="text-primary-400 font-mono mr-1.5">
                 {stepIdx + 1}.
               </span>
               {q.question}
             </legend>
             {q.helperText && (
-              <p className="text-xs text-white/55">{q.helperText}</p>
+              <p className="text-xs text-caption">{q.helperText}</p>
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -544,10 +563,10 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
                   <label
                     key={opt}
                     htmlFor={optId}
-                    className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-xs cursor-pointer transition-all ${
+                    className={`flex items-center gap-2.5 rounded-[--btn-radius] border px-3 py-2.5 text-xs cursor-pointer transition-all ${
                       selected
-                        ? "border-primary bg-primary/15 text-white font-semibold shadow-sm"
-                        : "border-white/10 bg-black/40 text-white/75 hover:border-white/25 hover:text-white"
+                        ? "border-primary-500/60 bg-primary-500/15 text-title font-semibold shadow-sm"
+                        : "border-[--ui-border-color] bg-[--ui-soft-bg]/50 text-body hover:text-title"
                     }`}
                   >
                     <input
@@ -568,14 +587,16 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
             <div>
               <label
                 htmlFor={`${fieldId}-custom`}
-                className="block text-[11px] font-medium text-white/50 mb-1"
+                className="block text-[11px] font-medium text-caption mb-1"
               >
                 Anything else to include? (optional):
               </label>
-              <input
+              <Input
                 id={`${fieldId}-custom`}
                 name={`${q.id}_custom`}
                 type="text"
+                variant="outlined"
+                size="sm"
                 value={customChoiceNotes[q.id] || ""}
                 onChange={(e) =>
                   setCustomChoiceNotes((prev) => ({
@@ -584,7 +605,6 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
                   }))
                 }
                 placeholder="Type additional items..."
-                className="w-full rounded-xl border border-white/10 bg-black/45 px-3 py-2 text-xs text-white placeholder-white/35 focus:border-primary focus:outline-none"
               />
             </div>
           </fieldset>
@@ -593,14 +613,14 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
         {/* TIMEFRAME WINDOW PICKER */}
         {q.inputType === "timeframe" && (
           <fieldset className="space-y-3">
-            <legend className="text-sm font-bold text-white leading-snug">
-              <span className="text-primary font-mono mr-1.5">
+            <legend className="text-sm font-semibold text-title leading-snug">
+              <span className="text-primary-400 font-mono mr-1.5">
                 {stepIdx + 1}.
               </span>
               {q.question}
             </legend>
             {q.helperText && (
-              <p className="text-xs text-white/55">{q.helperText}</p>
+              <p className="text-xs text-caption">{q.helperText}</p>
             )}
 
             <div className="grid grid-cols-2 gap-2">
@@ -616,10 +636,10 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
                   <label
                     key={preset.id}
                     htmlFor={pId}
-                    className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs cursor-pointer transition-all ${
+                    className={`flex items-center gap-2 rounded-[--btn-radius] border px-3 py-2 text-xs cursor-pointer transition-all ${
                       isSelected
-                        ? "border-primary bg-primary/15 text-highlight font-semibold"
-                        : "border-white/10 bg-black/40 text-white/70 hover:text-white"
+                        ? "border-primary-500/60 bg-primary-500/15 text-primary-300 font-semibold"
+                        : "border-[--ui-border-color] bg-[--ui-soft-bg]/50 text-body hover:text-title"
                     }`}
                   >
                     <input
@@ -637,46 +657,50 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
               })}
             </div>
 
-            <div className="grid grid-cols-2 gap-3 rounded-xl border border-white/10 bg-black/45 p-3">
+            <div className="grid grid-cols-2 gap-3 rounded-[--btn-radius] border border-[--ui-border-color] bg-[--ui-soft-bg]/40 p-3">
               <div>
                 <label
                   htmlFor={`${fieldId}-start`}
-                  className="flex items-center gap-1 text-[11px] font-semibold text-white/65 mb-1"
+                  className="flex items-center gap-1 text-[11px] font-semibold text-caption mb-1"
                 >
-                  <Clock className="w-3 h-3 text-primary" />
+                  <Clock className="size-3 text-primary-400" />
                   <span>Start Time</span>
                 </label>
-                <input
+                <Input
                   id={`${fieldId}-start`}
                   name="qa_start_time"
                   type="time"
+                  variant="outlined"
+                  size="sm"
                   value={startTime}
                   onChange={(e) => {
                     setTimeframePreset("custom");
                     setStartTime(e.target.value);
                   }}
-                  className="w-full rounded-lg border border-white/15 bg-black/65 px-3 py-1.5 text-xs font-mono text-white focus:border-primary focus:outline-none"
+                  className="font-mono"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor={`${fieldId}-end`}
-                  className="flex items-center gap-1 text-[11px] font-semibold text-white/65 mb-1"
+                  className="flex items-center gap-1 text-[11px] font-semibold text-caption mb-1"
                 >
-                  <CalendarClock className="w-3 h-3 text-primary" />
+                  <CalendarClock className="size-3 text-primary-400" />
                   <span>Planned End Time</span>
                 </label>
-                <input
+                <Input
                   id={`${fieldId}-end`}
                   name="qa_end_time"
                   type="time"
+                  variant="outlined"
+                  size="sm"
                   value={endTime}
                   onChange={(e) => {
                     setTimeframePreset("custom");
                     setEndTime(e.target.value);
                   }}
-                  className="w-full rounded-lg border border-white/15 bg-black/65 px-3 py-1.5 text-xs font-mono text-white focus:border-primary focus:outline-none"
+                  className="font-mono"
                 />
               </div>
             </div>
@@ -689,146 +713,169 @@ export const AgentQACard: React.FC<AgentQACardProps> = ({
   const isOnFinalStep = showAllAtOnce || activeStep >= questions.length - 1;
 
   return (
-    <form
-      onSubmit={handleFormSubmit}
-      action="/api/chat"
-      method="POST"
-      className="rounded-2xl border border-primary/40 bg-[#141720]/95 p-4 sm:p-5 shadow-[0_16px_50px_rgba(0,0,0,0.6)] backdrop-blur-xl space-y-4"
-    >
-      {/* Header + Progress Pills */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-primary/35 bg-primary/15 text-primary">
-            <ListChecks className="w-3.5 h-3.5" />
+    <Card variant="mixed" fancy className="p-0 backdrop-blur-xl overflow-hidden">
+      <form
+        onSubmit={handleFormSubmit}
+        action="/api/chat"
+        method="POST"
+        className="p-4 sm:p-5 space-y-4"
+      >
+        {/* Header + Progress Pills */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[--ui-border-color] pb-3">
+          <div className="flex items-center gap-2">
+            <div className="flex size-7 items-center justify-center rounded-[--btn-radius] border border-primary-500/35 bg-primary-500/15 text-primary-400">
+              <ListChecks className="size-3.5" />
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-title">
+                {qaPrompt.purpose === "plan_day"
+                  ? "Day Planning Q&A"
+                  : "Guided Q&A"}
+              </div>
+              <div className="text-[11px] text-caption">
+                {showAllAtOnce
+                  ? `Showing all ${questions.length} questions`
+                  : `Question ${activeStep + 1} of ${questions.length}`}
+              </div>
+            </div>
           </div>
+
+          <div className="flex items-center gap-2">
+            {!showAllAtOnce && questions.length > 1 && (
+              <div
+                className="flex items-center gap-1"
+                role="tablist"
+                aria-label="Question steps"
+              >
+                {questions.map((q, idx) => {
+                  const hasVal = resolveAnswerForQuestion(q).length > 0;
+                  const isCurrent = idx === activeStep;
+                  return (
+                    <Button.Root
+                      key={q.id}
+                      variant={
+                        isCurrent ? "solid" : hasVal ? "soft" : "outlined"
+                      }
+                      intent={isCurrent || hasVal ? "primary" : "gray"}
+                      size="xs"
+                      onClick={() => {
+                        setValidationError(null);
+                        setActiveStep(idx);
+                      }}
+                      className="h-6 min-w-[24px] px-1.5 font-mono text-[11px]"
+                      title={q.question}
+                    >
+                      <Button.Label>{idx + 1}</Button.Label>
+                    </Button.Root>
+                  );
+                })}
+              </div>
+            )}
+
+            {questions.length > 1 && (
+              <Button.Root
+                variant="outlined"
+                intent="gray"
+                size="xs"
+                onClick={() => setShowAllAtOnce((v) => !v)}
+                className="h-6 px-2.5 text-[11px]"
+              >
+                <Button.Label>
+                  {showAllAtOnce ? "Step-by-step" : "Show all"}
+                </Button.Label>
+              </Button.Root>
+            )}
+
+            <Button.Root
+              variant="ghost"
+              intent="gray"
+              size="xs"
+              onClick={onDismiss}
+              title="Cancel Q&A"
+            >
+              <Button.Icon type="only" size="xs">
+                <X />
+              </Button.Icon>
+            </Button.Root>
+          </div>
+        </div>
+
+        {/* Active Question(s) */}
+        <div className="space-y-5">
+          {visibleQuestions.map((q, idx) =>
+            renderSingleQuestion(q, showAllAtOnce ? idx : activeStep)
+          )}
+        </div>
+
+        {/* Live Accessible Validation Notice */}
+        <div aria-live="polite">
+          {validationError && (
+            <div className="rounded-[--btn-radius] border border-warning-500/35 bg-warning-500/10 px-3 py-2 text-xs text-warning-200">
+              {validationError}
+            </div>
+          )}
+        </div>
+
+        {/* Navigation & Submit Footer */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-[--ui-border-color] pt-3">
           <div>
-            <div className="text-xs font-bold text-white">
-              {qaPrompt.purpose === "plan_day"
-                ? "Day Planning Q&A"
-                : "Guided Q&A"}
-            </div>
-            <div className="text-[11px] text-white/50">
-              {showAllAtOnce
-                ? `Showing all ${questions.length} questions`
-                : `Question ${activeStep + 1} of ${questions.length}`}
-            </div>
+            {!showAllAtOnce && activeStep > 0 && (
+              <Button.Root
+                variant="outlined"
+                intent="gray"
+                size="sm"
+                disabled={disabled}
+                onClick={() => {
+                  setValidationError(null);
+                  setActiveStep((s) => Math.max(0, s - 1));
+                }}
+              >
+                <Button.Icon type="leading" size="xs">
+                  <ArrowLeft />
+                </Button.Icon>
+                <Button.Label>Back</Button.Label>
+              </Button.Root>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {!isOnFinalStep ? (
+              <Button.Root
+                variant="solid"
+                intent="primary"
+                size="sm"
+                disabled={disabled}
+                onClick={handleNextStep}
+                className="font-semibold"
+              >
+                <Button.Label>Next Question</Button.Label>
+                <Button.Icon type="trailing" size="xs">
+                  <ArrowRight className="stroke-[2.5]" />
+                </Button.Icon>
+              </Button.Root>
+            ) : (
+              <Button.Root
+                type="submit"
+                variant="solid"
+                intent="primary"
+                size="sm"
+                disabled={disabled}
+                className="font-semibold"
+              >
+                <Button.Icon type="leading" size="xs">
+                  <Check className="stroke-[2.5]" />
+                </Button.Icon>
+                <Button.Label>
+                  {qaPrompt.submitLabel ||
+                    (qaPrompt.purpose === "plan_day"
+                      ? "Populate Tasks & Build my day"
+                      : "Submit Answers & Fulfill Request")}
+                </Button.Label>
+              </Button.Root>
+            )}
           </div>
         </div>
-
-        <div className="flex items-center gap-2">
-          {!showAllAtOnce && questions.length > 1 && (
-            <div className="flex items-center gap-1" role="tablist" aria-label="Question steps">
-              {questions.map((q, idx) => {
-                const hasVal = resolveAnswerForQuestion(q).length > 0;
-                const isCurrent = idx === activeStep;
-                return (
-                  <button
-                    key={q.id}
-                    type="button"
-                    onClick={() => {
-                      setValidationError(null);
-                      setActiveStep(idx);
-                    }}
-                    className={`h-6 min-w-[24px] px-1.5 rounded-md font-mono text-[11px] font-bold transition-all ${
-                      isCurrent
-                        ? "bg-primary text-black shadow-neon"
-                        : hasVal
-                        ? "border border-primary/35 bg-primary/15 text-highlight"
-                        : "border border-white/10 bg-white/5 text-white/50 hover:text-white"
-                    }`}
-                    title={q.question}
-                  >
-                    {idx + 1}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {questions.length > 1 && (
-            <button
-              type="button"
-              onClick={() => setShowAllAtOnce((v) => !v)}
-              className="rounded-lg border border-white/12 bg-white/[0.04] hover:bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/70 hover:text-white transition-colors"
-            >
-              {showAllAtOnce ? "Step-by-step" : "Show all"}
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="rounded-lg p-1 text-white/45 hover:text-white hover:bg-white/10 transition-colors"
-            title="Cancel Q&A"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Active Question(s) */}
-      <div className="space-y-5">
-        {visibleQuestions.map((q, idx) =>
-          renderSingleQuestion(q, showAllAtOnce ? idx : activeStep)
-        )}
-      </div>
-
-      {/* Live Accessible Validation Notice */}
-      <div aria-live="polite">
-        {validationError && (
-          <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-            {validationError}
-          </div>
-        )}
-      </div>
-
-      {/* Navigation & Submit Footer */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-white/10 pt-3">
-        <div>
-          {!showAllAtOnce && activeStep > 0 && (
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => {
-                setValidationError(null);
-                setActiveStep((s) => Math.max(0, s - 1));
-              }}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/[0.04] hover:bg-white/10 px-3.5 py-2 text-xs font-semibold text-white/80 hover:text-white transition-colors"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back</span>
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {!isOnFinalStep ? (
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={handleNextStep}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-extrabold text-black shadow-neon hover:brightness-110 disabled:opacity-50 transition-all"
-            >
-              <span>Next Question</span>
-              <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={disabled}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs sm:text-[13px] font-extrabold text-black shadow-neon hover:brightness-110 disabled:opacity-50 transition-all"
-            >
-              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>
-                {qaPrompt.submitLabel ||
-                  (qaPrompt.purpose === "plan_day"
-                    ? "Populate Tasks & Build my day"
-                    : "Submit Answers & Fulfill Request")}
-              </span>
-            </button>
-          )}
-        </div>
-      </div>
-    </form>
+      </form>
+    </Card>
   );
 };

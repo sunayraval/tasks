@@ -36,6 +36,9 @@ export default function RootLayout({
     <html
       lang="en"
       data-theme="cyber_ocean"
+      data-palette="winter"
+      data-shade="900"
+      data-rounded="large"
       className={`${inter.variable} ${jetbrainsMono.variable} dark`}
     >
       <head>
@@ -43,7 +46,7 @@ export default function RootLayout({
         <link rel="alternate icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
-      <body className="font-sans antialiased selection:bg-primary selection:text-black">
+      <body className="font-sans antialiased dark:bg-gray-925 selection:bg-primary-500 selection:text-white">
         {children}
       </body>
     </html>

@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { TaskItem, WorkspaceConfig } from "@/types/taskit";
 import { CheckCircle2, Clock, Flame, Pencil } from "lucide-react";
+import { Badge, Card, Input, Progress, Text, Title } from "@/components/tailus-ui";
 
 interface CircularProgressProps {
   tasks: TaskItem[];
@@ -67,7 +68,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
     };
   }, [tasks]);
 
-  const size = 110;
+  const size = 104;
   const strokeWidth = 8;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -75,15 +76,21 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
     circumference - (stats.percentage / 100) * circumference;
 
   return (
-    <div className="rounded-xl border theme-panel p-5 backdrop-blur-xl transition-all duration-300">
+    <Card
+      variant="mixed"
+      fancy
+      className="backdrop-blur-xl transition-all duration-300"
+    >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-        {/* Left: Editable Heading & Stats */}
-        <div className="space-y-3 flex-1">
+        {/* Left: Editable Heading & Telemetry */}
+        <div className="space-y-3.5 flex-1">
           <div>
             {editingTitle ? (
-              <input
+              <Input
                 type="text"
                 autoFocus
+                variant="outlined"
+                size="lg"
                 value={titleDraft}
                 onChange={(e) => setTitleDraft(e.target.value)}
                 onBlur={commitTitle}
@@ -94,7 +101,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
                     setEditingTitle(false);
                   }
                 }}
-                className="w-full max-w-md rounded-lg border border-primary bg-black/75 px-2.5 py-1 text-xl sm:text-2xl font-bold text-white focus:outline-none"
+                className="max-w-md font-bold text-xl"
               />
             ) : (
               <button
@@ -103,19 +110,28 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
                   setTitleDraft(workspaceConfig.workspaceTitle);
                   setEditingTitle(true);
                 }}
-                className="group flex items-center gap-2 text-left text-xl sm:text-2xl font-bold tracking-tight text-white hover:text-highlight transition-colors"
+                className="group flex items-center gap-2 text-left transition-colors"
                 title="Click to edit workspace title"
               >
-                <span>{workspaceConfig.workspaceTitle}</span>
-                <Pencil className="w-3.5 h-3.5 text-primary opacity-0 group-hover:opacity-80 transition-opacity" />
+                <Title
+                  as="h1"
+                  size="2xl"
+                  weight="bold"
+                  className="tracking-tight group-hover:text-primary-300 transition-colors"
+                >
+                  {workspaceConfig.workspaceTitle}
+                </Title>
+                <Pencil className="size-3.5 text-primary-400 opacity-0 group-hover:opacity-90 transition-opacity" />
               </button>
             )}
 
             <div className="mt-1">
               {editingSubtitle ? (
-                <input
+                <Input
                   type="text"
                   autoFocus
+                  variant="outlined"
+                  size="sm"
                   value={subtitleDraft}
                   onChange={(e) => setSubtitleDraft(e.target.value)}
                   onBlur={commitSubtitle}
@@ -126,7 +142,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
                       setEditingSubtitle(false);
                     }
                   }}
-                  className="w-full max-w-2xl rounded-lg border border-primary bg-black/75 px-2.5 py-1 text-xs text-white focus:outline-none"
+                  className="max-w-2xl"
                 />
               ) : (
                 <button
@@ -135,54 +151,87 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
                     setSubtitleDraft(workspaceConfig.workspaceSubtitle);
                     setEditingSubtitle(true);
                   }}
-                  className="group flex items-center gap-1.5 text-left text-xs text-white/65 hover:text-white transition-colors"
+                  className="group flex items-center gap-1.5 text-left"
                   title="Click to edit workspace motto / subtitle"
                 >
-                  <span>
+                  <Text
+                    as="span"
+                    size="sm"
+                    className="text-caption group-hover:text-body transition-colors"
+                  >
                     {workspaceConfig.workspaceSubtitle ||
                       "Click to add a workspace motto..."}
-                  </span>
-                  <Pencil className="w-3 h-3 text-primary opacity-0 group-hover:opacity-80 transition-opacity shrink-0" />
+                  </Text>
+                  <Pencil className="size-3 text-primary-400 opacity-0 group-hover:opacity-90 transition-opacity shrink-0" />
                 </button>
               )}
             </div>
           </div>
 
-          {/* Quick telemetry chips */}
+          {/* Quick telemetry chips styled with Tailus Badges */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/30 px-3 py-1.5 text-xs">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-white/60">Completed:</span>
-              <span className="font-semibold text-white">
+            <Badge
+              variant="outlined"
+              intent="gray"
+              size="sm"
+              className="inline-flex items-center gap-1.5 py-1 px-2.5 font-normal"
+            >
+              <CheckCircle2 className="size-3.5 text-success-400 shrink-0" />
+              <span className="text-caption">Completed:</span>
+              <span className="font-semibold text-title">
                 {stats.done} / {stats.total}
               </span>
-            </div>
+            </Badge>
 
-            <div className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/30 px-3 py-1.5 text-xs">
-              <Clock className="w-3.5 h-3.5 text-primary" />
-              <span className="text-white/60">Remaining:</span>
-              <span className="font-semibold text-white">
+            <Badge
+              variant="outlined"
+              intent="gray"
+              size="sm"
+              className="inline-flex items-center gap-1.5 py-1 px-2.5 font-normal"
+            >
+              <Clock className="size-3.5 text-primary-400 shrink-0" />
+              <span className="text-caption">Remaining:</span>
+              <span className="font-semibold text-title">
                 {stats.remaining}
               </span>
               {stats.totalRemainingMinutes > 0 && (
-                <span className="text-[11px] text-highlight/80 font-mono">
+                <span className="text-[11px] text-primary-300 font-mono">
                   ({Math.floor(stats.totalRemainingMinutes / 60)}h{" "}
                   {stats.totalRemainingMinutes % 60}m)
                 </span>
               )}
-            </div>
+            </Badge>
 
-            <div className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/30 px-3 py-1.5 text-xs">
-              <Flame className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-white/60">Streak:</span>
-              <span className="font-semibold text-white">
+            <Badge
+              variant="outlined"
+              intent="gray"
+              size="sm"
+              className="inline-flex items-center gap-1.5 py-1 px-2.5 font-normal"
+            >
+              <Flame className="size-3.5 text-warning-400 shrink-0" />
+              <span className="text-caption">Streak:</span>
+              <span className="font-semibold text-title">
                 {streakDays} {streakDays === 1 ? "day" : "days"}
               </span>
-            </div>
+            </Badge>
           </div>
+
+          <Progress.Root
+            value={stats.percentage}
+            size="xs"
+            variant="soft"
+            className="max-w-sm"
+          >
+            <Progress.Indicator
+              intent="primary"
+              style={{
+                transform: `translateX(-${100 - stats.percentage}%)`,
+              }}
+            />
+          </Progress.Root>
         </div>
 
-        {/* Right: Theme-Colored SVG Progress Ring */}
+        {/* Right: Tailus-Accented SVG Progress Ring */}
         <div className="flex items-center gap-4 shrink-0">
           <div className="relative flex items-center justify-center">
             <svg
@@ -196,7 +245,8 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
                 cy={size / 2}
                 r={radius}
                 fill="transparent"
-                stroke="rgba(255, 255, 255, 0.1)"
+                stroke="currentColor"
+                className="text-gray-800/80"
                 strokeWidth={strokeWidth}
               />
               <circle
@@ -214,16 +264,16 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
             </svg>
 
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-              <span className="text-xl font-bold tracking-tight text-highlight">
+              <span className="text-lg font-bold tracking-tight text-title">
                 {stats.percentage}%
               </span>
-              <span className="text-[9px] uppercase tracking-wider text-white/50 font-semibold">
+              <span className="text-[9px] uppercase tracking-wider text-caption font-semibold">
                 Progress
               </span>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 };
