@@ -947,6 +947,7 @@ ${taskLines}`;
 
     const addedTasksMap = new Map<string, TaskItem>();
     const modifiedTaskIds = new Set<string>();
+    const modifiedTasksMap = new Map<string, TaskItem>();
     const deletedTaskIds = new Set<string>();
     let reordered = false;
     let tasksTouched = false;
@@ -1001,9 +1002,12 @@ ${taskLines}`;
     };
 
     const reindexWorkingTasks = () => {
+      // CRITICAL: Never drop completed tasks here (hideCompleted: false) — otherwise
+      // marking a task "Done" removes it from workingTasks before modifiedTasks is
+      // serialized and persisted to Supabase! TaskTable handles hiding completed rows visually.
       workingTasks = syncTasksWithHeadersAndFilter(workingTasks, {
         filterPastDue: true,
-        hideCompleted: !workingConfig.showCompletedTasks,
+        hideCompleted: false,
         startOfTodayMs: clientStartOfTodayMs,
         defaultSectionGroup: workingConfig.sections[0]?.id || "TODAY",
       });
@@ -1040,14 +1044,47 @@ ${taskLines}`;
       );
       if (byExactTitle) return byExactTitle;
 
-      // 3. Substring match
+      // 3. Bidirectional substring match
       if (qStripped.length >= 2) {
-        return pool.find(
-          (t) =>
-            t.title.toLowerCase().includes(qLower) ||
-            stripHeaderDecorations(t.title).toLowerCase().includes(qStripped)
-        );
+        const bySub = pool.find((t) => {
+          const tLower = t.title.toLowerCase();
+          const tStripped = stripHeaderDecorations(t.title).toLowerCase();
+          return (
+            tLower.includes(qLower) ||
+            tStripped.includes(qStripped) ||
+            (tStripped.length >= 3 && qStripped.includes(tStripped))
+          );
+        });
+        if (bySub) return bySub;
       }
+
+      // 4. Token/word-overlap fuzzy match (e.g. "fbla presentation" -> "FBLA Sales Presentation")
+      const qTokens = qStripped
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length >= 2);
+      if (qTokens.length > 0) {
+        let bestMatch: TaskItem | undefined;
+        let bestScore = 0;
+        for (const t of pool) {
+          const tTokens = stripHeaderDecorations(t.title)
+            .toLowerCase()
+            .replace(/[^a-z0-9\s]/g, " ")
+            .split(/\s+/)
+            .filter((w) => w.length >= 2);
+          if (tTokens.length === 0) continue;
+          const hits = qTokens.filter((qt) =>
+            tTokens.some((tt) => tt === qt || tt.includes(qt) || qt.includes(tt))
+          ).length;
+          const score = hits / Math.max(qTokens.length, 1);
+          if (score >= 0.6 && score > bestScore) {
+            bestScore = score;
+            bestMatch = t;
+          }
+        }
+        if (bestMatch) return bestMatch;
+      }
+
       return undefined;
     };
 
@@ -1833,6 +1870,7 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               addedTasksMap.set(next.id, next);
             } else {
               modifiedTaskIds.add(next.id);
+              modifiedTasksMap.set(next.id, next);
             }
             updatedTitles.push(next.title);
           }
@@ -1840,6 +1878,12 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
           if (updatedTitles.length > 0) {
             tasksTouched = true;
             reindexWorkingTasks();
+            // Refresh modifiedTasksMap with updated order_index / section_group after reindex
+            for (const t of workingTasks) {
+              if (modifiedTasksMap.has(t.id)) {
+                modifiedTasksMap.set(t.id, t);
+              }
+            }
             recordAction(
               "update",
               updatedTitles.length === 1
@@ -1850,10 +1894,18 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
           }
 
           return {
-            success: true,
+            success: updatedTitles.length > 0,
             updated_count: updatedTitles.length,
             updated_titles: updatedTitles,
             not_found: notFound,
+            ...(notFound.length > 0
+              ? {
+                  hint: "One or more targets were not found. Retry update_tasks using the exact 'id' from available_tasks below.",
+                  available_tasks: workingTasks
+                    .filter((t) => !isHeaderRow(t))
+                    .map((t) => ({ id: t.id, title: t.title, status: t.status })),
+                }
+              : {}),
           };
         },
       }),
@@ -3441,6 +3493,12 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
       );
     const effectiveTools = isGreeting ? {} : tools;
 
+    const isExplicitMutationIntent =
+      !isGreeting &&
+      /\b(add|create|put|insert|append|delete|remove|drop|clear|mark|check\s*off|tick\s*off|cross\s*off|complete|completed|finish|finished|done\s+with|reopen|uncheck|update|edit|change|rename|move|sort|reorder|shift|reschedule|schedule|bump|push\s+to|set\s+(?:priority|status|due|time)|plan\s+my\s+day|switch\s+theme|sync\s+canvas)\b/i.test(
+        userMessage
+      );
+
     const runNvidiaChat = async (apiKeyToUse: string): Promise<boolean> => {
       if (!apiKeyToUse || apiKeyToUse.length < 15) return false;
       const nvidia = createOpenAI({
@@ -3457,12 +3515,6 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
 
       const candidates = [primaryModel, backupModel];
       const candidateTimeoutMs = qaSubmission ? 65000 : 55000;
-
-      const isExplicitMutationIntent =
-        !isGreeting &&
-        /\b(add|create|put|insert|append|delete|remove|drop|mark|complete|finish|update|edit|change|rename|move|sort|reorder|shift|reschedule|schedule|plan\s+my\s+day|switch\s+theme|sync\s+canvas)\b/i.test(
-          userMessage
-        );
 
       for (let cIdx = 0; cIdx < candidates.length; cIdx++) {
         const candidate = candidates[cIdx];
@@ -3481,11 +3533,12 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               system: systemPrompt,
               messages: conversationMessages,
               tools: effectiveTools,
+              temperature: 0.2,
               // On backup retry after a faked text mutation, force tool_choice = required
               ...(cIdx > 0 && isExplicitMutationIntent && !qaState.prompt
                 ? { toolChoice: "required" as const }
                 : {}),
-              maxSteps: isGreeting ? 1 : qaSubmission ? 6 : 5,
+              maxSteps: isGreeting ? 1 : qaSubmission ? 8 : 8,
               maxTokens: 3500,
             }),
             timeoutPromise,
@@ -3497,10 +3550,10 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
           const candidateText =
             (result.text || "").trim() || stepTexts.join("\n\n").trim();
 
-          // Guard against small models (e.g. Nemotron Bolt) hallucinating a task list update in text without invoking any tool!
+          // Guard against models hallucinating a task list update in text without invoking any tool!
           const looksLikeClarifyingQuestion =
             candidateText.includes("?") &&
-            !/\b(added|updated|removed|deleted|scheduled|here is your updated|appended)\b/i.test(
+            !/\b(added|updated|marked|completed|finished|checked off|removed|deleted|scheduled|here is your updated|appended)\b/i.test(
               candidateText
             );
 
@@ -3558,7 +3611,8 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
       usedModel = modelChain[0];
       const candidateTimeoutMs = qaSubmission ? 65000 : 55000;
 
-      for (const candidate of modelChain) {
+      for (let cIdx = 0; cIdx < modelChain.length; cIdx++) {
+        const candidate = modelChain[cIdx];
         const candStart = Date.now();
         try {
           const timeoutPromise = new Promise<never>((_, reject) =>
@@ -3574,23 +3628,48 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               system: systemPrompt,
               messages: conversationMessages,
               tools: effectiveTools,
-              maxSteps: isGreeting ? 1 : qaSubmission ? 6 : 5,
+              temperature: 0.2,
+              ...(cIdx > 0 && isExplicitMutationIntent && !qaState.prompt
+                ? { toolChoice: "required" as const }
+                : {}),
+              maxSteps: isGreeting ? 1 : 8,
               maxTokens: 3500,
             }),
             timeoutPromise,
           ]);
 
-          usedModel = candidate;
           const stepTexts = (result.steps || [])
             .map((s) => (s.text || "").trim())
             .filter(Boolean);
-          replyText =
+          const candidateText =
             (result.text || "").trim() || stepTexts.join("\n\n").trim();
+
+          const looksLikeClarifyingQuestion =
+            candidateText.includes("?") &&
+            !/\b(added|updated|marked|completed|finished|checked off|removed|deleted|scheduled|here is your updated|appended)\b/i.test(
+              candidateText
+            );
+
+          if (
+            cIdx < modelChain.length - 1 &&
+            isExplicitMutationIntent &&
+            executedActions.length === 0 &&
+            !qaState.prompt &&
+            !looksLikeClarifyingQuestion
+          ) {
+            console.warn(
+              `[Gemini Chat] Model "${candidate}" returned text without invoking any tool on a mutation request; retrying "${modelChain[cIdx + 1]}" with toolChoice=required.`
+            );
+            continue;
+          }
+
+          usedModel = candidate;
+          replyText = candidateText;
           succeeded = true;
           console.log(
             `[Gemini Chat] Model "${candidate}" generated response in ${
               Date.now() - candStart
-            }ms`
+            }ms (actions: ${executedActions.length})`
           );
           return true;
         } catch (err) {
@@ -3757,13 +3836,25 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
       workspaceConfigUpdatesAssign(workingConfig, incomingConfig);
     }
 
+    const finalModifiedMap = new Map<string, TaskItem>();
+    for (const [id, task] of Array.from(modifiedTasksMap.entries())) {
+      if (!deletedTaskIds.has(id) && !addedTasksMap.has(id)) {
+        finalModifiedMap.set(id, task);
+      }
+    }
+    for (const t of workingTasks) {
+      if (modifiedTaskIds.has(t.id) && !deletedTaskIds.has(t.id) && !addedTasksMap.has(t.id)) {
+        finalModifiedMap.set(t.id, t);
+      }
+    }
+
     const mutationPayload: AgentWorkspaceMutationPayload = {
       executedActions,
       tasksMutation: tasksTouched
         ? {
             updatedTasks: workingTasks,
             addedTasks: Array.from(addedTasksMap.values()),
-            modifiedTasks: workingTasks.filter((t) => modifiedTaskIds.has(t.id)),
+            modifiedTasks: Array.from(finalModifiedMap.values()),
             deletedTaskIds: Array.from(deletedTaskIds),
             reordered,
           }

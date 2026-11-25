@@ -1639,8 +1639,9 @@ export default function KiteWorkspacePage() {
   const handleApplyAgentMutation = useCallback(
     (mutation: AgentWorkspaceMutationPayload): AgentUndoSnapshot => {
       const tm = mutation.tasksMutation;
+      const currentTasks = tasksRef.current;
 
-      const snapshotTasks = tasks.map((t) => ({
+      const snapshotTasks = currentTasks.map((t) => ({
         ...t,
         tags: [...(t.tags || [])],
         custom_properties: { ...(t.custom_properties || {}) },
@@ -1654,7 +1655,13 @@ export default function KiteWorkspacePage() {
       };
 
       const deletedSet = new Set(tm?.deletedTaskIds || []);
-      const modifiedSet = new Set((tm?.modifiedTasks || []).map((m) => m.id));
+      const modifiedById = new Map(
+        (tm?.modifiedTasks || []).map((m) => [m.id, m])
+      );
+      const addedById = new Map((tm?.addedTasks || []).map((a) => [a.id, a]));
+      const updatedOrderById = new Map(
+        (tm?.updatedTasks || []).map((u) => [u.id, u])
+      );
 
       const undoSnapshot: AgentUndoSnapshot = {
         tasks: snapshotTasks,
@@ -1662,7 +1669,7 @@ export default function KiteWorkspacePage() {
         workspaceConfig: snapshotConfig,
         addedTaskIds: (tm?.addedTasks || []).map((a) => a.id),
         deletedTasks: snapshotTasks.filter((t) => deletedSet.has(t.id)),
-        modifiedBefore: snapshotTasks.filter((t) => modifiedSet.has(t.id)),
+        modifiedBefore: snapshotTasks.filter((t) => modifiedById.has(t.id)),
       };
 
       if (tm) {
@@ -1673,7 +1680,51 @@ export default function KiteWorkspacePage() {
           }
         }
 
-        setTasks(tm.updatedTasks);
+        // Non-destructive merge: apply deletions, modifications, additions, and order updates
+        // while preserving any completed/hidden tasks that weren't in the filtered chat view.
+        setTasks((prev) => {
+          const merged: TaskItem[] = [];
+          const seenIds = new Set<string>();
+
+          for (const existing of prev) {
+            if (deletedSet.has(existing.id)) continue;
+            const mod = modifiedById.get(existing.id);
+            const ord = updatedOrderById.get(existing.id);
+            if (mod) {
+              merged.push({
+                ...existing,
+                ...mod,
+                subtasks: mod.subtasks ?? existing.subtasks ?? [],
+                custom_properties: {
+                  ...(existing.custom_properties || {}),
+                  ...(mod.custom_properties || {}),
+                  ...((mod.subtasks ?? existing.subtasks)
+                    ? { subtasks: mod.subtasks ?? existing.subtasks }
+                    : {}),
+                },
+              });
+            } else if (ord) {
+              merged.push({
+                ...existing,
+                order_index: ord.order_index,
+                section_group: ord.section_group,
+              });
+            } else {
+              merged.push(existing);
+            }
+            seenIds.add(existing.id);
+          }
+
+          for (const added of tm.addedTasks) {
+            if (!seenIds.has(added.id) && !deletedSet.has(added.id)) {
+              merged.push(added);
+              seenIds.add(added.id);
+            }
+          }
+
+          merged.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+          return merged;
+        });
 
         if (isSupabaseConfigured() && isAuthenticated) {
           const supabase = createClient();
@@ -1684,25 +1735,28 @@ export default function KiteWorkspacePage() {
               UUID_REGEX.test(id)
             );
             if (uuidDeletes.length > 0) {
-              supabase.from("tasks").delete().in("id", uuidDeletes).then();
-            }
-            for (const delTask of undoSnapshot.deletedTasks) {
-              if (delTask.title) {
-                supabase
-                  .from("tasks")
-                  .delete()
-                  .eq("user_id", profile.id)
-                  .eq("title", delTask.title)
-                  .then();
-              }
+              supabase
+                .from("tasks")
+                .delete()
+                .in("id", uuidDeletes)
+                .then(({ error }) => {
+                  if (error) console.warn("Agent delete error:", error.message);
+                });
             }
           }
 
           // 2) Persist newly added tasks & headers
           if (tm.addedTasks.length > 0) {
-            supabase.auth.getUser().then(({ data: { user } }) => {
-              const targetUserId =
-                user?.id || (profile.id !== "user-default" ? profile.id : null);
+            const persistAdded = async () => {
+              let targetUserId =
+                authUserIdRef.current ||
+                (profile.id !== "user-default" ? profile.id : null);
+              if (!targetUserId) {
+                const {
+                  data: { user },
+                } = await supabase.auth.getUser();
+                targetUserId = user?.id || null;
+              }
               if (targetUserId) {
                 const insertPayload = tm.addedTasks.map((created) => ({
                   id: created.id,
@@ -1718,13 +1772,22 @@ export default function KiteWorkspacePage() {
                   notes: created.notes,
                   is_canvas_assignment: created.is_canvas_assignment,
                   canvas_course_code: created.canvas_course_code,
-                  custom_properties: created.custom_properties || {},
+                  custom_properties: {
+                    ...(created.custom_properties || {}),
+                    ...(created.subtasks?.length
+                      ? { subtasks: created.subtasks }
+                      : {}),
+                  },
                   section_group: created.section_group,
                   order_index: created.order_index,
                 }));
-                supabase.from("tasks").insert(insertPayload).then();
+                const { error } = await supabase
+                  .from("tasks")
+                  .insert(insertPayload);
+                if (error) console.warn("Agent insert error:", error.message);
               }
-            });
+            };
+            persistAdded();
           }
 
           // 3) Persist modified tasks & headers
@@ -1732,6 +1795,14 @@ export default function KiteWorkspacePage() {
           for (const mod of tm.modifiedTasks) {
             if (UUID_REGEX.test(mod.id)) {
               updatedOrderHandled.add(mod.id);
+              const existing = currentTasks.find((t) => t.id === mod.id);
+              const mergedCustomProps = {
+                ...(existing?.custom_properties || {}),
+                ...(mod.custom_properties || {}),
+                ...((mod.subtasks ?? existing?.subtasks)
+                  ? { subtasks: mod.subtasks ?? existing?.subtasks }
+                  : {}),
+              };
               supabase
                 .from("tasks")
                 .update({
@@ -1744,29 +1815,33 @@ export default function KiteWorkspacePage() {
                   estimated_minutes: mod.estimated_minutes,
                   tags: mod.tags,
                   notes: mod.notes,
-                  custom_properties: mod.custom_properties || {},
+                  custom_properties: mergedCustomProps,
                   section_group: mod.section_group,
                   order_index: mod.order_index,
                   completed_at: mod.completed_at,
                   updated_at: mod.updated_at,
                 })
                 .eq("id", mod.id)
-                .then();
+                .then(({ error }) => {
+                  if (error) console.warn("Agent update error:", error.message);
+                });
             }
           }
 
           // 4) Persist order_index changes from move/reorder operations
           if (tm.reordered) {
-            const addedSet = new Set(tm.addedTasks.map((a) => a.id));
             for (const item of tm.updatedTasks) {
               if (
                 UUID_REGEX.test(item.id) &&
-                !addedSet.has(item.id) &&
+                !addedById.has(item.id) &&
                 !updatedOrderHandled.has(item.id)
               ) {
                 supabase
                   .from("tasks")
-                  .update({ order_index: item.order_index })
+                  .update({
+                    order_index: item.order_index,
+                    section_group: item.section_group,
+                  })
                   .eq("id", item.id)
                   .then();
               }
