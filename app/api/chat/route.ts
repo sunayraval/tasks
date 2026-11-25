@@ -1541,6 +1541,8 @@ GUIDELINES FOR THOUGHTFUL EXECUTION:
     -> When removing tasks from the schedule (via \`remove_block\`, \`remove_blocks\`, or \`reschedule\`), pass \`target_start_time\` and let \`cascade: true\` pack the remaining tasks sequentially so there are no dead gaps or accidental start-time drift.
     -> DOUBLE-CHECK BEFORE REPLYING: Every schedule tool returns \`actualScheduleStart\`, \`firstUpcomingBlock\`, and \`verificationCheck\`. Inspect these fields in the tool result! Verify that \`actualScheduleStart\` matches what the user asked for (e.g. "6:45 PM"). NEVER tell the user "I shifted your start time to 6:45 PM" if the tool result indicates a different start time—if it's off, call \`manage_my_day_schedule\` with \`action: "shift_schedule", target_start_time: "18:45"\` to correct it before providing your final response!
 - If the user mentions a task with @ or by partial name, match it accurately to the board items below.
+- SUBTASKS RULE: Whenever the user asks to create a task with subtasks / checklist items, or add/check off/remove subtasks on an existing task, ALWAYS use the real \`subtasks\` parameter on \`add_tasks\` or \`add_subtasks\` / \`replace_subtasks\` / \`toggle_subtasks\` / \`remove_subtasks\` on \`update_tasks\`! Do NOT fake subtasks as HTML \`<ul><li>\` inside \`content\`.
+- CLEAN MARKDOWN CHAT FORMATTING (NEVER OUTPUT RAW HTML): In your chat reply text, ALWAYS use clean Markdown (\`- **Item:** ...\`, \`**bold**\`, headings). NEVER output raw HTML tags like \`<ul>\`, \`<li>\`, \`<strong>\`, \`<p>\`, or \`<br>\` in your chat message!
 - Keep your text response clean, natural, well-structured (use concise Markdown bullets or bold highlights where helpful), and confirm what you just did or answer their question thoughtfully.
 
 CURRENT WORKSPACE CONFIGURATION:
@@ -1625,6 +1627,20 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
                 .string()
                 .optional()
                 .describe("Short inline note shown in the Notes column"),
+              subtasks: z
+                .array(
+                  z.union([
+                    z.string(),
+                    z.object({
+                      title: z.string(),
+                      completed: z.boolean().optional(),
+                    }),
+                  ])
+                )
+                .optional()
+                .describe(
+                  "Real checkable subtasks for this task (e.g. ['PIQ 1: ...', 'PIQ 2: ...']). Always use this for subtasks instead of putting HTML lists in content."
+                ),
               content: z
                 .string()
                 .optional()
@@ -1668,6 +1684,18 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               tzOffsetMinutes
             );
 
+            const normalizedSubtasks = (item.subtasks || [])
+              .map((s) =>
+                typeof s === "string"
+                  ? { id: makeUuid(), title: s.trim(), completed: false }
+                  : {
+                      id: makeUuid(),
+                      title: (s.title || "").trim(),
+                      completed: Boolean(s.completed),
+                    }
+              )
+              .filter((s) => s.title.length > 0);
+
             const newTask: TaskItem = {
               id: newId,
               user_id: userId,
@@ -1680,9 +1708,13 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               estimated_minutes: item.estimated_minutes || 30,
               tags: formattedTags,
               notes: item.notes || "",
+              subtasks: normalizedSubtasks,
               is_canvas_assignment: false,
               canvas_course_code: null,
-              custom_properties: {},
+              custom_properties:
+                normalizedSubtasks.length > 0
+                  ? { subtasks: normalizedSubtasks }
+                  : {},
               section_group: "TODAY",
               order_index: workingTasks.length,
               completed_at: isDoneStatus(status) ? nowISO : null,
@@ -1766,6 +1798,45 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               add_tags: z.array(z.string()).optional(),
               remove_tags: z.array(z.string()).optional(),
               notes: z.string().optional(),
+              add_subtasks: z
+                .array(
+                  z.union([
+                    z.string(),
+                    z.object({
+                      title: z.string(),
+                      completed: z.boolean().optional(),
+                    }),
+                  ])
+                )
+                .optional()
+                .describe("Append new checkable subtasks to this task"),
+              replace_subtasks: z
+                .array(
+                  z.union([
+                    z.string(),
+                    z.object({
+                      title: z.string(),
+                      completed: z.boolean().optional(),
+                    }),
+                  ])
+                )
+                .optional()
+                .describe("Replace all subtasks on this task with this list"),
+              toggle_subtasks: z
+                .array(
+                  z.object({
+                    target: z
+                      .string()
+                      .describe("Subtask ID or exact/partial subtask title"),
+                    completed: z.boolean(),
+                  })
+                )
+                .optional()
+                .describe("Check or uncheck specific subtasks on this task"),
+              remove_subtasks: z
+                .array(z.string())
+                .optional()
+                .describe("Remove subtasks matching these IDs or titles"),
               content: z
                 .string()
                 .optional()
@@ -1850,6 +1921,86 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
             }
             if (u.content !== undefined) {
               next.content = u.content;
+            }
+
+            if (
+              u.replace_subtasks !== undefined ||
+              (u.add_subtasks && u.add_subtasks.length > 0) ||
+              (u.toggle_subtasks && u.toggle_subtasks.length > 0) ||
+              (u.remove_subtasks && u.remove_subtasks.length > 0)
+            ) {
+              const existingSubs: Array<{
+                id: string;
+                title: string;
+                completed: boolean;
+              }> = Array.isArray(next.subtasks)
+                ? next.subtasks.map((s) => ({ ...s }))
+                : Array.isArray(next.custom_properties?.subtasks)
+                ? (
+                    next.custom_properties.subtasks as Array<{
+                      id: string;
+                      title: string;
+                      completed: boolean;
+                    }>
+                  ).map((s) => ({ ...s }))
+                : [];
+
+              const toSubTask = (
+                raw: string | { title: string; completed?: boolean }
+              ) =>
+                typeof raw === "string"
+                  ? { id: makeUuid(), title: raw.trim(), completed: false }
+                  : {
+                      id: makeUuid(),
+                      title: (raw.title || "").trim(),
+                      completed: Boolean(raw.completed),
+                    };
+
+              let nextSubs = existingSubs;
+              if (u.replace_subtasks !== undefined) {
+                nextSubs = u.replace_subtasks
+                  .map(toSubTask)
+                  .filter((s) => s.title.length > 0);
+              }
+              if (u.add_subtasks && u.add_subtasks.length > 0) {
+                const additions = u.add_subtasks
+                  .map(toSubTask)
+                  .filter((s) => s.title.length > 0);
+                nextSubs = [...nextSubs, ...additions];
+              }
+              if (u.toggle_subtasks && u.toggle_subtasks.length > 0) {
+                for (const tog of u.toggle_subtasks) {
+                  const q = (tog.target || "").trim().toLowerCase();
+                  if (!q) continue;
+                  nextSubs = nextSubs.map((s) =>
+                    s.id === tog.target ||
+                    s.title.toLowerCase() === q ||
+                    s.title.toLowerCase().includes(q)
+                      ? { ...s, completed: tog.completed }
+                      : s
+                  );
+                }
+              }
+              if (u.remove_subtasks && u.remove_subtasks.length > 0) {
+                const remQueries = u.remove_subtasks
+                  .map((r) => r.trim().toLowerCase())
+                  .filter(Boolean);
+                nextSubs = nextSubs.filter(
+                  (s) =>
+                    !remQueries.some(
+                      (q) =>
+                        s.id.toLowerCase() === q ||
+                        s.title.toLowerCase() === q ||
+                        s.title.toLowerCase().includes(q)
+                    )
+                );
+              }
+
+              next.subtasks = nextSubs;
+              next.custom_properties = {
+                ...(next.custom_properties || {}),
+                subtasks: nextSubs,
+              };
             }
 
             workingTasks[idx] = next;

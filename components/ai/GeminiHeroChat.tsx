@@ -147,9 +147,33 @@ function renderInlineFormatting(text: string): React.ReactNode[] {
   return parts;
 }
 
+function normalizeHtmlToMarkdown(raw: string): string {
+  if (!raw || !/<[a-z][\s\S]*?>/i.test(raw)) return raw;
+  // Preserve fenced code blocks untouched; convert stray HTML tags outside code blocks to Markdown
+  const parts = raw.split(/(```[\s\S]*?```)/g);
+  return parts
+    .map((segment, idx) => {
+      if (idx % 2 === 1) return segment;
+      return segment
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/?(?:strong|b)>/gi, "**")
+        .replace(/<\/?(?:em|i)>/gi, "*")
+        .replace(/<\/?code>/gi, "`")
+        .replace(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi, "\n### $1\n")
+        .replace(/<li[^>]*>\s*([\s\S]*?)\s*<\/li>/gi, (_, inner) => {
+          const cleaned = String(inner).replace(/\s*\n\s*/g, " ").trim();
+          return `\n- ${cleaned}`;
+        })
+        .replace(/<\/?(?:ul|ol|p|div|span)[^>]*>/gi, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+    })
+    .join("");
+}
+
 const FormattedAgentMarkdown: React.FC<{ content: string }> = React.memo(
   ({ content }) => {
-    const lines = content.split("\n");
+    const lines = normalizeHtmlToMarkdown(content).split("\n");
     const blocks: React.ReactNode[] = [];
     let idx = 0;
 
