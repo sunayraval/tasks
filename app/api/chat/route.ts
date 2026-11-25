@@ -1584,10 +1584,9 @@ ${serializedBoard || "(No tasks currently on the board)"}${qaSubmissionDirective
               : m.content,
         })),
       {
-        role: "system",
-        content: `[LIVE GROUND TRUTH — STRICTLY ENFORCED]\nThe user's Task List currently has ONLY the ${liveActiveTasksCount} active task(s) listed below. Any other tasks mentioned in earlier chat messages (such as deleted, completed, or past tasks) NO LONGER EXIST on the Task List and MUST NOT be mentioned or listed!\n\nLive Task List by Section:\n${serializedSectionsBreakdown}\n\nLive MY JOURNEY Roadmaps & Milestones (use this exact data whenever asked about my journey or next milestone — NEVER say my journey is empty if milestones are listed here!):\n${serializedJourney}`,
+        role: "user",
+        content: `[LIVE GROUND TRUTH — STRICTLY ENFORCED]\nThe user's Task List currently has ONLY the ${liveActiveTasksCount} active task(s) listed below. Any other tasks mentioned in earlier chat messages (such as deleted, completed, or past tasks) NO LONGER EXIST on the Task List and MUST NOT be mentioned or listed!\n\nLive Task List by Section:\n${serializedSectionsBreakdown}\n\nLive MY JOURNEY Roadmaps & Milestones (use this exact data whenever asked about my journey or next milestone — NEVER say my journey is empty if milestones are listed here!):\n${serializedJourney}\n\n[USER REQUEST]\n${userMessage}`,
       },
-      { role: "user", content: userMessage },
     ];
 
     const tools = {
